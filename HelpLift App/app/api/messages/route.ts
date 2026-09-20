@@ -23,6 +23,7 @@ export async function POST(request: Request) {
     let message = ""
     let target: string | undefined
     let recipientId: string | undefined
+    let replyTo: string | undefined
     let attachmentFiles: File[] = []
 
     if (contentType.includes("multipart/form-data")) {
@@ -30,6 +31,7 @@ export async function POST(request: Request) {
       message = String(formData.get("message") || "").trim()
       target = formData.get("target")?.toString()
       recipientId = formData.get("recipientId")?.toString()
+      replyTo = formData.get("replyTo")?.toString() || undefined
       attachmentFiles = formData.getAll("attachments").filter((f): f is File => f instanceof File && f.size > 0)
       // "attachment" (singular) kept for older callers; new clients send "attachments".
       const legacyFile = formData.get("attachment")
@@ -39,6 +41,7 @@ export async function POST(request: Request) {
       message = typeof body.message === "string" ? body.message.trim() : ""
       target = body.target
       recipientId = body.recipientId
+      replyTo = typeof body.replyTo === "string" ? body.replyTo : undefined
     }
 
     if (!message) return NextResponse.json({ message: "Message cannot be empty." }, { status: 400 })
@@ -55,7 +58,25 @@ export async function POST(request: Request) {
     let type: string
     let title: string
 
-    if (target === "admin") {
+    if (replyTo) {
+      // A reply is a normal message (same rules, still notifies the recipient)
+      // that also records which message it answers. It always goes back to the
+      // original sender; the database function double-checks both facts.
+      const { data: original } = await supabase
+        .from("notifications")
+        .select("id, sender_id, sender_role, recipient_id")
+        .eq("id", replyTo)
+        .maybeSingle()
+      if (!original || original.recipient_id !== user.id) {
+        return NextResponse.json({ message: "You can only reply to a message you received." }, { status: 403 })
+      }
+      if (!original.sender_id) {
+        return NextResponse.json({ message: "This message has no sender to reply to." }, { status: 400 })
+      }
+      recipientIdResolved = original.sender_id
+      type = senderProfile.role === "admin" ? "admin_message" : original.sender_role === "admin" ? "message_to_admin" : "org_message"
+      title = senderProfile.role === "admin" ? "Reply from HelpLift Admin" : `Reply from ${senderProfile.full_name}`
+    } else if (target === "admin") {
       const { data: adminId, error: adminErr } = await supabase.rpc("get_any_admin_id")
       if (adminErr) return NextResponse.json({ message: adminErr.message }, { status: 400 })
       if (!adminId) return NextResponse.json({ message: "No administrator account is available to receive messages." }, { status: 503 })
@@ -91,6 +112,9 @@ export async function POST(request: Request) {
       p_message: message,
       p_attachment_storage_path: uploadedAttachments[0]?.path || null,
       p_attachment_file_name: uploadedAttachments[0]?.name || null,
+      // Only sent for real replies, so ordinary messages keep working even
+      // before the reply migration (20260920000700) has been applied.
+      ...(replyTo ? { p_reply_to: replyTo } : {}),
     })
 
     if (error) return NextResponse.json({ message: error.message }, { status: 400 })

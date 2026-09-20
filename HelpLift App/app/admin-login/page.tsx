@@ -1,10 +1,18 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, Loader2, Mail, Lock, ShieldCheck, AlertCircle } from "lucide-react"
+import { GoogleSignInButton } from "@/components/google-sign-in-button"
+
+// Messages for the ?error= values /auth/callback redirects back with.
+const CALLBACK_ERRORS: Record<string, string> = {
+  google: "Google sign-in didn't complete. Please try again.",
+  not_admin: "That Google account isn't an administrator account.",
+  profile: "Your account profile is incomplete. Please contact support.",
+}
 
 export default function AdminLoginPage() {
   const router = useRouter()
@@ -12,6 +20,14 @@ export default function AdminLoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [errorMsg, setErrorMsg] = useState("")
+
+  useEffect(() => {
+    const callbackError = new URLSearchParams(window.location.search).get("error")
+    if (callbackError) {
+      setErrorMsg(CALLBACK_ERRORS[callbackError] || "Sign-in didn't complete. Please try again.")
+      window.history.replaceState({}, "", "/admin-login")
+    }
+  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -117,6 +133,16 @@ export default function AdminLoginPage() {
             Sign In to Admin Panel <ArrowRight className="ml-2 h-5 w-5" />
           </Button>
         </form>
+
+        <div className="mt-6 space-y-3">
+          <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-wider text-slate-400">
+            <span className="h-px flex-1 bg-slate-200 dark:bg-[#233350]" />
+            or
+            <span className="h-px flex-1 bg-slate-200 dark:bg-[#233350]" />
+          </div>
+          <GoogleSignInButton label="Sign in with Google" intent="admin" onError={setErrorMsg} />
+          <p className="text-center text-xs text-slate-400">Only for existing administrator accounts.</p>
+        </div>
 
         <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
           Not an admin? <Link href="/login" className="text-blue-600 dark:text-blue-300 font-bold hover:underline">User login</Link>

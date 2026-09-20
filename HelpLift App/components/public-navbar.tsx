@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   HeartHandshake,
   Gift,
+  Building2,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -54,6 +55,7 @@ export default function PublicNavbar() {
   const isForgotPasswordPage = pathnameLower === "/forgot-password"
   const isNeedsPage = pathnameLower === "/needs"
   const isGiftLibraryPage = pathnameLower === "/gift-library"
+  const isOrganizationsPage = pathnameLower === "/organizations"
 
   const isAuthView =
     isLoginPage || isRegisterPage || isVerifyPage || isForgotPasswordPage
@@ -100,6 +102,19 @@ export default function PublicNavbar() {
                 <span>Gift Library</span>
               </Link>
             </Button>
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className={`rounded-full px-4 gap-2 font-bold text-sm ${
+                isOrganizationsPage ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              <Link href="/organizations">
+                <Building2 className="w-4 h-4" />
+                <span>Organizations</span>
+              </Link>
+            </Button>
           </div>
 
           {/* Right Buttons */}
@@ -107,6 +122,7 @@ export default function PublicNavbar() {
             {/* Dark/Light Mode toggle */}
             <button
               onClick={toggleDarkMode}
+              aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
               className="p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-all active:scale-90"
             >
               {isDarkMode ? (
@@ -178,7 +194,7 @@ export default function PublicNavbar() {
                 only makes sense to show there; on other public pages like
                 /needs or /gift-library there's no matching anchor and it was
                 just a dead link. */}
-            {!isNeedsPage && !isGiftLibraryPage && (
+            {!isNeedsPage && !isGiftLibraryPage && !isOrganizationsPage && (
               <>
                 <Button
                   variant="ghost"
@@ -235,7 +251,7 @@ export default function PublicNavbar() {
             )}
 
             {/* Home Button */}
-            {(isLoginPage || isRegisterPage || isVerifyPage || isNeedsPage || isGiftLibraryPage) && (
+            {(isLoginPage || isRegisterPage || isVerifyPage || isNeedsPage || isGiftLibraryPage || isOrganizationsPage) && (
               <Button
                 asChild
                 variant="ghost"

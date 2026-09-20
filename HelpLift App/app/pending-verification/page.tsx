@@ -42,6 +42,7 @@ export default function PendingVerificationPage() {
   const [status, setStatus] = useState<string | null>(null)
   const [notes, setNotes] = useState<string | null>(null)
   const [documents, setDocuments] = useState<OrgDocument[]>([])
+  const [memberRole, setMemberRole] = useState<"owner" | "manager" | "viewer">("owner")
   const [isLoading, setIsLoading] = useState(true)
 
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
@@ -57,11 +58,14 @@ export default function PendingVerificationPage() {
   const loadData = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const { data: org } = await supabase
-      .from("organizations")
-      .select("verification_status, verification_notes")
+    const { data: membership } = await supabase
+      .from("organization_members")
+      .select("role, organizations(verification_status, verification_notes)")
       .eq("profile_id", user.id)
-      .single()
+      .maybeSingle()
+    const orgField = (membership as any)?.organizations
+    const org = Array.isArray(orgField) ? orgField[0] : orgField
+    setMemberRole(((membership as any)?.role as "owner" | "manager" | "viewer") ?? "owner")
     setStatus(org?.verification_status || "pending")
     setNotes(org?.verification_notes || null)
 
@@ -171,6 +175,9 @@ export default function PendingVerificationPage() {
             <h2 className="font-bold text-slate-900 dark:text-slate-100">Submit a document</h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">Upload registration or tax evidence for admin review. Maximum 10 MB.</p>
           </div>
+          {memberRole !== "owner" ? (
+            <p className="text-sm text-slate-500 dark:text-slate-400">Only owners can upload verification documents or resubmit the organization for review.</p>
+          ) : (
           <form onSubmit={uploadDocument} className="space-y-4">
             <div>
               <Label htmlFor="pending-doc-type">Document type</Label>
@@ -203,6 +210,7 @@ export default function PendingVerificationPage() {
               {selectedFiles.length > 1 ? `Upload ${selectedFiles.length} documents` : "Upload document"}
             </button>
           </form>
+          )}
 
           {documents.length > 0 && (
             <div className="space-y-2 pt-2">
@@ -218,7 +226,7 @@ export default function PendingVerificationPage() {
             </div>
           )}
 
-          {status === "more_info_requested" && (
+          {status === "more_info_requested" && memberRole === "owner" && (
             <button
               onClick={handleResubmit}
               disabled={isResubmitting}
@@ -235,11 +243,11 @@ export default function PendingVerificationPage() {
             <p className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-700">
               Message sent — an administrator will get back to you.
             </p>
-          ) : (
+          ) : memberRole !== "viewer" ? (
             <Button onClick={() => setIsMessagingAdmin(true)} variant="outline" className="w-full max-w-md mx-auto">
               <Mail className="w-4 h-4 mr-1.5" /> Message Admin
             </Button>
-          )}
+          ) : null}
 
           <button onClick={logout} className="inline-flex items-center gap-1.5 text-sm font-bold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 mx-auto">
             <LogOut className="w-4 h-4" /> Log out

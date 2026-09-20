@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { getOrgContext, roleAtLeast, insufficientRoleMessage } from "@/lib/organization-access"
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
@@ -8,7 +9,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (!user) return NextResponse.json({ message: "Authentication required." }, { status: 401 })
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
     if (profile?.role !== "organization") return NextResponse.json({ message: "Organization access required." }, { status: 403 })
-    const { data: organization } = await supabase.from("organizations").select("id").eq("profile_id", user.id).single()
+    const orgCtx = await getOrgContext<{ id: any }>(supabase, user.id, "id")
+    const organization = orgCtx?.organization ?? null
+    if (orgCtx && !roleAtLeast(orgCtx.role, "manager")) return NextResponse.json({ message: insufficientRoleMessage(orgCtx.role, "manager") }, { status: 403 })
     const { id } = await context.params
     const { status } = await request.json()
     if (!organization || !["accepted", "declined"].includes(status)) return NextResponse.json({ message: "Invalid interest update." }, { status: 400 })

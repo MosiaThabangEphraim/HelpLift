@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>You're offline - HelpLift</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: #fafafa; color: #0f172a; padding: 24px; box-sizing: border-box;
+    }
+    @media (prefers-color-scheme: dark) { body { background: #0b1220; color: #e2e8f0; } .card { background: #121b2e; border-color: #233350; } p { color: #94a3b8 !important; } }
+    .card { max-width: 420px; text-align: center; background: #fff; border: 1px solid #e2e8f0; border-radius: 24px; padding: 40px 28px; }
+    .icon { width: 56px; height: 56px; margin: 0 auto 16px; border-radius: 16px; background: #2563eb; display: flex; align-items: center; justify-content: center; }
+    h1 { font-size: 22px; margin: 0 0 8px; }
+    p { margin: 0 0 20px; color: #475569; line-height: 1.5; font-size: 15px; }
+    button { border: 0; border-radius: 999px; background: #2563eb; color: #fff; padding: 12px 24px; font-size: 14px; font-weight: 700; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="icon" aria-hidden="true">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8.8a15 15 0 0 1 20 0"/><path d="M5 12.9a10 10 0 0 1 14 0"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M12 20h.01"/><path d="M3 3l18 18"/></svg>
+    </div>
+    <h1>You're offline</h1>
+    <p>HelpLift can't reach the internet right now, and this page hasn't been saved on your device yet. Pages you've opened recently are available offline. Reconnect to see this one.</p>
+    <button type="button" onclick="location.reload()">Try again</button>
+  </main>
+</body>
+</html>

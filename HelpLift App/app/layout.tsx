@@ -5,6 +5,9 @@ import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/theme-provider"
 import PublicShell from "@/components/public-shell"
 import { Toaster } from "@/components/ui/sonner"
+import { SiteTooltips } from "@/components/site-tooltips"
+import { RouteHistoryTracker } from "@/components/route-history-tracker"
+import { OfflineProvider } from "@/components/offline-provider"
 import "./globals.css"
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" })
@@ -60,6 +63,9 @@ export default function RootLayout({
             {children}
           </PublicShell>
           <Toaster />
+          <SiteTooltips />
+          <RouteHistoryTracker />
+          <OfflineProvider />
         </ThemeProvider>
         <Analytics />
       </body>

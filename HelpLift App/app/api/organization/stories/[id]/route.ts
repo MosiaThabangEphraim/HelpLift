@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { getOrgContext, roleAtLeast, insufficientRoleMessage } from "@/lib/organization-access"
 
 const EDITABLE_FIELDS = new Set(["title", "content", "author_role"])
 
@@ -9,7 +10,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ message: "Authentication required." }, { status: 401 })
 
-    const { data: org } = await supabase.from("organizations").select("id").eq("profile_id", user.id).single()
+    const orgCtx = await getOrgContext<{ id: any }>(supabase, user.id, "id")
+    const org = orgCtx?.organization ?? null
+    if (orgCtx && !roleAtLeast(orgCtx.role, "manager")) return NextResponse.json({ message: insufficientRoleMessage(orgCtx.role, "manager") }, { status: 403 })
     if (!org) return NextResponse.json({ message: "Organization access required." }, { status: 403 })
 
     const { id } = await context.params
@@ -66,7 +69,9 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ message: "Authentication required." }, { status: 401 })
 
-    const { data: org } = await supabase.from("organizations").select("id").eq("profile_id", user.id).single()
+    const orgCtx = await getOrgContext<{ id: any }>(supabase, user.id, "id")
+    const org = orgCtx?.organization ?? null
+    if (orgCtx && !roleAtLeast(orgCtx.role, "manager")) return NextResponse.json({ message: insufficientRoleMessage(orgCtx.role, "manager") }, { status: 403 })
     if (!org) return NextResponse.json({ message: "Organization access required." }, { status: 403 })
 
     const { id } = await context.params

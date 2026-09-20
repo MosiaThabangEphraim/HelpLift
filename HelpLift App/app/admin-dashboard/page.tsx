@@ -29,7 +29,8 @@ import {
   Download,
   History,
   Paperclip,
-  Megaphone
+  Megaphone,
+  Star
 } from "lucide-react"
 import {
   Area,
@@ -72,6 +73,10 @@ import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { MessageComposeDialog } from "@/components/message-compose-dialog"
+import { RejectReasonDialog } from "@/components/reject-reason-dialog"
+import { MessageViewToggle, SentMessages } from "@/components/sent-messages"
+import { AdminFeedback } from "@/components/admin-feedback"
+import { AdminFulfillmentsView, type AdminFulfillment } from "@/components/admin-fulfillments"
 import { MessageDetailDialog } from "@/components/message-detail-dialog"
 import { AnnouncementComposeDialog } from "@/components/announcement-compose-dialog"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -168,12 +173,17 @@ export default function AdminDashboardPage() {
   const [verificationHistory, setVerificationHistory] = useState<OrgVerificationHistoryEntry[]>([])
   const [gifts, setGifts] = useState<AdminGift[]>([])
   const [messages, setMessages] = useState<AdminMessage[]>([])
+  const [stories, setStories] = useState<AdminStory[]>([])
+  const [fulfillments, setFulfillments] = useState<AdminFulfillment[]>([])
+  // Asked whenever something is rejected/declined, so the admin can optionally
+  // explain why; the reason is included in the notification sent to the user.
+  const [rejectDialog, setRejectDialog] = useState<{ title: string; description: string; run: (reason: string) => Promise<void> | void } | null>(null)
   const [donations, setDonations] = useState<AdminDonation[]>([])
   const [selectedDonation, setSelectedDonation] = useState<DonationSummary | null>(null)
   const [selectedGift, setSelectedGift] = useState<GiftDetailSummary | null>(null)
   const [selectedOrgDetail, setSelectedOrgDetail] = useState<Organization | null>(null)
   const [selectedUserDetail, setSelectedUserDetail] = useState<Profile | null>(null)
-  const [activeTab, setActiveTab] = useState<"organizations" | "needs" | "interests" | "users" | "gifts" | "messages" | "donations" | "reports">("organizations")
+  const [activeTab, setActiveTab] = useState<"organizations" | "needs" | "interests" | "users" | "gifts" | "messages" | "donations" | "stories" | "fulfillments" | "reports">("organizations")
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState("")
   const [adminForm, setAdminForm] = useState({ full_name: "", email: "", password: "" })
@@ -320,8 +330,8 @@ export default function AdminDashboardPage() {
     try {
       const { data, error: err } = await supabase
         .from("notifications")
-        .select("id, title, message, sender_name, sender_role, read_at, created_at, attachment_storage_path, attachment_file_name")
-        .in("type", ["message_to_admin", "contact_inquiry"])
+        .select("id, type, title, message, sender_id, sender_name, sender_role, reply_to_snippet, read_at, created_at, attachment_storage_path, attachment_file_name")
+        .in("type", ["message_to_admin", "contact_inquiry", "platform_feedback"])
         .order("created_at", { ascending: false })
       if (err) throw err
       const withAttachments = await Promise.all((data || []).map(async (item) => {
@@ -348,6 +358,22 @@ export default function AdminDashboardPage() {
       console.error("Admin messages load error:", e)
     }
 
+    // --- Fulfillments (deliveries) and their proof
+    try {
+      const fulfillmentsRes = await fetch("/api/admin/fulfillments")
+      if (fulfillmentsRes.ok) setFulfillments((await fulfillmentsRes.json()).fulfillments || [])
+    } catch (e: any) {
+      console.error("Admin fulfillments load error:", e)
+    }
+
+    // --- Impact stories awaiting review
+    try {
+      const storiesRes = await fetch("/api/admin/stories")
+      if (storiesRes.ok) setStories((await storiesRes.json()).stories || [])
+    } catch (e: any) {
+      console.error("Admin stories load error:", e)
+    }
+
     // --- Donations
     try {
       const donationsRes = await fetch("/api/admin/donations")
@@ -363,6 +389,18 @@ export default function AdminDashboardPage() {
   useEffect(() => { loadData() }, [])
 
   const updateOrganization = async (id: string, verification_status: Organization["verification_status"], verification_notes?: string) => {
+    if (verification_status === "rejected" && verification_notes === undefined) {
+      setRejectDialog({
+        title: "Reject organization",
+        description: "The organization will be told it was rejected. You can add a message explaining why.",
+        run: reason => performOrganizationUpdate(id, verification_status, reason || undefined),
+      })
+      return
+    }
+    await performOrganizationUpdate(id, verification_status, verification_notes)
+  }
+
+  const performOrganizationUpdate = async (id: string, verification_status: Organization["verification_status"], verification_notes?: string) => {
     const response = await fetch(`/api/admin/organizations/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -386,23 +424,57 @@ export default function AdminDashboardPage() {
     else await loadData()
   }
 
-  const updateInterest = async (id: string, status: Interest["status"]) => {
+  const updateInterest = async (id: string, status: Interest["status"], reason?: string) => {
+    if (status === "declined" && reason === undefined) {
+      setRejectDialog({
+        title: "Decline support interest",
+        description: "The giver will be told their interest was declined. You can add a message explaining why.",
+        run: message => updateInterest(id, status, message),
+      })
+      return
+    }
     const response = await fetch(`/api/admin/interests/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, reason }),
     })
     if (!response.ok) setError((await response.json()).message || "Interest update failed.")
     else await loadData()
   }
 
-  const updateGift = async (id: string, status: AdminGift["status"], claim_notes?: string) => {
+  const updateGift = async (id: string, status: AdminGift["status"], claim_notes?: string, rejection_reason?: string) => {
+    if (status === "rejected" && claim_notes === undefined && rejection_reason === undefined) {
+      setRejectDialog({
+        title: "Reject gift offering",
+        description: "The giver will be told their offering was rejected. You can add a message explaining why.",
+        run: reason => updateGift(id, status, undefined, reason),
+      })
+      return
+    }
     const response = await fetch(`/api/admin/gifts/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status, claim_notes }),
+      body: JSON.stringify({ status, claim_notes, rejection_reason }),
     })
     if (!response.ok) setError((await response.json()).message || "Gift update failed.")
+    else await loadData()
+  }
+
+  const reviewStory = async (id: string, status: "approved" | "rejected", reason?: string) => {
+    if (status === "rejected" && reason === undefined) {
+      setRejectDialog({
+        title: "Reject impact story",
+        description: "The organization will be told the story was rejected and can edit it to be reviewed again. You can add a message explaining why.",
+        run: message => reviewStory(id, status, message),
+      })
+      return
+    }
+    const response = await fetch(`/api/admin/stories/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status, reason }),
+    })
+    if (!response.ok) setError((await response.json().catch(() => ({}))).message || "Story review failed.")
     else await loadData()
   }
 
@@ -517,6 +589,7 @@ export default function AdminDashboardPage() {
   const fulfilledNeeds = needs.filter(n => n.status === "fulfilled").length
   const unfulfilledNeeds = needs.filter(n => !["fulfilled", "closed"].includes(n.status)).length
   const pendingGifts = gifts.filter(g => g.status === "pending").length
+  const pendingStories = stories.filter(s => s.status === "pending").length
   const pendingInterests = interests.filter(i => i.status === "pending").length
   const totalDonated = donations.filter(d => d.status === "successful").reduce((sum, d) => sum + Number(d.amount || 0), 0)
 
@@ -570,6 +643,9 @@ export default function AdminDashboardPage() {
             <TabsTrigger value="gifts" className="gap-1.5 rounded-xl"><Gift className="w-4 h-4" />Gift Library<CountBadge value={pendingGifts} /></TabsTrigger>
             <TabsTrigger value="interests" className="gap-1.5 rounded-xl"><CheckCircle2 className="w-4 h-4" />Interests<CountBadge value={pendingInterests} /></TabsTrigger>
             <TabsTrigger value="donations" className="gap-1.5 rounded-xl"><Banknote className="w-4 h-4" />Donations<CountBadge value={pendingDonations} /></TabsTrigger>
+            <TabsTrigger value="stories" className="gap-1.5 rounded-xl"><FileText className="w-4 h-4" />Impact Stories<CountBadge value={pendingStories} /></TabsTrigger>
+            <TabsTrigger value="feedback" className="gap-1.5 rounded-xl"><Star className="w-4 h-4" />Feedback</TabsTrigger>
+            <TabsTrigger value="fulfillments" className="gap-1.5 rounded-xl"><PackageCheck className="w-4 h-4" />Fulfillments</TabsTrigger>
             <TabsTrigger value="users" className="gap-1.5 rounded-xl"><Users className="w-4 h-4" />Users<CountBadge value={profiles.length} /></TabsTrigger>
             <TabsTrigger value="messages" className="gap-1.5 rounded-xl"><Mail className="w-4 h-4" />Messages<CountBadge value={unreadMessages} /></TabsTrigger>
             <TabsTrigger value="reports" className="gap-1.5 rounded-xl"><BarChart3 className="w-4 h-4" />Reports</TabsTrigger>
@@ -589,6 +665,15 @@ export default function AdminDashboardPage() {
           </TabsContent>
           <TabsContent value="donations">
             <DonationsView donations={donations} onSelect={setSelectedDonation} />
+          </TabsContent>
+          <TabsContent value="feedback">
+            <AdminFeedback />
+          </TabsContent>
+          <TabsContent value="fulfillments">
+            <AdminFulfillmentsView fulfillments={fulfillments} />
+          </TabsContent>
+          <TabsContent value="stories">
+            <StoriesView stories={stories} onReview={reviewStory} />
           </TabsContent>
           <TabsContent value="messages">
             <MessagesView messages={messages} onOpen={openMessage} />
@@ -633,7 +718,7 @@ export default function AdminDashboardPage() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader className="flex flex-row items-center justify-between">
             <DialogTitle>Edit Organization</DialogTitle>
-            <button
+            <button aria-label="Close"
               type="button"
               onClick={() => setEditingOrganization(null)}
               className="rounded-md p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
@@ -706,7 +791,7 @@ export default function AdminDashboardPage() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader className="flex flex-row items-center justify-between">
             <DialogTitle>Edit User Profile</DialogTitle>
-            <button
+            <button aria-label="Close"
               type="button"
               onClick={() => setEditingProfile(null)}
               className="rounded-md p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
@@ -843,6 +928,17 @@ export default function AdminDashboardPage() {
         profile={selectedUserDetail}
         onEdit={(profile) => { setSelectedUserDetail(null); setEditingProfile(profile) }}
         onMessage={(profile) => { setSelectedUserDetail(null); setMessagingRecipient({ id: profile.id, label: profile.full_name }) }}
+      />
+      <RejectReasonDialog
+        open={!!rejectDialog}
+        title={rejectDialog?.title || ""}
+        description={rejectDialog?.description || ""}
+        onCancel={() => setRejectDialog(null)}
+        onConfirm={async reason => {
+          const dialog = rejectDialog
+          setRejectDialog(null)
+          if (dialog) await dialog.run(reason)
+        }}
       />
     </main>
   )
@@ -1763,9 +1859,12 @@ function UsersView({ profiles, onEdit, onMessage, onSelect }: { profiles: Profil
 }
 
 function MessagesView({ messages, onOpen }: { messages: AdminMessage[]; onOpen: (item: AdminMessage) => void }) {
+  const [view, setView] = useState<"inbox" | "sent">("inbox")
   return (
-    <Panel title="Messages sent to admin">
-      {messages.length === 0 ? (
+    <Panel title="Messages sent to admin" toolbar={<MessageViewToggle value={view} onChange={setView} />}>
+      {view === "sent" ? (
+        <SentMessages />
+      ) : messages.length === 0 ? (
         <Empty text="No messages from users or organizations yet." />
       ) : messages.map(item => (
         <div
@@ -2103,6 +2202,86 @@ function ExportButton({ label, onClick }: { label: string; onClick: () => void }
     >
       <Download className="w-3.5 h-3.5" /> Export {label}
     </button>
+  )
+}
+
+type AdminStory = {
+  id: string
+  title: string
+  content: string
+  author_role?: string | null
+  image_url?: string | null
+  video_url?: string | null
+  status: "pending" | "approved" | "rejected"
+  rejection_reason?: string | null
+  created_at: string
+  organizations: { id: string; name: string } | { id: string; name: string }[] | null
+  media: { id: string; media_type: "image" | "video"; url: string }[]
+}
+
+// Impact stories are only public once an administrator approves them.
+function StoriesView({ stories, onReview }: { stories: AdminStory[]; onReview: (id: string, status: "approved" | "rejected", reason?: string) => void }) {
+  const [filter, setFilter] = useState<"pending" | "all">("pending")
+  const visible = filter === "pending" ? stories.filter(s => s.status === "pending") : stories
+
+  return (
+    <Panel
+      title="Impact stories"
+      toolbar={
+        <div className="flex items-center gap-2 text-xs font-bold">
+          <button onClick={() => setFilter("pending")} className={`rounded-full px-3 py-1.5 ${filter === "pending" ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-[#1A2740]"}`}>Awaiting review</button>
+          <button onClick={() => setFilter("all")} className={`rounded-full px-3 py-1.5 ${filter === "all" ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-[#1A2740]"}`}>All stories</button>
+        </div>
+      }
+    >
+      {visible.length === 0 ? (
+        <Empty text={filter === "pending" ? "No impact stories are waiting for review." : "No impact stories yet."} />
+      ) : visible.map(story => {
+        const org = firstOf(story.organizations)
+        const badge =
+          story.status === "approved" ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+          : story.status === "rejected" ? "bg-red-100 text-red-700 border-red-200"
+          : "bg-amber-100 text-amber-700 border-amber-200"
+        return (
+          <article key={story.id} className="rounded-2xl border border-slate-200 dark:border-[#233350] p-4 space-y-3">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-bold text-base">{story.title}</h3>
+                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border capitalize ${badge}`}>{story.status === "pending" ? "Awaiting review" : story.status}</span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">{org?.name || "Organization"} · {story.author_role || "Staff"} · {new Date(story.created_at).toLocaleDateString()}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {story.status !== "approved" && (
+                  <button onClick={() => onReview(story.id, "approved")} className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700">Approve &amp; Publish</button>
+                )}
+                {story.status !== "rejected" && (
+                  <button onClick={() => onReview(story.id, "rejected")} className="rounded-full border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 px-3 py-1.5 text-xs font-bold hover:bg-red-50 dark:hover:bg-red-950/30">
+                    {story.status === "approved" ? "Unpublish" : "Reject"}
+                  </button>
+                )}
+              </div>
+            </div>
+            <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed">{story.content}</p>
+            {story.status === "rejected" && story.rejection_reason && (
+              <p className="text-xs italic text-red-700 dark:text-red-400">Reason given: {story.rejection_reason}</p>
+            )}
+            {(story.media.length > 0 || story.image_url || story.video_url) && (
+              <div className="flex flex-wrap gap-2">
+                {story.image_url && <a href={story.image_url} target="_blank" rel="noreferrer"><img src={story.image_url} alt="" className="h-20 w-20 rounded-lg object-cover" /></a>}
+                {story.media.map(m => m.media_type === "image" ? (
+                  <a key={m.id} href={m.url} target="_blank" rel="noreferrer"><img src={m.url} alt="" className="h-20 w-20 rounded-lg object-cover" /></a>
+                ) : (
+                  <a key={m.id} href={m.url} target="_blank" rel="noreferrer" className="inline-flex h-20 items-center rounded-lg bg-purple-50 px-3 text-xs font-bold text-purple-700">🎥 Video</a>
+                ))}
+                {story.video_url && <a href={story.video_url} target="_blank" rel="noreferrer" className="inline-flex h-20 items-center rounded-lg bg-purple-50 px-3 text-xs font-bold text-purple-700">🎥 Video link</a>}
+              </div>
+            )}
+          </article>
+        )
+      })}
+    </Panel>
   )
 }
 

@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button"
 import { ArrowRight, Sparkles, Building, Briefcase, FileText, AlertCircle, Loader2 } from "lucide-react"
 import { PasswordRequirements } from "@/components/password-requirements"
 import { isPasswordValid, isValidEmail } from "@/lib/password"
+import { NEED_CATEGORIES } from "@/lib/categories"
+import { GoogleSignInButton } from "@/components/google-sign-in-button"
+import { BackButton } from "@/components/back-button"
 
 function FieldLabel({ children, required = true }: { children: React.ReactNode; required?: boolean }) {
   return (
@@ -126,7 +129,8 @@ export default function RegisterPage() {
       const destination = data.requiresEmailConfirmation
         ? `/verify-email?email=${encodeURIComponent(email)}`
         : "/login"
-      setTimeout(() => router.push(destination), 1800)
+      // Leave the message on screen longer when some documents did not upload.
+      setTimeout(() => router.push(destination), data.documentsFailed?.length ? 9000 : 1800)
     } catch (error) {
       setErrorMsg(error instanceof Error ? error.message : "Registration failed.")
     } finally {
@@ -136,6 +140,9 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 flex flex-col items-center py-20 px-4">
+      <div className="w-full max-w-xl mb-6">
+        <BackButton fallbackHref="/login" />
+      </div>
 
       <div className="text-center mb-12">
         <div className="bg-gradient-to-tr from-blue-600 to-indigo-500 p-3 rounded-2xl shadow-lg inline-block mb-6">
@@ -160,6 +167,22 @@ export default function RegisterPage() {
           <span className="font-bold text-sm">Giver</span>
         </button>
       </div>
+
+      {role && (
+        <div className="w-full max-w-xl mb-8 space-y-4">
+          <GoogleSignInButton label="Sign up with Google" intent={role === "organization" ? "org" : "giver"} onError={setErrorMsg} />
+          <p className="text-center text-xs text-slate-400 dark:text-slate-500">
+            {role === "organization"
+              ? "Google verifies your email. You'll then add your organization's details and documents, and choose a password."
+              : "Google verifies your email. You'll then add your details and choose a password."}
+          </p>
+          <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-wider text-slate-400">
+            <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+            or fill in the form
+            <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+          </div>
+        </div>
+      )}
 
       {role && (
         <form onSubmit={handleRegister} className="w-full max-w-xl space-y-8 animate-in fade-in slide-in-from-bottom-4 pb-20">
@@ -356,7 +379,26 @@ export default function RegisterPage() {
               </div>
               <div>
                 <FieldLabel required={false}>Preferred Support Categories</FieldLabel>
-                <input value={categories} onChange={(e) => setCategories(e.target.value)} className={inputClass} placeholder="e.g. Education, Food & Nutrition" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {NEED_CATEGORIES.map(category => {
+                    const selected = categories.split(",").map(c => c.trim()).filter(Boolean)
+                    return (
+                      <label key={category} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(category)}
+                          onChange={(e) =>
+                            setCategories(
+                              (e.target.checked ? [...selected, category] : selected.filter(c => c !== category)).join(",")
+                            )
+                          }
+                          className="w-4 h-4 accent-blue-600"
+                        />
+                        {category}
+                      </label>
+                    )
+                  })}
+                </div>
               </div>
               <div>
                 <FieldLabel required={false}>Preferred Locations</FieldLabel>

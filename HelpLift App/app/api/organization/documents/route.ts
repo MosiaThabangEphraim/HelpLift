@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { getOrgContext, roleAtLeast, insufficientRoleMessage } from "@/lib/organization-access"
 
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ message: "Authentication required." }, { status: 401 })
-  const { data: organization } = await supabase.from("organizations").select("id").eq("profile_id", user.id).single()
+  const orgCtx = await getOrgContext<{ id: any }>(supabase, user.id, "id")
+    const organization = orgCtx?.organization ?? null
   if (!organization) return NextResponse.json({ message: "Organization profile not found." }, { status: 404 })
   const { data, error } = await supabase.from("organization_documents").select("id, file_name, document_type, created_at").eq("organization_id", organization.id).order("created_at", { ascending: false })
   if (error) return NextResponse.json({ message: error.message }, { status: 400 })
@@ -17,7 +19,9 @@ export async function POST(request: Request) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ message: "Authentication required." }, { status: 401 })
-    const { data: organization } = await supabase.from("organizations").select("id").eq("profile_id", user.id).single()
+    const orgCtx = await getOrgContext<{ id: any }>(supabase, user.id, "id")
+    const organization = orgCtx?.organization ?? null
+    if (orgCtx && !roleAtLeast(orgCtx.role, "owner")) return NextResponse.json({ message: insufficientRoleMessage(orgCtx.role, "owner") }, { status: 403 })
     if (!organization) return NextResponse.json({ message: "Organization profile not found." }, { status: 404 })
 
     const formData = await request.formData()

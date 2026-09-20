@@ -8,11 +8,12 @@ export async function GET(
   try {
     const { id } = await context.params
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
 
     // 1. Fetch organization details
     const { data: organization, error: orgError } = await supabase
       .from("organizations")
-      .select("id, name, type, city, province, address, contact_email, phone, mission, verification_status, logo_url, created_at")
+      .select("id, name, type, city, province, address, contact_email, phone, mission, verification_status, logo_url, created_at, profile_id")
       .eq("id", id)
       .single()
 
@@ -42,6 +43,7 @@ export async function GET(
         .from("impact_stories")
         .select("id, title, content, author_role, image_url, video_url, created_at")
         .eq("organization_id", id)
+        .eq("status", "approved")
         .order("created_at", { ascending: false })
 
       const storyIds = (orgStories || []).map((s) => s.id)
@@ -64,9 +66,15 @@ export async function GET(
       stories = []
     }
 
+    // The profile a message is addressed to is only revealed to signed-in
+    // visitors (only they can send messages), never to guests.
+    const { profile_id, ...publicOrganization } = organization
     return NextResponse.json({
       success: true,
-      organization,
+      organization: {
+        ...publicOrganization,
+        ...(user ? { message_recipient_id: profile_id, is_own: profile_id === user.id } : {}),
+      },
       needs,
       stories,
     })

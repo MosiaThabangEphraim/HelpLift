@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { getOrgContext, roleAtLeast, insufficientRoleMessage } from "@/lib/organization-access"
 
 export async function GET() {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ message: "Authentication required." }, { status: 401 })
-    const { data: org } = await supabase.from("organizations").select("id").eq("profile_id", user.id).single()
+    const orgCtx = await getOrgContext<{ id: any }>(supabase, user.id, "id")
+    const org = orgCtx?.organization ?? null
     if (!org) return NextResponse.json({ message: "Organization profile not found." }, { status: 404 })
 
     const { data: donations, error } = await supabase

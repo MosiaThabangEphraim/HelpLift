@@ -22,11 +22,13 @@ type MessageComposeDialogProps = {
   onSent?: () => void
   /** Pre-fills the message body (e.g. a thank-you template) — still editable before sending. */
   defaultMessage?: string
+  /** Set when replying: the message being answered (recorded with the reply, and quoted to the recipient). */
+  replyTo?: { id: string; snippet: string }
 }
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024 // 10MB
 
-export function MessageComposeDialog({ open, onOpenChange, recipientLabel, target, recipientId, onSent, defaultMessage }: MessageComposeDialogProps) {
+export function MessageComposeDialog({ open, onOpenChange, recipientLabel, target, recipientId, onSent, defaultMessage, replyTo }: MessageComposeDialogProps) {
   const [message, setMessage] = useState("")
   const [attachments, setAttachments] = useState<File[]>([])
   const [isSending, setIsSending] = useState(false)
@@ -61,7 +63,8 @@ export function MessageComposeDialog({ open, onOpenChange, recipientLabel, targe
     try {
       const formData = new FormData()
       formData.append("message", message)
-      if (target === "admin") formData.append("target", "admin")
+      if (replyTo) formData.append("replyTo", replyTo.id)
+      else if (target === "admin") formData.append("target", "admin")
       else if (recipientId) formData.append("recipientId", recipientId)
       attachments.forEach((file) => formData.append("attachments", file))
 
@@ -82,7 +85,7 @@ export function MessageComposeDialog({ open, onOpenChange, recipientLabel, targe
     <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Message {recipientLabel}</DialogTitle>
+          <DialogTitle>{replyTo ? "Reply to" : "Message"} {recipientLabel}</DialogTitle>
         </DialogHeader>
         {sent ? (
           <p className="py-6 text-center text-sm font-semibold text-emerald-600 dark:text-emerald-400">
@@ -95,8 +98,14 @@ export function MessageComposeDialog({ open, onOpenChange, recipientLabel, targe
                 {error}
               </div>
             )}
+            {replyTo && (
+              <blockquote className="rounded-xl border-l-4 border-blue-500 bg-slate-50 dark:bg-[#0B1220] px-3 py-2 text-xs text-slate-600 dark:text-slate-300">
+                <p className="mb-0.5 font-bold text-slate-500 dark:text-slate-400">Replying to</p>
+                <p className="line-clamp-3 whitespace-pre-line">{replyTo.snippet}</p>
+              </blockquote>
+            )}
             <div className="space-y-1">
-              <Label htmlFor="message-compose-body">Message</Label>
+              <Label htmlFor="message-compose-body">{replyTo ? "Your reply" : "Message"}</Label>
               <textarea
                 id="message-compose-body"
                 value={message}
@@ -112,7 +121,7 @@ export function MessageComposeDialog({ open, onOpenChange, recipientLabel, targe
               {attachments.map((file, index) => (
                 <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 dark:border-[#233350] bg-slate-50 dark:bg-[#0B1220] px-3 py-2 text-sm">
                   <span className="truncate">{file.name}</span>
-                  <button type="button" onClick={() => setAttachments(files => files.filter((_, i) => i !== index))} className="shrink-0 text-slate-400 hover:text-red-500">
+                  <button aria-label="Remove" type="button" onClick={() => setAttachments(files => files.filter((_, i) => i !== index))} className="shrink-0 text-slate-400 hover:text-red-500">
                     <X className="w-4 h-4" />
                   </button>
                 </div>

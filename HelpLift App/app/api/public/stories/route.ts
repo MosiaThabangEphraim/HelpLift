@@ -8,6 +8,7 @@ export async function GET() {
     const { data, error } = await supabase
       .from("impact_stories")
       .select("id, title, content, author_role, image_url, video_url, created_at, organizations(id, name, type, city, province)")
+      .eq("status", "approved")
       .order("created_at", { ascending: false })
       .limit(10)
 

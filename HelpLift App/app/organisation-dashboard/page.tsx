@@ -33,7 +33,9 @@ import {
   Send,
   Banknote,
   Mail,
-  Paperclip
+  Paperclip,
+  BarChart3,
+  Settings,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { firstOf } from "@/lib/utils"
@@ -53,6 +55,11 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { OrganizationTeam } from "@/components/organization-team"
+import { OrganizationAnalytics } from "@/components/analytics/organization-analytics"
+import { UserAvatar } from "@/components/user-avatar"
+import { MessageViewToggle, SentMessages } from "@/components/sent-messages"
+import { getOrgContext, ROLE_LABELS, type OrgRole } from "@/lib/organization-access"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,6 +72,9 @@ import { MessageComposeDialog } from "@/components/message-compose-dialog"
 import { MessageDetailDialog } from "@/components/message-detail-dialog"
 import { ChangeEmailFlow, ChangePasswordFlow, DeleteAccountFlow } from "@/components/account-security"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { FeedbackButton } from "@/components/feedback-button"
+import { SettingsDialog } from "@/components/settings-dialog"
+import { useNotificationAlerts } from "@/hooks/use-notification-alerts"
 
 type Organization = {
   id: string
@@ -113,15 +123,15 @@ type Fulfillment = {
   proof_notes?: string | null
   completed_at?: string | null
   created_at: string
-  givers: { profile_id: string; name: string; email: string; phone?: string | null; account_type?: string | null }[] | { profile_id: string; name: string; email: string; phone?: string | null; account_type?: string | null } | null
+  givers: { profile_id: string; name: string; email: string; phone?: string | null; account_type?: string | null; avatar_url?: string | null }[] | { profile_id: string; name: string; email: string; phone?: string | null; account_type?: string | null; avatar_url?: string | null } | null
   support_interests: FulfillmentInterest[] | FulfillmentInterest | null
 }
 type FulfillmentNeed = { title: string; description: string; category: string; location: string | null; quantity: string | null; due_date: string | null }
 type FulfillmentInterest = { message: string | null; needs: FulfillmentNeed[] | FulfillmentNeed | null }
 type Notification = { id: string; type: string; title: string; message: string; sender_name?: string | null; sender_role?: string | null; read_at: string | null; created_at: string; attachment_file_name?: string | null; attachmentUrl?: string | null; attachments?: { id: string; file_name: string | null; url: string | null }[] }
-type OrganizationInterest = { id: string; status: string; message: string | null; needs: { title: string }[] | { title: string } | null; givers: { profile_id?: string; name: string; email: string; phone?: string | null; account_type?: string | null }[] | { profile_id?: string; name: string; email: string; phone?: string | null; account_type?: string | null } | null }
+type OrganizationInterest = { id: string; status: string; created_at: string; message: string | null; needs: { title: string }[] | { title: string } | null; givers: { profile_id?: string; name: string; email: string; phone?: string | null; account_type?: string | null; avatar_url?: string | null }[] | { profile_id?: string; name: string; email: string; phone?: string | null; account_type?: string | null; avatar_url?: string | null } | null }
 type StoryMedia = { id: string; media_type: "image" | "video"; url: string }
-type ImpactStory = { id: string; title: string; content: string; author_role?: string | null; image_url?: string | null; video_url?: string | null; created_at: string; media?: StoryMedia[] }
+type ImpactStory = { id: string; title: string; content: string; author_role?: string | null; image_url?: string | null; video_url?: string | null; created_at: string; media?: StoryMedia[]; status?: "pending" | "approved" | "rejected"; rejection_reason?: string | null }
 type AvailableGift = {
   id: string
   title: string
@@ -147,15 +157,31 @@ type Donation = {
   givers: { name: string; email: string; profile_id: string }[] | { name: string; email: string; profile_id: string } | null
 }
 
+// A disabled <fieldset> (used to make the dashboard read-only for viewers)
+// switches off every real <button>, so "open a detail view" controls are plain
+// elements with role="button" instead, and stay usable.
+function activateOnKey(e: React.KeyboardEvent<HTMLElement>) {
+  if (e.target !== e.currentTarget) return
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault()
+    e.currentTarget.click()
+  }
+}
+
 export default function OrganizationDashboardPage() {
   const router = useRouter()
   const supabase = createClient()
 
   const [organization, setOrganization] = useState<Organization | null>(null)
+  // Role within the organization (owner/manager/viewer). Only used to tailor the
+  // UI; the API routes and database policies are what actually enforce it.
+  const [memberRole, setMemberRole] = useState<OrgRole>("owner")
   const [needs, setNeeds] = useState<Need[]>([])
   const [documents, setDocuments] = useState<OrganizationDocument[]>([])
   const [fulfillments, setFulfillments] = useState<Fulfillment[]>([])
   const [notifications, setNotifications] = useState<Notification[]>([])
+  // Keeps the bell fresh while the page is open and chimes on new notifications.
+  useNotificationAlerts<Notification>(setNotifications)
   const [interests, setInterests] = useState<OrganizationInterest[]>([])
   const [stories, setStories] = useState<ImpactStory[]>([])
   const [availableGifts, setAvailableGifts] = useState<AvailableGift[]>([])
@@ -230,23 +256,39 @@ export default function OrganizationDashboardPage() {
   const [needsQuery, setNeedsQuery] = useState("")
 
   const [loginEmail, setLoginEmail] = useState("")
+  // Settings window: opens the edit-organization / password / delete-account screens below
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [orgDialogMode, setOrgDialogMode] = useState<"fields" | "email" | "password" | "delete">("fields")
 
   // Message Admin / Message Giver dialogs
   const [isMessagingAdmin, setIsMessagingAdmin] = useState(false)
   const [messagingGiver, setMessagingGiver] = useState<{ id: string; label: string } | null>(null)
   const [selectedMessage, setSelectedMessage] = useState<Notification | null>(null)
-  const [viewingGiver, setViewingGiver] = useState<{ name: string; email: string; phone?: string | null; account_type?: string | null } | null>(null)
+  const [messageView, setMessageView] = useState<"inbox" | "sent">("inbox")
+  const [viewingGiver, setViewingGiver] = useState<{ name: string; email: string; phone?: string | null; account_type?: string | null; avatar_url?: string | null } | null>(null)
 
   // Fulfillment detail modal
   const [selectedFulfillment, setSelectedFulfillment] = useState<Fulfillment | null>(null)
   const [proofSignedUrl, setProofSignedUrl] = useState<string | null>(null)
   const [proofGallery, setProofGallery] = useState<{ id: string; fileName: string | null; signedUrl: string | null }[]>([])
   const [isLoadingProof, setIsLoadingProof] = useState(false)
+  const [extraProofFiles, setExtraProofFiles] = useState<File[]>([])
+  const [isUploadingProof, setIsUploadingProof] = useState(false)
+  const [proofUploadNote, setProofUploadNote] = useState<{ type: "success" | "error"; text: string } | null>(null)
+  const [proofRefreshKey, setProofRefreshKey] = useState(0)
 
   const loadData = async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return router.replace("/login")
+    if (!user) {
+      // Offline, the sign-in check can fail even though the person is signed in. Don't send them
+      // to the login page for that; tell them, and let them retry once they're back online.
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        setError("You're offline and your saved sign-in couldn't be confirmed. Reconnect to continue.")
+        setIsLoading(false)
+        return
+      }
+      return router.replace("/login")
+    }
     setLoginEmail(user.email || "")
 
     const { data: currentProfile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
@@ -256,11 +298,13 @@ export default function OrganizationDashboardPage() {
       return router.replace("/login")
     }
 
-    const { data: org } = await supabase
-      .from("organizations")
-      .select("id, name, type, registration_number, contact_name, contact_role, contact_email, phone, address, city, province, mission, bank_name, bank_account_holder, bank_account_number, bank_branch_code, bank_account_type, verification_status, verification_notes, logo_url")
-      .eq("profile_id", user.id)
-      .single()
+    const orgCtx = await getOrgContext<Organization>(
+      supabase,
+      user.id,
+      "id, name, type, registration_number, contact_name, contact_role, contact_email, phone, address, city, province, mission, bank_name, bank_account_holder, bank_account_number, bank_branch_code, bank_account_type, verification_status, verification_notes, logo_url"
+    )
+    const org = orgCtx?.organization ?? null
+    if (orgCtx) setMemberRole(orgCtx.role)
 
     if (!org) {
       setError("Your organization profile could not be found. Please contact support if this persists.")
@@ -315,7 +359,7 @@ export default function OrganizationDashboardPage() {
     // Load fulfillments
     const { data: organizationFulfillments } = await supabase
       .from("fulfillments")
-      .select("id, status, notes, proof_storage_path, proof_notes, completed_at, created_at, givers(profile_id, name, email, phone, account_type), support_interests(message, needs(title, description, category, location, quantity, due_date))")
+      .select("id, status, notes, proof_storage_path, proof_notes, completed_at, created_at, givers(profile_id, name, email, phone, account_type, avatar_url), support_interests(message, needs(title, description, category, location, quantity, due_date))")
       .eq("organization_id", org.id)
       .order("created_at", { ascending: false })
     setFulfillments((organizationFulfillments || []) as unknown as Fulfillment[])
@@ -353,6 +397,8 @@ export default function OrganizationDashboardPage() {
     if (!selectedFulfillment) {
       setProofSignedUrl(null)
       setProofGallery([])
+      setExtraProofFiles([])
+      setProofUploadNote(null)
       return
     }
     setIsLoadingProof(true)
@@ -380,7 +426,29 @@ export default function OrganizationDashboardPage() {
       }
       setIsLoadingProof(false)
     })()
-  }, [selectedFulfillment])
+  }, [selectedFulfillment, proofRefreshKey])
+
+  // Owners and managers can attach more proof (photos, receipts, documents)
+  // after delivery has started or finished.
+  const uploadMoreProof = async () => {
+    if (!selectedFulfillment || extraProofFiles.length === 0) return
+    setIsUploadingProof(true)
+    setProofUploadNote(null)
+    try {
+      const formData = new FormData()
+      extraProofFiles.forEach(file => formData.append("proofs", file))
+      const res = await fetch(`/api/fulfillments/${selectedFulfillment.id}/proofs`, { method: "POST", body: formData })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.message || "Could not add proof.")
+      setProofUploadNote({ type: "success", text: data.message || "Proof added." })
+      setExtraProofFiles([])
+      setProofRefreshKey(key => key + 1)
+    } catch (err: any) {
+      setProofUploadNote({ type: "error", text: err.message || "Could not add proof." })
+    } finally {
+      setIsUploadingProof(false)
+    }
+  }
 
   const handleCreateNeed = async (event: FormEvent) => {
     event.preventDefault()
@@ -600,7 +668,7 @@ export default function OrganizationDashboardPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || "Failed to publish story.")
 
-      setMessage("Impact Story published to your public profile!")
+      setMessage("Impact Story submitted. It will appear on your public profile once an administrator approves it.")
       setStoryTitle("")
       setStoryContent("")
       setStoryRole("")
@@ -640,7 +708,7 @@ export default function OrganizationDashboardPage() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.message || "Unable to update story.")
-      setMessage("Impact Story updated.")
+      setMessage("Impact Story updated and sent for administrator review again.")
       setEditingStory(null)
       await loadData()
     } catch (err: any) {
@@ -890,10 +958,14 @@ export default function OrganizationDashboardPage() {
 
           <div className="flex items-center gap-2 flex-wrap">
             <ThemeToggle className="h-9 w-9" />
+            {memberRole !== "viewer" && <FeedbackButton />}
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740] transition-colors">
+                <button
+                  aria-label="Notifications"
+                  data-tip={unreadCount > 0 ? `Notifications: ${unreadCount} unread. Click to see them.` : "Notifications. You're all caught up."}
+                  className="relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740] transition-colors">
                   <Bell className="w-4 h-4" />
                   {unreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
@@ -924,6 +996,13 @@ export default function OrganizationDashboardPage() {
               </DropdownMenuContent>
             </DropdownMenu>
 
+            <Link
+              href="/organizations"
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+            >
+              Organizations
+            </Link>
+
             {organization?.id && (
               <Link
                 href={`/organizations/${organization.id}`}
@@ -936,18 +1015,20 @@ export default function OrganizationDashboardPage() {
             )}
 
             <button
-              onClick={() => setIsEditingOrg(true)}
+              onClick={() => setIsSettingsOpen(true)}
               className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
             >
-              <Pencil className="h-3.5 w-3.5" /> Edit
+              <Settings className="h-3.5 w-3.5" /> Settings
             </button>
 
+            {memberRole !== "viewer" && (
             <button
               onClick={() => setIsMessagingAdmin(true)}
               className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
             >
               <MessageSquare className="h-3.5 w-3.5" /> Message Admin
             </button>
+            )}
 
             <button
               onClick={logout}
@@ -967,6 +1048,15 @@ export default function OrganizationDashboardPage() {
           </div>
         )}
 
+        {memberRole !== "owner" && (
+          <div className="rounded-2xl border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/30 p-4 text-sm font-semibold text-blue-800 dark:text-blue-300">
+            You're signed in as a {ROLE_LABELS[memberRole].toLowerCase()} of {organization?.name}.{" "}
+            {memberRole === "viewer"
+              ? "You have read-only access, so actions that change data will be declined, and you can’t message administrators."
+              : "You can manage needs, interests, fulfillments, stories and messages, and contact administrators. Only owners can edit the organization’s information or manage the team."}
+          </div>
+        )}
+
         {organization?.verification_status === "more_info_requested" && (
           <div className="rounded-2xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-2">
             <p className="text-sm font-bold text-amber-800 dark:text-amber-300">An administrator needs more information before approving your account</p>
@@ -974,6 +1064,7 @@ export default function OrganizationDashboardPage() {
               <p className="text-sm text-amber-700 dark:text-amber-400 italic">"{organization.verification_notes}"</p>
             )}
             <p className="text-xs text-amber-700 dark:text-amber-400">Upload what's needed in the Documents tab, then resubmit for review.</p>
+            {memberRole === "owner" ? (
             <button
               onClick={handleResubmitForReview}
               disabled={isResubmitting}
@@ -982,6 +1073,9 @@ export default function OrganizationDashboardPage() {
               {isResubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
               Resubmit for Review
             </button>
+            ) : (
+              <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">An owner needs to resubmit the organization for review.</p>
+            )}
           </div>
         )}
 
@@ -1010,7 +1104,14 @@ export default function OrganizationDashboardPage() {
             <TabsTrigger value="stories" className="gap-1.5 rounded-xl"><Sparkles className="w-4 h-4" />Impact Stories</TabsTrigger>
             <TabsTrigger value="gifts" className="gap-1.5 rounded-xl"><Gift className="w-4 h-4" />Gift Library</TabsTrigger>
             <TabsTrigger value="documents" className="gap-1.5 rounded-xl"><FileText className="w-4 h-4" />Documents</TabsTrigger>
+            <TabsTrigger value="analytics" className="gap-1.5 rounded-xl"><BarChart3 className="w-4 h-4" />Analytics</TabsTrigger>
+            {memberRole === "owner" && <TabsTrigger value="team" className="gap-1.5 rounded-xl"><Users className="w-4 h-4" />Team</TabsTrigger>}
           </TabsList>
+
+          {/* Viewers are read-only: a disabled fieldset turns every button, input,
+              select and textarea in the tab contents off. The tab list above and
+              the header (sign out) stay usable. The API and database enforce it too. */}
+          <fieldset disabled={memberRole === "viewer"} className="min-w-0 disabled:opacity-90">
 
           {/* --- NEEDS TAB --- */}
           <TabsContent value="needs" className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
@@ -1252,11 +1353,13 @@ export default function OrganizationDashboardPage() {
                   <EmptyState text="No accepted support to track yet." />
                 ) : (
                   fulfillments.map(item => (
-                    <button
+                    <div
                       key={item.id}
-                      type="button"
+                      role="button"
+                      tabIndex={0}
                       onClick={() => setSelectedFulfillment(item)}
-                      className="flex w-full flex-col justify-between gap-3 rounded-2xl border border-slate-200 dark:border-[#233350] p-4 text-left md:flex-row md:items-center hover:border-blue-300 dark:hover:border-blue-800 hover:shadow-sm transition-all"
+                      onKeyDown={activateOnKey}
+                      className="flex w-full cursor-pointer flex-col justify-between gap-3 rounded-2xl border border-slate-200 dark:border-[#233350] p-4 text-left md:flex-row md:items-center hover:border-blue-300 dark:hover:border-blue-800 hover:shadow-sm transition-all"
                     >
                       <div>
                         <p className="font-semibold text-base">{firstOf(firstOf(item.support_interests)?.needs)?.title || "Community Need"}</p>
@@ -1276,7 +1379,7 @@ export default function OrganizationDashboardPage() {
                           {item.status.replace("_", " ")}
                         </span>
 
-                        {item.status === "pending" && (
+                        {item.status === "pending" && memberRole !== "viewer" && (
                           <span
                             role="button"
                             onClick={(e) => { e.stopPropagation(); handleStartFulfillment(item.id) }}
@@ -1286,7 +1389,7 @@ export default function OrganizationDashboardPage() {
                           </span>
                         )}
 
-                        {item.status === "in_progress" && (
+                        {item.status === "in_progress" && memberRole !== "viewer" && (
                           <span
                             role="button"
                             onClick={(e) => { e.stopPropagation(); setVerifyingFulfillment(item) }}
@@ -1296,7 +1399,7 @@ export default function OrganizationDashboardPage() {
                           </span>
                         )}
                       </div>
-                    </button>
+                    </div>
                   ))
                 )}
               </CardContent>
@@ -1321,18 +1424,24 @@ export default function OrganizationDashboardPage() {
                     <div key={item.id} className="flex flex-col justify-between gap-3 rounded-2xl border border-slate-200 dark:border-[#233350] p-4 md:flex-row md:items-center">
                       <div>
                         <p className="font-semibold">{need?.title || "Need"}</p>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">{giver?.name || "Giver"} · {giver?.email}</p>
+                        <p className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                          <UserAvatar src={giver?.avatar_url} name={giver?.name} className="size-6 text-[10px]" />
+                          <span>{giver?.name || "Giver"} · {giver?.email}</span>
+                        </p>
                         {item.message && <p className="mt-1 text-sm text-slate-600 dark:text-slate-300 italic">"{item.message}"</p>}
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="rounded-full bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-xs font-bold capitalize">{item.status}</span>
                         {giver && (
-                          <button
+                          <span
+                            role="button"
+                            tabIndex={0}
                             onClick={() => setViewingGiver(giver)}
-                            className="inline-flex items-center gap-1 rounded-full border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                            onKeyDown={activateOnKey}
+                            className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
                           >
                             <Eye className="w-3 h-3" /> Details
-                          </button>
+                          </span>
                         )}
                         {giver?.profile_id && (
                           <button
@@ -1424,7 +1533,8 @@ export default function OrganizationDashboardPage() {
                 <CardDescription>Direct messages from HelpLift admins and givers.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {messages.length === 0 ? (
+                <MessageViewToggle value={messageView} onChange={setMessageView} />
+                {messageView === "inbox" && (messages.length === 0 ? (
                   <EmptyState text="No messages yet." />
                 ) : (
                   messages.map(item => (
@@ -1446,7 +1556,8 @@ export default function OrganizationDashboardPage() {
                       )}
                     </div>
                   ))
-                )}
+                ))}
+                {messageView === "sent" && <SentMessages canReply={memberRole !== "viewer"} />}
               </CardContent>
             </Card>
           </TabsContent>
@@ -1498,7 +1609,7 @@ export default function OrganizationDashboardPage() {
                       {storyImages.map((file, index) => (
                         <span key={`${file.name}-${index}`} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
                           {file.name}
-                          <button type="button" onClick={() => setStoryImages(files => files.filter((_, i) => i !== index))} className="text-slate-400 hover:text-red-500">
+                          <button aria-label="Remove" type="button" onClick={() => setStoryImages(files => files.filter((_, i) => i !== index))} className="text-slate-400 hover:text-red-500">
                             <X className="w-3 h-3" />
                           </button>
                         </span>
@@ -1531,7 +1642,7 @@ export default function OrganizationDashboardPage() {
                       {storyVideoUrls.map((url, index) => (
                         <span key={`${url}-${index}`} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300 max-w-xs">
                           <span className="truncate">{url}</span>
-                          <button type="button" onClick={() => setStoryVideoUrls(urls => urls.filter((_, i) => i !== index))} className="text-slate-400 hover:text-red-500 shrink-0">
+                          <button aria-label="Remove" type="button" onClick={() => setStoryVideoUrls(urls => urls.filter((_, i) => i !== index))} className="text-slate-400 hover:text-red-500 shrink-0">
                             <X className="w-3 h-3" />
                           </button>
                         </span>
@@ -1558,7 +1669,7 @@ export default function OrganizationDashboardPage() {
               <CardContent>
                 <div className="space-y-4 max-h-[420px] overflow-y-auto pr-1">
                   {stories.length === 0 ? (
-                    <EmptyState text="No impact stories published yet." />
+                    <EmptyState text="No impact stories yet." />
                   ) : (
                     stories.map(story => {
                       const photoCount = (story.media || []).filter(m => m.media_type === "image").length
@@ -1567,10 +1678,18 @@ export default function OrganizationDashboardPage() {
                       <article key={story.id} className="rounded-2xl border border-slate-200 dark:border-[#233350] p-4 space-y-2">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="font-bold text-base">{story.title}</h3>
+                          {story.status === "pending" && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Awaiting admin approval</span>}
+                          {story.status === "rejected" && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">Rejected</span>}
+                          {story.status === "approved" && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Published</span>}
                           {videoCount > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700">🎥 {videoCount} video{videoCount === 1 ? "" : "s"}</span>}
                           {photoCount > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">🖼 {photoCount} photo{photoCount === 1 ? "" : "s"}</span>}
                         </div>
                         <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-3 leading-relaxed whitespace-pre-line">{story.content}</p>
+                        {story.status === "rejected" && (
+                          <p className="text-xs italic text-red-700 dark:text-red-400">
+                            An administrator rejected this story{story.rejection_reason ? `: ${story.rejection_reason}` : "."} Edit it and it will be reviewed again.
+                          </p>
+                        )}
                         <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-100 dark:border-[#233350]">
                           <span>{story.author_role || "Staff"}</span>
                           <span>{new Date(story.created_at).toLocaleDateString()}</span>
@@ -1617,9 +1736,11 @@ export default function OrganizationDashboardPage() {
                     </div>
                   ) : (
                     availableGifts.map(gift => (
-                      <button
+                      <div
                         key={gift.id}
-                        type="button"
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={activateOnKey}
                         onClick={() => setSelectedGift({
                           id: gift.id,
                           title: gift.title,
@@ -1647,7 +1768,7 @@ export default function OrganizationDashboardPage() {
                           <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">{gift.description}</p>
                         </div>
                         <span className="text-xs font-bold text-purple-600">View details & claim →</span>
-                      </button>
+                      </div>
                     ))
                   )}
                 </div>
@@ -1691,6 +1812,9 @@ export default function OrganizationDashboardPage() {
                 <CardDescription>Upload registration or tax evidence for admin review. Maximum 10 MB.</CardDescription>
               </CardHeader>
               <CardContent>
+                {memberRole !== "owner" ? (
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Only owners can upload verification documents. You can view the documents your organization has submitted.</p>
+                ) : (
                 <form onSubmit={uploadDocument} className="space-y-4">
                   <div>
                     <Label htmlFor="org-doc-type">Document type</Label>
@@ -1723,6 +1847,7 @@ export default function OrganizationDashboardPage() {
                     {selectedFiles.length > 1 ? `Upload ${selectedFiles.length} documents` : "Upload document"}
                   </button>
                 </form>
+                )}
               </CardContent>
             </Card>
 
@@ -1749,6 +1874,17 @@ export default function OrganizationDashboardPage() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {memberRole === "owner" && (
+            <TabsContent value="team">
+              <OrganizationTeam />
+            </TabsContent>
+          )}
+          </fieldset>
+
+          <TabsContent value="analytics">
+            <OrganizationAnalytics needs={needs} donations={donations} interests={interests} fulfillments={fulfillments} />
+          </TabsContent>
         </Tabs>
 
       </div>
@@ -1770,7 +1906,7 @@ export default function OrganizationDashboardPage() {
                   Upload notes, photos, and documents (e.g. delivery receipt, photo with beneficiaries) to verify completion.
                 </p>
               </div>
-              <button onClick={() => setVerifyingFulfillment(null)} className="text-slate-400 hover:text-slate-600">
+              <button aria-label="Close" onClick={() => setVerifyingFulfillment(null)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -2005,7 +2141,7 @@ export default function OrganizationDashboardPage() {
                     {editStoryNewVideoUrls.map((url, index) => (
                       <span key={`${url}-${index}`} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300 max-w-xs">
                         <span className="truncate">{url}</span>
-                        <button type="button" onClick={() => setEditStoryNewVideoUrls(urls => urls.filter((_, i) => i !== index))} className="text-slate-400 hover:text-red-500 shrink-0">
+                        <button aria-label="Remove" type="button" onClick={() => setEditStoryNewVideoUrls(urls => urls.filter((_, i) => i !== index))} className="text-slate-400 hover:text-red-500 shrink-0">
                           <X className="w-3 h-3" />
                         </button>
                       </span>
@@ -2033,13 +2169,22 @@ export default function OrganizationDashboardPage() {
       </Dialog>
 
       {/* --- EDIT ORGANIZATION DIALOG --- */}
+      <SettingsDialog
+        open={isSettingsOpen}
+        onOpenChange={setIsSettingsOpen}
+        // Only owners can edit the organization's information; everyone else can still change their own password.
+        onEditProfile={memberRole === "owner" ? () => { setIsSettingsOpen(false); setOrgDialogMode("fields"); setIsEditingOrg(true) } : undefined}
+        onChangePassword={() => { setIsSettingsOpen(false); setOrgDialogMode("password"); setIsEditingOrg(true) }}
+        onDeleteAccount={() => { setIsSettingsOpen(false); setOrgDialogMode("delete"); setIsEditingOrg(true) }}
+      />
+
       <Dialog open={isEditingOrg} onOpenChange={open => !open && closeOrgDialog()}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader className="flex flex-row items-center justify-between">
             <DialogTitle>
               {orgDialogMode === "email" ? "Change Login Email" : orgDialogMode === "password" ? "Change Password" : orgDialogMode === "delete" ? "Delete Account" : "Edit Your Organization"}
             </DialogTitle>
-            <button
+            <button aria-label="Close"
               type="button"
               onClick={closeOrgDialog}
               className="rounded-md p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
@@ -2222,6 +2367,7 @@ export default function OrganizationDashboardPage() {
       )}
 
       <MessageDetailDialog
+        canReply={memberRole !== "viewer"}
         open={!!selectedMessage}
         onOpenChange={(open) => !open && setSelectedMessage(null)}
         message={selectedMessage}
@@ -2235,6 +2381,7 @@ export default function OrganizationDashboardPage() {
           </DialogHeader>
           {viewingGiver && (
             <div className="space-y-3 pt-2 text-sm">
+              <UserAvatar src={viewingGiver.avatar_url} name={viewingGiver.name} className="size-16 text-2xl" />
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Name</p>
                 <p className="font-semibold">{viewingGiver.name}</p>
@@ -2346,7 +2493,27 @@ export default function OrganizationDashboardPage() {
                     )}
                   </div>
                 )}
-                {giverInfo?.profile_id && (
+                {memberRole !== "viewer" && (selectedFulfillment.status === "in_progress" || selectedFulfillment.status === "completed") && (
+                  <div className="space-y-2 rounded-2xl border border-dashed border-slate-300 dark:border-[#233350] p-3">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Add more proof</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Attach extra photos, receipts or documents (images or PDFs, up to 10 MB each). The giver is notified.</p>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*,.pdf"
+                      onChange={event => setExtraProofFiles(Array.from(event.target.files || []))}
+                      className="block w-full text-xs file:mr-3 file:rounded-full file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-blue-700"
+                    />
+                    {proofUploadNote && (
+                      <p className={`text-xs font-semibold ${proofUploadNote.type === "success" ? "text-emerald-600" : "text-red-600"}`}>{proofUploadNote.text}</p>
+                    )}
+                    <Button type="button" variant="outline" className="w-full" disabled={isUploadingProof || extraProofFiles.length === 0} onClick={uploadMoreProof}>
+                      {isUploadingProof ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : null}
+                      {extraProofFiles.length > 1 ? `Upload ${extraProofFiles.length} files` : "Upload file"}
+                    </Button>
+                  </div>
+                )}
+                {giverInfo?.profile_id && memberRole !== "viewer" && (
                   <Button
                     type="button"
                     variant="outline"
@@ -2376,7 +2543,7 @@ export default function OrganizationDashboardPage() {
         onOpenChange={(open) => !open && setSelectedGift(null)}
         gift={selectedGift}
         role="organization"
-        canClaim={organization?.verification_status === "approved"}
+        canClaim={memberRole !== "viewer" && organization?.verification_status === "approved"}
         onClaim={async (motivation) => { if (selectedGift) await handleClaimGift(selectedGift.id, motivation) }}
       />
     </main>

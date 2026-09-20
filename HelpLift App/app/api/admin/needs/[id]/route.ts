@@ -54,7 +54,18 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       console.warn("Need status notification warning:", notifyErr)
     }
 
-    return NextResponse.json({ need })
+    let notifiedGivers = 0
+    if (status === "open") {
+      try {
+        const { data: count, error: matchError } = await supabase.rpc("notify_matching_givers", { p_need_id: id })
+        if (matchError) console.warn("Need matching warning:", matchError.message)
+        else notifiedGivers = typeof count === "number" ? count : 0
+      } catch (matchErr) {
+        console.warn("Need matching warning:", matchErr)
+      }
+    }
+
+    return NextResponse.json({ need, notified_givers: notifiedGivers })
   } catch (error) {
     console.error("Admin need moderation error:", error)
     return NextResponse.json({ message: "Need moderation is unavailable." }, { status: 503 })

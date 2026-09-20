@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createServerClient } from "@supabase/ssr"
+import { getOrgContext } from "@/lib/organization-access"
+import { transferMemberDocuments } from "@/lib/organization-team"
 
 function serviceClient() {
   return createServerClient(
@@ -35,6 +37,36 @@ export async function DELETE(request: Request) {
 
     const { error: verifyError } = await supabase.auth.signInWithPassword({ email: user.email, password })
     if (verifyError) return NextResponse.json({ message: "Incorrect password." }, { status: 401 })
+
+    // Organization team members: deleting an account must not take the
+    // organization (or its documents) down with it.
+    //  - The original account holder (organizations.profile_id) owns the
+    //    organization row, which cascades away with their profile. If another
+    //    owner exists, hand the organization to them first; if only
+    //    non-owners remain, refuse until someone is promoted to owner.
+    //  - Anyone else just leaves; the documents they uploaded are handed on.
+    const orgCtx = await getOrgContext<{ id: string; profile_id: string }>(supabase, user.id, "id, profile_id")
+    if (orgCtx) {
+      const admin = serviceClient()
+      const orgId = orgCtx.organization.id
+      let heirId = orgCtx.organization.profile_id
+      if (orgCtx.organization.profile_id === user.id) {
+        const { data: others } = await admin.from("organization_members").select("profile_id, role").eq("organization_id", orgId).neq("profile_id", user.id)
+        if ((others || []).length > 0) {
+          const heir = others!.find(m => m.role === "owner")
+          if (!heir) {
+            return NextResponse.json({ message: "Your organization still has team members. Promote one of them to owner first (Team tab), then delete your account." }, { status: 400 })
+          }
+          const { error: handoverError } = await admin.from("organizations").update({ profile_id: heir.profile_id }).eq("id", orgId)
+          if (handoverError) return NextResponse.json({ message: handoverError.message }, { status: 400 })
+          heirId = heir.profile_id
+        }
+      }
+      if (heirId !== user.id) {
+        const transferError = await transferMemberDocuments(admin, orgId, user.id, heirId)
+        if (transferError) return NextResponse.json({ message: transferError }, { status: 500 })
+      }
+    }
 
     const { error } = await serviceClient().auth.admin.deleteUser(user.id)
     if (error) return NextResponse.json({ message: error.message }, { status: 400 })

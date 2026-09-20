@@ -14,7 +14,8 @@ export async function PATCH(
     if (profile?.role !== "admin") return NextResponse.json({ message: "Administrator access required." }, { status: 403 })
 
     const { id } = await context.params
-    const { status, claim_notes } = await request.json()
+    const { status, claim_notes, rejection_reason } = await request.json()
+    const cleanRejectionReason = typeof rejection_reason === "string" && rejection_reason.trim() ? rejection_reason.trim() : null
 
     if (!["pending", "approved", "pending_claim", "claimed", "expired", "rejected"].includes(status)) {
       return NextResponse.json({ message: "Invalid gift status." }, { status: 400 })
@@ -37,6 +38,7 @@ export async function PATCH(
     const isInitialModeration = current.status === "pending" && ["approved", "rejected"].includes(status)
 
     const payload: Record<string, any> = { status }
+    if (isInitialModeration) payload.rejection_reason = status === "rejected" ? cleanRejectionReason : null
     if (isRejectingClaim) {
       payload.claimed_by_org_id = null
       payload.claim_notes = claim_notes || null
@@ -75,7 +77,7 @@ export async function PATCH(
         notifications.push({
           recipient_id: giver.profile_id, sender_id: user.id, type: "gift_offering_reviewed",
           title: `Gift offering ${status}`,
-          message: `Your offering "${current.title}" was ${status} by an administrator.${status === "approved" ? " It is now listed in the Gift Library." : ""}`,
+          message: `Your offering "${current.title}" was ${status} by an administrator.${status === "approved" ? " It is now listed in the Gift Library." : cleanRejectionReason ? ` Reason: ${cleanRejectionReason}` : ""}`,
         })
       }
       if (notifications.length) await supabase.from("notifications").insert(notifications)

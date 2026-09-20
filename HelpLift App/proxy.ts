@@ -10,6 +10,7 @@ const roleHome: Record<UserRole, string> = {
 }
 
 const protectedRoutes: { prefix: string; roles?: UserRole[] }[] = [
+  { prefix: "/register/complete", roles: ["giver", "organization"] },
   { prefix: "/givers-dashboard", roles: ["giver"] },
   { prefix: "/organisation-dashboard", roles: ["organization"] },
   { prefix: "/admin-dashboard", roles: ["admin"] },
@@ -24,11 +25,15 @@ async function isUnverifiedOrganization(
   supabase: ReturnType<typeof createServerClient>,
   userId: string
 ) {
-  const { data: org } = await supabase
-    .from("organizations")
-    .select("verification_status")
+  // Resolved through membership so team members (managers/viewers) are gated
+  // by their organization's status the same way the owner is.
+  const { data: membership } = await supabase
+    .from("organization_members")
+    .select("organizations(verification_status)")
     .eq("profile_id", userId)
-    .single()
+    .maybeSingle()
+  const orgField = (membership as any)?.organizations
+  const org = Array.isArray(orgField) ? orgField[0] : orgField
   return !!org && org.verification_status !== "approved"
 }
 
@@ -60,13 +65,23 @@ export async function proxy(request: NextRequest) {
   }
 
   if (user && matchedRoute) {
-    const { data: profile } = await supabase.from("profiles").select("role, suspended").eq("id", user.id).single()
+    const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
     const role = profile?.role as UserRole | undefined
     if (!role) return NextResponse.redirect(new URL("/login", request.url))
     if (profile?.suspended && pathname !== "/suspended") {
       return NextResponse.redirect(new URL("/suspended", request.url))
     }
     if (matchedRoute.roles && !matchedRoute.roles.includes(role)) {
+      return NextResponse.redirect(new URL(roleHome[role], request.url))
+    }
+    // A giver or organization that signed up with Google must finish registration
+    // (details and a password) before using the site; once finished, the completion page is
+    // no longer available.
+    const onCompletionPage = pathname.startsWith("/register/complete")
+    if ((role === "giver" || role === "organization") && profile?.registration_complete === false && !onCompletionPage) {
+      return NextResponse.redirect(new URL("/register/complete", request.url))
+    }
+    if (onCompletionPage && profile?.registration_complete !== false) {
       return NextResponse.redirect(new URL(roleHome[role], request.url))
     }
     if (

@@ -9,7 +9,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
     if (profile?.role !== "admin") return NextResponse.json({ message: "Administrator access required." }, { status: 403 })
     const { id } = await context.params
-    const { status } = await request.json()
+    const { status, reason } = await request.json()
+    const cleanReason = typeof reason === "string" && reason.trim() ? reason.trim() : null
     if (!["accepted", "declined"].includes(status)) return NextResponse.json({ message: "Invalid interest status." }, { status: 400 })
     const { data: existingInterest, error: lookupError } = await supabase.from("support_interests").select("id, need_id, giver_id").eq("id", id).single()
     if (lookupError || !existingInterest) return NextResponse.json({ message: lookupError?.message || "Interest not found." }, { status: 404 })
@@ -32,7 +33,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       sender_id: user.id,
       type: "interest_update",
       title: `Support interest ${status}`,
-      message: `Your support interest was ${status} by the platform administrator.`,
+      message: `Your support interest was ${status} by the platform administrator.${status === "declined" && cleanReason ? ` Reason: ${cleanReason}` : ""}`,
     })
     return NextResponse.json({ interest })
   } catch (error) {

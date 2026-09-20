@@ -18,9 +18,13 @@ import {
   Send,
   Flame,
   AlertTriangle,
-  PackageCheck
+  PackageCheck,
+  MessageSquare
 } from "lucide-react"
 import { StoryMediaGallery } from "@/components/story-media-gallery"
+import { MessageComposeDialog } from "@/components/message-compose-dialog"
+import { useCanMessage } from "@/hooks/use-can-message"
+import { BackButton } from "@/components/back-button"
 
 type OrganizationProfile = {
   id: string
@@ -35,6 +39,9 @@ type OrganizationProfile = {
   verification_status: string
   logo_url?: string | null
   created_at: string
+  // Present only for signed-in visitors.
+  message_recipient_id?: string
+  is_own?: boolean
 }
 
 type Need = {
@@ -73,6 +80,18 @@ export default function OrganizationPublicProfilePage() {
   const [stories, setStories] = useState<Story[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState("")
+  const { signedIn, isViewer } = useCanMessage()
+  const [isMessaging, setIsMessaging] = useState(false)
+  const [showSignInPrompt, setShowSignInPrompt] = useState(false)
+
+  const handleMessage = () => {
+    if (!signedIn || !org?.message_recipient_id) {
+      setShowSignInPrompt(true)
+      return
+    }
+    setShowSignInPrompt(false)
+    setIsMessaging(true)
+  }
 
   useEffect(() => {
     if (!id) return
@@ -155,14 +174,7 @@ export default function OrganizationPublicProfilePage() {
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 text-slate-900 dark:text-slate-100 pt-28 pb-24 px-4 md:px-8">
       <div className="max-w-6xl mx-auto space-y-10">
 
-        {/* Back Link */}
-        <Link
-          href="/needs"
-          className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 dark:text-slate-400 hover:text-blue-600 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to all community needs</span>
-        </Link>
+        <BackButton fallbackHref="/organizations" />
 
         {/* Organization Header Card */}
         <header className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 shadow-sm space-y-6">
@@ -190,6 +202,34 @@ export default function OrganizationPublicProfilePage() {
                 <p className="text-slate-500 dark:text-slate-400 text-sm font-semibold mt-1">
                   {org.type} · Registered Entity
                 </p>
+                {org.is_own ? (
+                  <p className="mt-3 text-xs font-bold text-slate-400">This is your organization's public profile.</p>
+                ) : isViewer ? (
+                  <span
+                    aria-disabled="true"
+                    data-tip="Viewers have read-only access and can't send messages. Ask an owner or manager."
+                    className="mt-3 inline-flex cursor-not-allowed items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-700 px-4 py-2 text-sm font-bold text-slate-400 opacity-70"
+                  >
+                    <MessageSquare className="w-4 h-4" /> Message
+                  </span>
+                ) : (
+                  <div className="mt-3 flex items-center gap-3 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={handleMessage}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm font-bold transition-colors"
+                      data-tip={signedIn ? `Send a message to ${org.name}` : "Sign in to message this organization"}
+                    >
+                      <MessageSquare className="w-4 h-4" /> Message
+                    </button>
+                    {showSignInPrompt && (
+                      <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">
+                        Sign in to message {org.name}.{" "}
+                        <Link href="/login" className="underline font-bold">Sign in</Link>
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -233,6 +273,13 @@ export default function OrganizationPublicProfilePage() {
             </div>
           )}
         </header>
+
+        <MessageComposeDialog
+          open={isMessaging}
+          onOpenChange={setIsMessaging}
+          recipientLabel={org.name}
+          recipientId={org.message_recipient_id}
+        />
 
         {/* --- ACTIVE OPEN NEEDS SECTION --- */}
         <section className="space-y-6">

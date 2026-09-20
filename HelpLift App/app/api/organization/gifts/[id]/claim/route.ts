@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { getOrgContext, roleAtLeast, insufficientRoleMessage } from "@/lib/organization-access"
 
 export async function POST(
   request: Request,
@@ -10,13 +11,11 @@ export async function POST(
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ message: "Authentication required." }, { status: 401 })
 
-    const { data: org } = await supabase
-      .from("organizations")
-      .select("id, name, verification_status")
-      .eq("profile_id", user.id)
-      .single()
+    const orgCtx = await getOrgContext<{ id: string; name: string; verification_status: string }>(supabase, user.id, "id, name, verification_status")
+    const org = orgCtx?.organization ?? null
 
-    if (!org) return NextResponse.json({ message: "Organization account required." }, { status: 403 })
+    if (!orgCtx || !org) return NextResponse.json({ message: "Organization account required." }, { status: 403 })
+    if (!roleAtLeast(orgCtx.role, "manager")) return NextResponse.json({ message: insufficientRoleMessage(orgCtx.role, "manager") }, { status: 403 })
     if (org.verification_status !== "approved") {
       return NextResponse.json({ message: "Your organization must be approved by an administrator before claiming offerings." }, { status: 403 })
     }

@@ -604,8 +604,12 @@ export default function LandingPage() {
 
             <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[2.5rem] p-10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] relative overflow-hidden">
                <div className="absolute -top-10 -right-10 w-40 h-40 bg-blue-50 dark:bg-blue-950 rounded-full blur-2xl -z-10" />
-               <h3 className="text-2xl font-bold mb-2 text-slate-900 dark:text-slate-100">Partner with us</h3>
-               <p className="text-slate-500 dark:text-slate-400 mb-8">Need help registering your organization? Reach out.</p>
+               <h3 className="text-2xl font-bold mb-2 text-slate-900 dark:text-slate-100">Partner with us or get in touch</h3>
+               <p className="text-slate-500 dark:text-slate-400 mb-2">Need help registering your organization? Reach out. This is also where you can contact us with any other inquiry or question.</p>
+               <p className="text-slate-500 dark:text-slate-400 mb-8">
+                 Prefer email? Write to us at{" "}
+                 <a href="mailto:helplift_platform@yahoo.com" className="font-semibold text-blue-600 hover:underline">helplift_platform@yahoo.com</a>.
+               </p>
 
                {contactFeedback && (
                  <div className={`mb-5 p-4 rounded-2xl text-sm font-semibold ${

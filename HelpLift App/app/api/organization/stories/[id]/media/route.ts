@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { getOrgContext, roleAtLeast, insufficientRoleMessage } from "@/lib/organization-access"
 
 // Appends photos/videos to an existing story (used by the edit dialog's
 // "add more" flow, separate from the main story PATCH so each item can be
@@ -10,7 +11,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ message: "Authentication required." }, { status: 401 })
 
-    const { data: org } = await supabase.from("organizations").select("id").eq("profile_id", user.id).single()
+    const orgCtx = await getOrgContext<{ id: any }>(supabase, user.id, "id")
+    const org = orgCtx?.organization ?? null
+    if (orgCtx && !roleAtLeast(orgCtx.role, "manager")) return NextResponse.json({ message: insufficientRoleMessage(orgCtx.role, "manager") }, { status: 403 })
     if (!org) return NextResponse.json({ message: "Organization access required." }, { status: 403 })
 
     const { id } = await context.params

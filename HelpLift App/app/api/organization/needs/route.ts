@@ -1,21 +1,23 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { NEED_CATEGORIES } from "@/lib/categories"
+import { getOrgContext, roleAtLeast, insufficientRoleMessage } from "@/lib/organization-access"
 
 async function getOrganizationClient() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { supabase, user: null, organization: null, status: 401 }
+  if (!user) return { supabase, user: null, organization: null, status: 401, message: undefined as string | undefined }
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-  if (profile?.role !== "organization") return { supabase, user, organization: null, status: 403 }
-  const { data: organization } = await supabase.from("organizations").select("id, verification_status").eq("profile_id", user.id).single()
-  return { supabase, user, organization, status: organization ? 200 : 404 }
+  if (profile?.role !== "organization") return { supabase, user, organization: null, status: 403, message: undefined as string | undefined }
+  const ctx = await getOrgContext<{ id: string; verification_status: string }>(supabase, user.id, "id, verification_status")
+  if (ctx && !roleAtLeast(ctx.role, "manager")) return { supabase, user, organization: null, status: 403, message: insufficientRoleMessage(ctx.role, "manager") }
+  return { supabase, user, organization: ctx?.organization ?? null, status: ctx ? 200 : 404, message: undefined as string | undefined }
 }
 
 export async function POST(request: Request) {
   try {
-    const { supabase, user, organization, status } = await getOrganizationClient()
-    if (!organization || !user) return NextResponse.json({ message: status === 401 ? "Authentication required." : "Organization access required." }, { status })
+    const { supabase, user, organization, status, message } = await getOrganizationClient()
+    if (!organization || !user) return NextResponse.json({ message: message ?? (status === 401 ? "Authentication required." : "Organization access required.") }, { status })
 
     const contentType = request.headers.get("content-type") || ""
     let body: Record<string, any> = {}

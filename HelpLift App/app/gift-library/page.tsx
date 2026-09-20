@@ -23,6 +23,7 @@ import {
   ShieldCheck
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { BackButton } from "@/components/back-button"
 
 type GiftOffering = {
   id: string
@@ -74,7 +75,9 @@ export default function PublicGiftLibraryPage() {
         if (profile) {
           setUserRole(profile.role)
           if (profile.role === "organization") {
-            const { data: org } = await supabase.from("organizations").select("verification_status").eq("profile_id", user.id).single()
+            const { data: membership } = await supabase.from("organization_members").select("organizations(verification_status)").eq("profile_id", user.id).maybeSingle()
+            const orgField = (membership as any)?.organizations
+            const org = Array.isArray(orgField) ? orgField[0] : orgField
             if (org) setOrgVerification(org.verification_status)
           }
         }
@@ -200,6 +203,9 @@ export default function PublicGiftLibraryPage() {
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 text-slate-900 dark:text-slate-100 pt-28 pb-20 px-4 md:px-8">
       <div className="max-w-7xl mx-auto space-y-10">
+        <div className="-mb-4">
+          <BackButton fallbackHref="/" />
+        </div>
 
         {/* --- HEADER --- */}
         <header className="flex flex-col md:flex-row items-center justify-between gap-6 border-b border-slate-200 dark:border-slate-800 pb-10">
@@ -239,7 +245,7 @@ export default function PublicGiftLibraryPage() {
               {feedback.type === "success" ? <CheckCircle2 className="w-5 h-5 shrink-0" /> : <AlertCircle className="w-5 h-5 shrink-0" />}
               <span>{feedback.text}</span>
             </div>
-            <button onClick={() => setFeedback(null)} className="opacity-60 hover:opacity-100">
+            <button aria-label="Dismiss message" onClick={() => setFeedback(null)} className="opacity-60 hover:opacity-100">
               <X className="w-4 h-4" />
             </button>
           </div>

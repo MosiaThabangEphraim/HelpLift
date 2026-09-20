@@ -18,6 +18,7 @@ import {
   ExternalLink,
   Sparkles,
   Pencil,
+  Settings,
   Search,
   MessageSquare,
   Bell,
@@ -26,7 +27,8 @@ import {
   Users,
   X,
   Banknote,
-  Paperclip
+  Paperclip,
+  BarChart3
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { firstOf } from "@/lib/utils"
@@ -35,6 +37,7 @@ import { ChangeEmailFlow, ChangePasswordFlow, DeleteAccountFlow } from "@/compon
 import { PledgeFinancialDialog } from "@/components/pledge-financial-dialog"
 import { DonationDetailDialog, statusBadgeClasses, type DonationSummary } from "@/components/donation-detail-dialog"
 import { formatCurrency } from "@/lib/banking"
+import { NEED_CATEGORIES } from "@/lib/categories"
 import {
   Dialog,
   DialogContent,
@@ -58,8 +61,14 @@ import {
 import { MessageComposeDialog } from "@/components/message-compose-dialog"
 import { MessageDetailDialog } from "@/components/message-detail-dialog"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { FeedbackButton } from "@/components/feedback-button"
+import { SettingsDialog } from "@/components/settings-dialog"
+import { useNotificationAlerts } from "@/hooks/use-notification-alerts"
+import { GiverAnalytics } from "@/components/analytics/giver-analytics"
+import { UserAvatar } from "@/components/user-avatar"
+import { MessageViewToggle, SentMessages } from "@/components/sent-messages"
 
-type Giver = { id: string; name: string; email: string; phone: string | null; account_type: string; preferred_categories: string[] | null; preferred_locations: string[] | null }
+type Giver = { id: string; name: string; email: string; phone: string | null; account_type: string; preferred_categories: string[] | null; preferred_locations: string[] | null; avatar_url?: string | null }
 type Need = {
   id: string
   title: string
@@ -120,6 +129,8 @@ export default function GiverDashboardPage() {
   const [interests, setInterests] = useState<Interest[]>([])
   const [fulfillments, setFulfillments] = useState<Fulfillment[]>([])
   const [notifications, setNotifications] = useState<Notification[]>([])
+  // Keeps the bell fresh while the page is open and chimes on new notifications.
+  useNotificationAlerts<Notification>(setNotifications)
   const [myGifts, setMyGifts] = useState<MyGift[]>([])
   const [donations, setDonations] = useState<Donation[]>([])
 
@@ -133,6 +144,7 @@ export default function GiverDashboardPage() {
   const [activeTab, setActiveTab] = useState("needs")
   const [payfastBanner, setPayfastBanner] = useState<"success" | "cancelled" | null>(null)
   const [selectedMessage, setSelectedMessage] = useState<Notification | null>(null)
+  const [messageView, setMessageView] = useState<"inbox" | "sent">("inbox")
 
   // Gift Pledge Modal state
   const [showGiftModal, setShowGiftModal] = useState(false)
@@ -148,10 +160,15 @@ export default function GiverDashboardPage() {
   })
   const [isSubmittingGift, setIsSubmittingGift] = useState(false)
 
+  // Settings window: opens the edit-profile / delete-account screens below
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+
   // Edit Profile Dialog state
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [profileDialogMode, setProfileDialogMode] = useState<"fields" | "email" | "password" | "delete">("fields")
   const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false)
+  const [avatarNote, setAvatarNote] = useState<{ type: "success" | "error"; text: string } | null>(null)
 
   // Message Admin dialog
   const [isMessagingAdmin, setIsMessagingAdmin] = useState(false)
@@ -168,7 +185,16 @@ export default function GiverDashboardPage() {
 
   const loadData = async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return router.replace("/login")
+    if (!user) {
+      // Offline, the sign-in check can fail even though the person is signed in. Don't send them
+      // to the login page for that; tell them, and let them retry once they're back online.
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        setError("You're offline and your saved sign-in couldn't be confirmed. Reconnect to continue.")
+        setIsLoading(false)
+        return
+      }
+      return router.replace("/login")
+    }
 
     const { data: currentProfile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
     if (currentProfile && currentProfile.role !== "giver") {
@@ -177,11 +203,22 @@ export default function GiverDashboardPage() {
       return router.replace("/login")
     }
 
-    const { data: giverProfile } = await supabase
+    let { data: giverProfile } = await supabase
       .from("givers")
-      .select("id, name, email, phone, account_type, preferred_categories, preferred_locations")
+      .select("id, name, email, phone, account_type, preferred_categories, preferred_locations, avatar_url")
       .eq("profile_id", user.id)
       .single()
+    // avatar_url only exists once the profile-picture migration has been applied;
+    // without it the query above fails as a whole, so retry without that column
+    // rather than reporting the giver as missing.
+    if (!giverProfile) {
+      const retry = await supabase
+        .from("givers")
+        .select("id, name, email, phone, account_type, preferred_categories, preferred_locations")
+        .eq("profile_id", user.id)
+        .single()
+      giverProfile = retry.data ? { ...retry.data, avatar_url: null } : null
+    }
 
     if (!giverProfile) {
       setError("Your giver profile could not be found. Please contact support if this persists.")
@@ -199,7 +236,7 @@ export default function GiverDashboardPage() {
         .order("created_at", { ascending: false }),
       supabase
         .from("support_interests")
-        .select("id, status, message, needs(title)")
+        .select("id, status, message, created_at, needs(title)")
         .eq("giver_id", giverProfile.id)
         .order("created_at", { ascending: false }),
       supabase
@@ -354,6 +391,42 @@ export default function GiverDashboardPage() {
     router.replace("/login")
   }
 
+  // The picture is saved as soon as it's chosen, separately from the Save changes button.
+  const changeAvatar = async (file: File | undefined) => {
+    if (!file) return
+    setIsUpdatingAvatar(true)
+    setAvatarNote(null)
+    try {
+      const formData = new FormData()
+      formData.append("avatar", file)
+      const res = await fetch("/api/giver/avatar", { method: "POST", body: formData })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.message || "Could not upload the picture.")
+      setGiver(current => (current ? { ...current, avatar_url: data.avatar_url } : current))
+      setAvatarNote({ type: "success", text: "Profile picture updated." })
+    } catch (err: any) {
+      setAvatarNote({ type: "error", text: err.message || "Could not upload the picture." })
+    } finally {
+      setIsUpdatingAvatar(false)
+    }
+  }
+
+  const removeAvatar = async () => {
+    setIsUpdatingAvatar(true)
+    setAvatarNote(null)
+    try {
+      const res = await fetch("/api/giver/avatar", { method: "DELETE" })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.message || "Could not remove the picture.")
+      setGiver(current => (current ? { ...current, avatar_url: null } : current))
+      setAvatarNote({ type: "success", text: "Profile picture removed." })
+    } catch (err: any) {
+      setAvatarNote({ type: "error", text: err.message || "Could not remove the picture." })
+    } finally {
+      setIsUpdatingAvatar(false)
+    }
+  }
+
   const saveProfile = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setIsSavingProfile(true)
@@ -363,7 +436,7 @@ export default function GiverDashboardPage() {
       full_name: (formData.get("full_name") as string)?.trim(),
       phone: (formData.get("phone") as string)?.trim() || null,
       account_type: formData.get("account_type") as string,
-      preferred_categories: (formData.get("preferred_categories") as string) || "",
+      preferred_categories: formData.getAll("preferred_categories").join(","),
       preferred_locations: (formData.get("preferred_locations") as string) || "",
     }
     const res = await fetch("/api/giver/profile", {
@@ -442,9 +515,7 @@ export default function GiverDashboardPage() {
         {/* --- HEADER --- */}
         <header className="flex flex-wrap items-center justify-between gap-5">
           <div className="flex items-center gap-4">
-            <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 p-3.5 text-white shadow-lg shadow-blue-600/20">
-              <HeartHandshake className="h-6 w-6" />
-            </div>
+            <UserAvatar src={giver?.avatar_url} name={giver?.name} className="size-14 text-xl shadow-lg shadow-blue-600/20" />
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Giver dashboard</p>
               <h1 className="text-2xl md:text-3xl font-extrabold leading-tight">Welcome, {giver?.name}</h1>
@@ -459,10 +530,21 @@ export default function GiverDashboardPage() {
 
           <div className="flex items-center gap-2 flex-wrap">
             <ThemeToggle className="h-9 w-9" />
+            <FeedbackButton />
+
+            <Link
+              href="/organizations"
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+            >
+              Organizations
+            </Link>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740] transition-colors">
+                <button
+                  aria-label="Notifications"
+                  data-tip={unreadCount > 0 ? `Notifications: ${unreadCount} unread. Click to see them.` : "Notifications. You're all caught up."}
+                  className="relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740] transition-colors">
                   <Bell className="w-4 h-4" />
                   {unreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
@@ -501,10 +583,10 @@ export default function GiverDashboardPage() {
             </button>
 
             <button
-              onClick={() => setIsEditingProfile(true)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+              onClick={() => setIsSettingsOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
             >
-              <Pencil className="h-3.5 w-3.5" /> Edit Profile
+              <Settings className="h-3.5 w-3.5" /> Settings
             </button>
 
             <button
@@ -549,6 +631,7 @@ export default function GiverDashboardPage() {
             <TabsTrigger value="fulfillments" className="gap-1.5 rounded-xl"><PackageCheck className="w-4 h-4" />Fulfillments<CountBadge value={stats.activeFulfillments} /></TabsTrigger>
             <TabsTrigger value="donations" className="gap-1.5 rounded-xl"><Banknote className="w-4 h-4" />My Donations<CountBadge value={pendingDonations} /></TabsTrigger>
             <TabsTrigger value="messages" className="gap-1.5 rounded-xl"><Mail className="w-4 h-4" />Messages<CountBadge value={unreadMessages} /></TabsTrigger>
+            <TabsTrigger value="analytics" className="gap-1.5 rounded-xl"><BarChart3 className="w-4 h-4" />Analytics</TabsTrigger>
           </TabsList>
 
           {/* --- BROWSE NEEDS TAB --- */}
@@ -870,7 +953,8 @@ export default function GiverDashboardPage() {
                 <CardDescription>Direct messages from HelpLift admins and organizations.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {messages.length === 0 ? (
+                <MessageViewToggle value={messageView} onChange={setMessageView} />
+                {messageView === "inbox" && (messages.length === 0 ? (
                   <EmptyState text="No messages yet." />
                 ) : (
                   messages.map(item => (
@@ -892,9 +976,13 @@ export default function GiverDashboardPage() {
                       )}
                     </div>
                   ))
-                )}
+                ))}
+                {messageView === "sent" && <SentMessages canReply={true} />}
               </CardContent>
             </Card>
+          </TabsContent>
+          <TabsContent value="analytics">
+            <GiverAnalytics donations={donations as any} interests={interests as any} fulfillments={fulfillments as any} gifts={myGifts} />
           </TabsContent>
         </Tabs>
 
@@ -942,7 +1030,7 @@ export default function GiverDashboardPage() {
                     Offer goods, professional services, or direct financial support to verified organizations.
                   </p>
                 </div>
-                <button onClick={() => setShowGiftModal(false)} className="text-slate-400 hover:text-slate-600">
+                <button aria-label="Close" onClick={() => setShowGiftModal(false)} className="text-slate-400 hover:text-slate-600">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -1036,13 +1124,20 @@ export default function GiverDashboardPage() {
       </div>
 
       {/* --- EDIT PROFILE DIALOG --- */}
+      <SettingsDialog
+        open={isSettingsOpen}
+        onOpenChange={setIsSettingsOpen}
+        onEditProfile={() => { setIsSettingsOpen(false); setProfileDialogMode("fields"); setIsEditingProfile(true) }}
+        onDeleteAccount={() => { setIsSettingsOpen(false); setProfileDialogMode("delete"); setIsEditingProfile(true) }}
+      />
+
       <Dialog open={isEditingProfile} onOpenChange={open => !open && closeProfileDialog()}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader className="flex flex-row items-center justify-between">
             <DialogTitle>
               {profileDialogMode === "email" ? "Change Email" : profileDialogMode === "password" ? "Change Password" : profileDialogMode === "delete" ? "Delete Account" : "Edit Your Profile"}
             </DialogTitle>
-            <button
+            <button aria-label="Close"
               type="button"
               onClick={closeProfileDialog}
               className="rounded-md p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
@@ -1077,6 +1172,34 @@ export default function GiverDashboardPage() {
           )}
           {giver && profileDialogMode === "fields" && (
             <form onSubmit={saveProfile} className="space-y-3 pt-2">
+              <div className="flex items-center gap-4">
+                <UserAvatar src={giver.avatar_url} name={giver.name} className="size-20 text-2xl" />
+                <div className="space-y-1.5">
+                  <p className="text-sm font-semibold">Profile picture</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label className={`inline-flex cursor-pointer items-center rounded-full border border-slate-200 dark:border-[#233350] px-3.5 py-1.5 text-xs font-bold hover:bg-slate-50 dark:hover:bg-[#1A2740] ${isUpdatingAvatar ? "pointer-events-none opacity-60" : ""}`}>
+                      {isUpdatingAvatar ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+                      {giver.avatar_url ? "Change photo" : "Upload photo"}
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="sr-only"
+                        disabled={isUpdatingAvatar}
+                        onChange={event => { changeAvatar(event.target.files?.[0]); event.target.value = "" }}
+                      />
+                    </label>
+                    {giver.avatar_url && (
+                      <button type="button" onClick={removeAvatar} disabled={isUpdatingAvatar} className="text-xs font-bold text-red-600 hover:underline disabled:opacity-60">
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">PNG, JPG or WebP, up to 2 MB.</p>
+                  {avatarNote && (
+                    <p className={`text-xs font-semibold ${avatarNote.type === "success" ? "text-emerald-600" : "text-red-600"}`}>{avatarNote.text}</p>
+                  )}
+                </div>
+              </div>
               <div className="space-y-1">
                 <Label htmlFor="edit-giver-name">Full name</Label>
                 <Input id="edit-giver-name" name="full_name" defaultValue={giver.name} required />
@@ -1106,8 +1229,21 @@ export default function GiverDashboardPage() {
                 </select>
               </div>
               <div className="space-y-1">
-                <Label htmlFor="edit-giver-categories">Preferred support categories</Label>
-                <Input id="edit-giver-categories" name="preferred_categories" defaultValue={(giver.preferred_categories || []).join(", ")} placeholder="e.g. Education, Food & Nutrition" />
+                <Label>Preferred support categories</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {NEED_CATEGORIES.map(category => (
+                    <label key={category} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        name="preferred_categories"
+                        value={category}
+                        defaultChecked={(giver.preferred_categories || []).some(c => c.trim().toLowerCase() === category.toLowerCase())}
+                        className="w-4 h-4 accent-blue-600"
+                      />
+                      {category}
+                    </label>
+                  ))}
+                </div>
               </div>
               <div className="space-y-1">
                 <Label htmlFor="edit-giver-locations">Preferred locations</Label>

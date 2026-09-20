@@ -7,6 +7,14 @@ import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, Sparkles, Loader2, AlertCircle, CheckCircle2, Mail, Lock, Quote as QuoteIcon } from "lucide-react"
 import { getRandomQuote } from "@/lib/quotes"
+import { GoogleSignInButton } from "@/components/google-sign-in-button"
+
+// Messages for the ?error= values /auth/callback redirects back with.
+const CALLBACK_ERRORS: Record<string, string> = {
+  google: "Google sign-in didn't complete. Please try again.",
+  admin: "Administrators sign in through the administrator portal.",
+  profile: "Your account profile is incomplete. Please contact support.",
+}
 
 export default function LoginPage() {
   return (
@@ -31,6 +39,14 @@ function LoginContent() {
   // Picked once per page load, so every visit to this screen (i.e. every
   // time someone logs in) shows a fresh random one.
   const [quote] = useState(() => getRandomQuote())
+
+  useEffect(() => {
+    const callbackError = searchParams.get("error")
+    if (callbackError) {
+      setErrorMsg(CALLBACK_ERRORS[callbackError] || "Sign-in didn't complete. Please try again.")
+      window.history.replaceState({}, "", "/login")
+    }
+  }, [searchParams])
 
   useEffect(() => {
     if (searchParams.get("verified") === "1") {
@@ -203,6 +219,18 @@ function LoginContent() {
           Sign In <ArrowRight className="ml-2 h-5 w-5" />
         </Button>
       </form>
+
+      <div className="w-full max-w-xl mt-6 space-y-4">
+        <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-wider text-slate-400">
+          <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+          or
+          <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
+        </div>
+        <GoogleSignInButton label="Sign in with Google" onError={setErrorMsg} />
+        <p className="text-center text-xs text-slate-400 dark:text-slate-500">
+          New to HelpLift? Google only verifies your email. You'll then choose whether you're a giver or an organization and finish registering.
+        </p>
+      </div>
 
       <p className="mt-8 text-sm text-slate-500 dark:text-slate-400">
         New to the platform?{" "}

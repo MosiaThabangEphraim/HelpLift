@@ -25,6 +25,7 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import { NEED_CATEGORIES } from "@/lib/categories"
 import { DonateDialog } from "@/components/donate-dialog"
+import { BackButton } from "@/components/back-button"
 import { formatCurrency } from "@/lib/banking"
 
 type OrganizationInfo = {
@@ -76,6 +77,9 @@ export default function PublicNeedsPage() {
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [giverId, setGiverId] = useState<string | null>(null)
+  const [preferredCategories, setPreferredCategories] = useState<string[]>([])
+  const [preferredLocations, setPreferredLocations] = useState<string[]>([])
+  const [matchesOnly, setMatchesOnly] = useState(false)
   const [selectedNeed, setSelectedNeed] = useState<PublicNeed | null>(null)
   const [interestMessage, setInterestMessage] = useState("")
   const [isSubmittingInterest, setIsSubmittingInterest] = useState(false)
@@ -100,8 +104,12 @@ export default function PublicNeedsPage() {
         if (profile) {
           setUserRole(profile.role)
           if (profile.role === "giver") {
-            const { data: giver } = await supabase.from("givers").select("id").eq("profile_id", user.id).single()
-            if (giver) setGiverId(giver.id)
+            const { data: giver } = await supabase.from("givers").select("id, preferred_categories, preferred_locations").eq("profile_id", user.id).single()
+            if (giver) {
+              setGiverId(giver.id)
+              setPreferredCategories(giver.preferred_categories || [])
+              setPreferredLocations(giver.preferred_locations || [])
+            }
           }
         }
       }
@@ -155,7 +163,22 @@ export default function PublicNeedsPage() {
         need.category?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         need.location?.toLowerCase().includes(searchQuery.toLowerCase())
 
-      return matchesCategory && matchesUrgency && matchesLocation && matchesSearch
+      // Same rules as notify_matching_givers() in the database: each preference
+      // list that is set must match; an empty list places no restriction.
+      let matchesPreferences = true
+      if (matchesOnly) {
+        const org = Array.isArray(need.organizations) ? need.organizations[0] : need.organizations
+        const needPlace = [need.location, org?.city, org?.province].filter(Boolean).join(" ").toLowerCase()
+        const categoryOk =
+          preferredCategories.length === 0 ||
+          preferredCategories.some(c => c.trim().toLowerCase() === need.category?.trim().toLowerCase())
+        const locationOk =
+          preferredLocations.length === 0 ||
+          preferredLocations.some(l => l.trim() && needPlace.includes(l.trim().toLowerCase()))
+        matchesPreferences = categoryOk && locationOk
+      }
+
+      return matchesCategory && matchesUrgency && matchesLocation && matchesSearch && matchesPreferences
     })
 
     const sorted = [...filtered]
@@ -164,7 +187,9 @@ export default function PublicNeedsPage() {
     else if (sortBy === "title") sorted.sort((a, b) => a.title.localeCompare(b.title))
     else sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     return sorted
-  }, [needs, selectedCategory, selectedUrgency, locationFilter, searchQuery, sortBy])
+  }, [needs, selectedCategory, selectedUrgency, locationFilter, searchQuery, sortBy, matchesOnly, preferredCategories, preferredLocations])
+
+  const hasPreferences = preferredCategories.length > 0 || preferredLocations.length > 0
 
   const handleSupportClick = (need: PublicNeed) => {
     if (!currentUser) {
@@ -259,6 +284,9 @@ export default function PublicNeedsPage() {
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100 pt-28 pb-20 px-4 md:px-8 transition-colors">
       <div className="max-w-7xl mx-auto space-y-10">
+        <div className="-mb-4">
+          <BackButton fallbackHref="/" />
+        </div>
 
         {/* --- HEADER --- */}
         <header className="space-y-4 text-center max-w-3xl mx-auto">
@@ -286,7 +314,7 @@ export default function PublicNeedsPage() {
               {feedback.type === "success" ? <CheckCircle2 className="w-5 h-5 shrink-0" /> : <AlertCircle className="w-5 h-5 shrink-0" />}
               <span>{feedback.text}</span>
             </div>
-            <button onClick={() => setFeedback(null)} className="opacity-60 hover:opacity-100">
+            <button aria-label="Dismiss message" onClick={() => setFeedback(null)} className="opacity-60 hover:opacity-100">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -367,6 +395,27 @@ export default function PublicNeedsPage() {
               </button>
             ))}
           </div>
+
+          {/* Preference matching (givers only) */}
+          {userRole === "giver" && (
+            <div className="flex items-center gap-3 flex-wrap text-sm">
+              <label className={`inline-flex items-center gap-2 font-semibold ${hasPreferences ? "cursor-pointer" : "opacity-60"}`}>
+                <input
+                  type="checkbox"
+                  checked={matchesOnly}
+                  disabled={!hasPreferences}
+                  onChange={(e) => setMatchesOnly(e.target.checked)}
+                  className="w-4 h-4 accent-blue-600"
+                />
+                Only show needs matching my preferences
+              </label>
+              {!hasPreferences && (
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  Set preferred categories and locations in your dashboard profile settings to use this.
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* --- NEEDS GRID --- */}
@@ -389,6 +438,7 @@ export default function PublicNeedsPage() {
                 setSelectedUrgency("all")
                 setLocationFilter("")
                 setSortBy("newest")
+                setMatchesOnly(false)
               }}
               className="px-5 py-2.5 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-sm hover:opacity-90 transition-opacity"
             >
@@ -527,7 +577,7 @@ export default function PublicNeedsPage() {
                     Let the organization know how you can help fulfill this need.
                   </p>
                 </div>
-                <button
+                <button aria-label="Close"
                   onClick={() => setSelectedNeed(null)}
                   className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-[#1A2740] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
                 >

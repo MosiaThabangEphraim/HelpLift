@@ -7,7 +7,11 @@ export async function GET() {
   if (!user) return NextResponse.json({ message: "Authentication required." }, { status: 401 })
   const { data, error } = await supabase
     .from("notifications")
-    .select("id, type, title, message, sender_name, sender_role, read_at, created_at, attachment_storage_path, attachment_file_name")
+    .select("id, type, title, message, sender_id, sender_name, sender_role, reply_to_id, reply_to_snippet, read_at, created_at, attachment_storage_path, attachment_file_name")
+    // Only messages addressed to this user. Row-level security also lets people
+    // read the messages they SENT (for conversation history), so the inbox must
+    // filter by recipient explicitly.
+    .eq("recipient_id", user.id)
     .order("created_at", { ascending: false })
     .limit(50)
   if (error) return NextResponse.json({ message: error.message }, { status: 400 })

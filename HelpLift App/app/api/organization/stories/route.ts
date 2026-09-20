@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { getOrgContext, roleAtLeast, insufficientRoleMessage } from "@/lib/organization-access"
 
 export async function GET() {
   try {
@@ -7,12 +8,13 @@ export async function GET() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ message: "Authentication required." }, { status: 401 })
 
-    const { data: org } = await supabase.from("organizations").select("id").eq("profile_id", user.id).single()
+    const orgCtx = await getOrgContext<{ id: any }>(supabase, user.id, "id")
+    const org = orgCtx?.organization ?? null
     if (!org) return NextResponse.json({ message: "Organization profile not found." }, { status: 404 })
 
     const { data, error } = await supabase
       .from("impact_stories")
-      .select("id, title, content, author_role, image_url, video_url, created_at, need_id")
+      .select("id, title, content, author_role, image_url, video_url, created_at, need_id, status, rejection_reason")
       .eq("organization_id", org.id)
       .order("created_at", { ascending: false })
 
@@ -49,7 +51,9 @@ export async function POST(request: Request) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ message: "Authentication required." }, { status: 401 })
 
-    const { data: org } = await supabase.from("organizations").select("id, verification_status").eq("profile_id", user.id).single()
+    const orgCtx = await getOrgContext<{ id: any; verification_status: any }>(supabase, user.id, "id, verification_status")
+    const org = orgCtx?.organization ?? null
+    if (orgCtx && !roleAtLeast(orgCtx.role, "manager")) return NextResponse.json({ message: insufficientRoleMessage(orgCtx.role, "manager") }, { status: 403 })
     if (!org) return NextResponse.json({ message: "Organization access required." }, { status: 403 })
 
     const contentType = request.headers.get("content-type") || ""
