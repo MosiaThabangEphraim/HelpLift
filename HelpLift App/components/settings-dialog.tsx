@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
+import { PasskeySettings } from "@/components/passkey-settings"
 import {
   isNotificationSoundEnabled,
   playNotificationSound,
@@ -101,6 +102,8 @@ export function SettingsDialog({
               <Button type="button" variant="outline" size="sm" onClick={onChangePassword}>Change</Button>
             </SettingRow>
           )}
+
+          <PasskeySettings open={open} />
 
           <SettingRow icon={<Bell className="h-5 w-5" />} title="Notification sounds" description={soundOn ? "A chime plays when a new notification arrives." : "Muted. No sound for new notifications."}>
             <Switch checked={soundOn} onCheckedChange={changeSound} aria-label="Notification sounds" />

@@ -5,9 +5,11 @@ import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Sparkles, Loader2, AlertCircle, CheckCircle2, Mail, Lock, Quote as QuoteIcon } from "lucide-react"
+import { ArrowRight, Sparkles, Loader2, AlertCircle, CheckCircle2, Mail, Lock, Fingerprint, Quote as QuoteIcon } from "lucide-react"
 import { getRandomQuote } from "@/lib/quotes"
 import { GoogleSignInButton } from "@/components/google-sign-in-button"
+import { createClient } from "@/lib/supabase/client"
+import { isPasskeySupported, passkeyErrorMessage } from "@/lib/passkeys"
 
 // Messages for the ?error= values /auth/callback redirects back with.
 const CALLBACK_ERRORS: Record<string, string> = {
@@ -36,6 +38,8 @@ function LoginContent() {
   const [password, setPassword] = useState("")
   const [errorMsg, setErrorMsg] = useState("")
   const [showVerifiedBanner, setShowVerifiedBanner] = useState(false)
+  const [passkeySupported, setPasskeySupported] = useState(false)
+  const [isPasskeyLoading, setIsPasskeyLoading] = useState(false)
   // Picked once per page load, so every visit to this screen (i.e. every
   // time someone logs in) shows a fresh random one.
   const [quote] = useState(() => getRandomQuote())
@@ -55,6 +59,39 @@ function LoginContent() {
       window.history.replaceState({}, "", "/login")
     }
   }, [searchParams])
+
+  useEffect(() => {
+    setPasskeySupported(isPasskeySupported())
+  }, [])
+
+  // Sign in with a passkey (fingerprint, face or device PIN). No email or password
+  // is typed: the device offers the passkeys it has for this site. Afterwards the
+  // same rules as the password login apply: administrators use their own portal.
+  const handlePasskeyLogin = async () => {
+    setErrorMsg("")
+    setIsPasskeyLoading(true)
+    const supabase = createClient()
+    try {
+      const { data, error } = await supabase.auth.signInWithPasskey()
+      if (error || !data?.user) throw error ?? new Error("Passkey sign-in didn't complete.")
+
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).single()
+      if (!profile) {
+        await supabase.auth.signOut()
+        throw new Error("Your account profile is incomplete. Please contact support.")
+      }
+      if (profile.role === "admin") {
+        await supabase.auth.signOut()
+        throw new Error("Administrators sign in through the administrator portal.")
+      }
+      setIsLoading(true)
+      router.push(profile.role === "organization" ? "/organisation-dashboard" : "/givers-dashboard")
+    } catch (err) {
+      setErrorMsg(passkeyErrorMessage(err, "signin"))
+      setIsPasskeyLoading(false)
+      setIsLoading(false)
+    }
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -226,6 +263,22 @@ function LoginContent() {
           or
           <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
         </div>
+        {passkeySupported && (
+          <button
+            type="button"
+            onClick={handlePasskeyLogin}
+            disabled={isPasskeyLoading}
+            className="flex w-full items-center justify-center gap-3 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-6 py-3.5 text-sm font-bold text-slate-800 dark:text-slate-100 shadow-sm transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-60"
+          >
+            {isPasskeyLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Fingerprint className="h-5 w-5" />}
+            <span>Sign in with a passkey</span>
+          </button>
+        )}
+        {passkeySupported && (
+          <p className="-mt-2 text-center text-xs text-slate-400 dark:text-slate-500">
+            Passkeys are set up after your first sign-in, in Settings.
+          </p>
+        )}
         <GoogleSignInButton label="Sign in with Google" onError={setErrorMsg} />
         <p className="text-center text-xs text-slate-400 dark:text-slate-500">
           New to HelpLift? Google only verifies your email. You'll then choose whether you're a giver or an organization and finish registering.

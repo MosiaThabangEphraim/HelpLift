@@ -63,6 +63,7 @@ import { MessageDetailDialog } from "@/components/message-detail-dialog"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { FeedbackButton } from "@/components/feedback-button"
 import { SettingsDialog } from "@/components/settings-dialog"
+import { PasskeyPrompt } from "@/components/passkey-prompt"
 import { useNotificationAlerts } from "@/hooks/use-notification-alerts"
 import { GiverAnalytics } from "@/components/analytics/giver-analytics"
 import { UserAvatar } from "@/components/user-avatar"
@@ -1124,6 +1125,8 @@ export default function GiverDashboardPage() {
       </div>
 
       {/* --- EDIT PROFILE DIALOG --- */}
+      <PasskeyPrompt />
+
       <SettingsDialog
         open={isSettingsOpen}
         onOpenChange={setIsSettingsOpen}

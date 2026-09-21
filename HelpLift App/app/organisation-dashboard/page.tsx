@@ -74,6 +74,7 @@ import { ChangeEmailFlow, ChangePasswordFlow, DeleteAccountFlow } from "@/compon
 import { ThemeToggle } from "@/components/theme-toggle"
 import { FeedbackButton } from "@/components/feedback-button"
 import { SettingsDialog } from "@/components/settings-dialog"
+import { PasskeyPrompt } from "@/components/passkey-prompt"
 import { useNotificationAlerts } from "@/hooks/use-notification-alerts"
 
 type Organization = {
@@ -2169,6 +2170,8 @@ export default function OrganizationDashboardPage() {
       </Dialog>
 
       {/* --- EDIT ORGANIZATION DIALOG --- */}
+      <PasskeyPrompt />
+
       <SettingsDialog
         open={isSettingsOpen}
         onOpenChange={setIsSettingsOpen}
