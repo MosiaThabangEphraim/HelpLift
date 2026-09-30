@@ -58,8 +58,12 @@ export async function PATCH(
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ message: "Authentication required." }, { status: 401 })
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
-    if (!profile || !["giver", "organization", "admin"].includes(profile.role)) {
-      return NextResponse.json({ message: "Access denied." }, { status: 403 })
+    // Only the organization (the recipient - of a delivery or a gift) may
+    // change a fulfillment's status; a giver self-declaring "delivered"
+    // without the recipient confirming is a weaker signal than the org
+    // confirming receipt. The giver can still view and message.
+    if (!profile || !["organization", "admin"].includes(profile.role)) {
+      return NextResponse.json({ message: "Only the organization can update a fulfillment's status." }, { status: 403 })
     }
 
     const { id } = await context.params
@@ -121,7 +125,7 @@ export async function PATCH(
       .from("fulfillments")
       .update(fullPayload)
       .eq("id", id)
-      .select("id, status, notes, proof_storage_path, giver_id, organization_id, support_interests(needs(title))")
+      .select("id, status, notes, proof_storage_path, giver_id, organization_id, support_interests(needs(title)), gift_offerings(title)")
       .single()
 
     // Defensive fallback if proof_storage_path column doesn't exist yet in Supabase
@@ -135,7 +139,7 @@ export async function PATCH(
         .from("fulfillments")
         .update(fallbackPayload)
         .eq("id", id)
-        .select("id, status, notes, proof_storage_path, giver_id, organization_id, support_interests(needs(title))")
+        .select("id, status, notes, proof_storage_path, giver_id, organization_id, support_interests(needs(title)), gift_offerings(title)")
         .single()
       fulfillment = retry.data
       error = retry.error
@@ -164,6 +168,8 @@ export async function PATCH(
       const needTitle = (fulfillment as any).support_interests?.needs?.title
         || (fulfillment as any).support_interests?.[0]?.needs?.title
         || (fulfillment as any).support_interests?.[0]?.needs?.[0]?.title
+        || (fulfillment as any).gift_offerings?.title
+        || (fulfillment as any).gift_offerings?.[0]?.title
         || "a fulfillment"
       const actingAsGiver = giver?.profile_id === user.id
       const actingAsOrg = org?.profile_id === user.id

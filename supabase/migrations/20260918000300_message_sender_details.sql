@@ -1,6 +1,6 @@
 -- Migration: 20260918000300_message_sender_details.sql
 -- Description: The Messages views (admin/giver/organisation dashboards) show
--- a notification's title/message but never who sent it as structured data —
+-- a notification's title/message but never who sent it as structured data -
 -- the sender's name is only ever embedded inside the free-text `title`
 -- ("Message from X"), not queryable/displayable on its own. A live join to
 -- profiles at read time won't work generally: "Users can view their own
@@ -13,7 +13,7 @@
 alter table public.notifications add column if not exists sender_name text;
 alter table public.notifications add column if not exists sender_role text;
 
--- Same signature as 20260918000200_harden_suspension_enforcement.sql — just
+-- Same signature as 20260918000200_harden_suspension_enforcement.sql - just
 -- adding sender_name/sender_role to what gets stored, no other logic change.
 create or replace function public.send_notification(
   p_recipient uuid,
@@ -56,7 +56,7 @@ begin
     v_allowed := true;
   end if;
 
-  -- A giver may message any organization — organizations are public
+  -- A giver may message any organization - organizations are public
   -- entities (listed on the needs board and their own profile page).
   if not v_allowed and v_sender_role = 'giver' and v_recipient_role = 'organization' then
     v_allowed := true;

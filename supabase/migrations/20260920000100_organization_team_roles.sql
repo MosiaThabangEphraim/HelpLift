@@ -3,15 +3,15 @@
 --
 -- Until now an organization was a single login (organizations.profile_id is
 -- unique), so there was nobody to give a role to. This adds:
---   * organization_members     — who belongs to which organization, and as what
---   * organization_invitations — email invitations (token stored hashed)
---   * has_org_role()           — one helper the policies and API routes share
+--   * organization_members     - who belongs to which organization, and as what
+--   * organization_invitations - email invitations (token stored hashed)
+--   * has_org_role()           - one helper the policies and API routes share
 --
 -- Roles (higher includes everything below it):
---   viewer  — read-only access to the organization's data
---   manager — viewer + create/edit needs, handle interests, fulfillments,
+--   viewer  - read-only access to the organization's data
+--   manager - viewer + create/edit needs, handle interests, fulfillments,
 --             stories, documents, gift claims
---   owner   — manager + manage the team, edit the organization profile and
+--   owner   - manager + manage the team, edit the organization profile and
 --             banking details, delete the account (the original login)
 --
 -- Existing "o.profile_id = auth.uid()" policies are deliberately LEFT ALONE.

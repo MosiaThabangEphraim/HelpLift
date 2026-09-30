@@ -88,6 +88,129 @@
   --sidebar-ring: #2C3E63;
 }
 
+/* High-contrast mode - a third theme choice alongside light/dark (see
+   components/theme-toggle.tsx and the ThemeProvider's `themes` prop in
+   app/layout.tsx), for anyone who needs stronger contrast, regardless of
+   whether they'd otherwise prefer a light or dark background. Pure
+   black-on-white, thick high-visibility focus rings, and no reliance on
+   color alone to indicate state.
+
+   Every component built on the shared CSS variables below (shadcn's
+   Button/Card/Dialog/Input/etc., which use bg-background/text-foreground/
+   border-border rather than literal colors) gets full coverage for free.
+   The dashboards additionally use a lot of literal Tailwind colors
+   (bg-white, text-slate-500, dark:bg-[#121B2E]...) that predate this mode;
+   the broad-strokes overrides after the variables catch the handful of
+   color combinations repeated the most often across this app, as a
+   pragmatic first pass - not an exhaustive guarantee on every literal
+   color everywhere. */
+.high-contrast {
+  --background: #ffffff;
+  --foreground: #000000;
+  --card: #ffffff;
+  --card-foreground: #000000;
+  --popover: #ffffff;
+  --popover-foreground: #000000;
+  --primary: #000000;
+  --primary-foreground: #ffffff;
+  --secondary: #ffffff;
+  --secondary-foreground: #000000;
+  --muted: #ffffff;
+  --muted-foreground: #000000;
+  --accent: #000000;
+  --accent-foreground: #ffffff;
+  --destructive: #b30000;
+  --destructive-foreground: #ffffff;
+  --border: #000000;
+  --input: #000000;
+  --ring: #0000ee;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #000000;
+  --sidebar-primary: #000000;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #000000;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #000000;
+  --sidebar-ring: #0000ee;
+}
+
+/* Thick, unmistakable focus rings everywhere — the single highest-impact
+   change for keyboard navigation, and cheap to apply globally. */
+.high-contrast *:focus-visible {
+  outline: 3px solid #0000ee !important;
+  outline-offset: 2px !important;
+}
+
+/* Real <button>/<a> elements and shadcn's components already draw their own
+   focus-visible ring. A "row" standing in for one (role="button" tabIndex={0}
+   - see lib/keyboard.ts) usually has no styling of its own for it, so it
+   would otherwise fall back to whatever the browser does (sometimes nothing
+   visible against a rounded/bordered card). This guarantees every one of
+   those gets a clearly visible keyboard focus ring too, in every theme. */
+[role="button"]:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+.dark [role="button"]:focus-visible {
+  outline-color: #60a5fa;
+}
+
+/* Broad-strokes overrides for the literal (non-variable) color utilities
+   repeated the most throughout the dashboards. Only the LIGHT-mode literal
+   utilities need overriding here - next-themes applies exactly one class
+   name to <html> at a time (attribute="class"), so ".dark" and
+   ".high-contrast" never co-occur, which means every `dark:`-prefixed
+   utility is already inert (not matching anything) whenever high-contrast
+   is active; only its light-mode base utility is actually rendered. */
+.high-contrast body {
+  background: #ffffff !important;
+  color: #000000 !important;
+}
+.high-contrast .bg-white,
+.high-contrast .bg-slate-50,
+.high-contrast .bg-slate-100 {
+  background-color: #ffffff !important;
+}
+.high-contrast .text-slate-400,
+.high-contrast .text-slate-500,
+.high-contrast .text-slate-600 {
+  color: #000000 !important;
+}
+.high-contrast .border-slate-200,
+.high-contrast .border-slate-300 {
+  border-color: #000000 !important;
+}
+.high-contrast a,
+.high-contrast button {
+  text-underline-offset: 3px;
+}
+
+/* Fourth theme: a literal black-and-white mode - every color desaturated,
+   not just the specific Tailwind utility classes high-contrast targets
+   above. A single CSS filter on the whole page does this correctly and
+   completely (photos, avatars, chart fills, anything) in one line, where a
+   hand-maintained class list (the high-contrast approach) never could.
+   grayscale(1) alone only removes saturation - it keeps each color's
+   original lightness, so the dark theme's actual navy background
+   (#0B1220, not literal black) just becomes a muted dark grey. The added
+   contrast boost pushes darks toward black and lights toward white, so it
+   reads as genuinely black-and-white instead of "dark mode, less colorful". */
+html.grayscale {
+  filter: grayscale(1) contrast(1.3);
+}
+
+/* "Larger text" accessibility preference (see lib/font-size.ts, set from
+   Settings in the giver/organization dashboards) - scales the root
+   font-size so every rem-based Tailwind text utility (text-sm, text-base,
+   text-lg, ...) scales proportionally with it, with no changes needed to
+   any individual component. */
+html.font-size-large {
+  font-size: 125%; /* 16px base -> 20px */
+}
+html.font-size-larger {
+  font-size: 150%; /* 16px base -> 24px */
+}
+
 /* Theme & fonts */
 @theme inline {
   --font-sans: "Geist", "Geist Fallback";
@@ -161,8 +284,9 @@ body {
 .field {
   width: 100%;
   border: 1px solid #e2e8f0;
-  border-radius: 1rem;
-  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
   color: #0f172a;
   outline: none;
   background: transparent;
@@ -177,6 +301,37 @@ body {
   border-color: #233350;
   color: #f1f5f9;
   background: #0f1729;
+}
+
+/* Flatter/tighter redesign, rolled out site-wide from an organization-
+   dashboard trial. Card/CardTitle/CardDescription's own share of this now
+   lives directly in components/ui/card.tsx (it's a real shadcn component,
+   so there was no need to fight it with CSS once the redesign was
+   approved everywhere); these two data-tip-targeted controls are plain
+   attribute selectors instead, so they stay here. */
+
+/* "Check grammar": plain text link, no chip/background. */
+[data-tip="Check grammar and spelling"] {
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  font-weight: 400;
+}
+[data-tip="Check grammar and spelling"]:hover {
+  background: transparent;
+  text-decoration: underline;
+}
+
+/* Mic button: small bordered square instead of a circle, both idle and
+   recording states. */
+[data-tip="Speak instead of typing"],
+[data-tip="Stop voice typing"] {
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+.dark [data-tip="Speak instead of typing"],
+.dark [data-tip="Stop voice typing"] {
+  border-color: #233350;
 }
 
 code, pre {

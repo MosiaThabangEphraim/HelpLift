@@ -73,7 +73,7 @@ begin
     v_allowed := true;
   end if;
 
-  -- A giver may message any organization — organizations are public
+  -- A giver may message any organization - organizations are public
   -- entities (listed on the needs board and their own profile page).
   if not v_allowed and v_sender_role = 'giver' and v_recipient_role = 'organization' then
     v_allowed := true;

@@ -43,7 +43,7 @@ begin
     raise exception 'Your account is suspended. You may only message an administrator.';
   end if;
 
-  -- Admins may message anyone; anyone may message an admin — except a
+  -- Admins may message anyone; anyone may message an admin - except a
   -- read-only organization viewer, who may not.
   if v_sender_role = 'admin' or v_recipient_role = 'admin' then
     if v_sender_role = 'organization' and exists (
@@ -55,7 +55,7 @@ begin
     v_allowed := true;
   end if;
 
-  -- A giver may message any organization — organizations are public
+  -- A giver may message any organization - organizations are public
   -- entities (listed on the needs board and their own profile page).
   if not v_allowed and v_sender_role = 'giver' and v_recipient_role = 'organization' then
     v_allowed := true;

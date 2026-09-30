@@ -2,7 +2,7 @@ import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 
 export const metadata = {
-  title: "Privacy Policy — HelpLift",
+  title: "Privacy Policy - HelpLift",
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -42,7 +42,7 @@ export default function PrivacyPolicyPage() {
             <li><strong className="text-slate-800 dark:text-slate-100">Organizations</strong>: organization name, type, registration number, contact person's name and role, email, phone, physical address, mission statement, and banking details (used to forward verified donations to you).</li>
           </ul>
           <p><strong className="text-slate-800 dark:text-slate-100">Verification documents.</strong> Organizations upload registration certificates, tax exemption letters, founding documents, and proof of banking details so our administrators can verify the organization before it can publish needs or receive donations.</p>
-          <p><strong className="text-slate-800 dark:text-slate-100">Donation and payment information.</strong> When you donate — by bank transfer (EFT) or via PayFast — we record the amount, payment method, a reference code, and (for EFT) a proof-of-payment file you upload for admin verification. Card and instant-EFT payments made through PayFast are processed by PayFast directly; we do not see or store your card number.</p>
+          <p><strong className="text-slate-800 dark:text-slate-100">Donation and payment information.</strong> When you donate - by bank transfer (EFT) or via PayFast - we record the amount, payment method, a reference code, and (for EFT) a proof-of-payment file you upload for admin verification. Card and instant-EFT payments made through PayFast are processed by PayFast directly; we do not see or store your card number.</p>
           <p><strong className="text-slate-800 dark:text-slate-100">Content you post.</strong> Needs, impact stories (including photos and videos you upload), and messages you send to other users (including any file attachments) are stored on the platform. Impact stories and published needs are publicly visible.</p>
           <p><strong className="text-slate-800 dark:text-slate-100">Usage and security information.</strong> We log sign-in timestamps and an approximate device/browser identifier and time zone, used only to help us detect suspicious account activity.</p>
         </Section>
@@ -73,7 +73,7 @@ export default function PrivacyPolicyPage() {
         <Section title="5. How we protect your information">
           <p>
             Passwords are hashed and never stored in plain text. Access to platform data is restricted by row-level
-            security policies, so an account can only read or change data it is authorized to see — for example, an
+            security policies, so an account can only read or change data it is authorized to see - for example, an
             organization cannot view another organization's banking details, and a giver cannot see donations they
             didn't make. Administrators can suspend an account suspected of abuse, which immediately blocks that
             account from creating, editing, or viewing most platform data until the suspension is lifted.
@@ -84,7 +84,7 @@ export default function PrivacyPolicyPage() {
           <p>Under POPIA, you have the right to:</p>
           <ul className="list-disc pl-5 space-y-1.5">
             <li>Access the personal information we hold about you.</li>
-            <li>Correct inaccurate information — most account fields can be edited directly from your dashboard.</li>
+            <li>Correct inaccurate information - most account fields can be edited directly from your dashboard.</li>
             <li>Request deletion of your account. Givers and organizations can permanently delete their own account from Settings at any time (this requires re-entering your password and confirming the action). Records of past donations may be retained after deletion for financial and audit purposes, as described below.</li>
             <li>Object to or request that we restrict certain processing of your information.</li>
             <li>Lodge a complaint with the Information Regulator of South Africa if you believe we have mishandled your information.</li>

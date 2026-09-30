@@ -7,12 +7,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ROLE_LABELS, type OrgRole } from "@/lib/organization-access"
+import { showFeedback } from "@/lib/inline-feedback"
 
 type Member = { id: string; profile_id: string; role: OrgRole; name: string | null; email: string | null; is_primary: boolean; is_you: boolean }
 type PendingInvite = { id: string; email: string; role: OrgRole; expires_at: string }
 
 const ROLE_HELP: Record<OrgRole, string> = {
-  owner: "Full access, including managing the team, organization profile and banking details.",
+  owner: "Full access, including managing the team, organization profile, banking details and requesting withdrawals.",
   manager: "Create and edit needs; handle interests, fulfillments, stories, documents and gift claims.",
   viewer: "Read-only access to needs, interests, donations and fulfillments.",
 }
@@ -30,6 +31,8 @@ export function OrganizationTeam() {
   const [role, setRole] = useState<OrgRole>("manager")
   const [isInviting, setIsInviting] = useState(false)
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string; link?: string } | null>(null)
+  const [busyMemberId, setBusyMemberId] = useState<string | null>(null)
+  const [busyInviteId, setBusyInviteId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const res = await fetch("/api/organization/team")
@@ -73,32 +76,53 @@ export function OrganizationTeam() {
   }
 
   const changeRole = async (member: Member, newRole: OrgRole) => {
+    if (newRole === member.role) return
+    const label = member.name || member.email || "this member"
+    if (!window.confirm(`Change ${label}'s role from ${ROLE_LABELS[member.role]} to ${ROLE_LABELS[newRole]}?\n\n${ROLE_HELP[newRole]}`)) return
     setFeedback(null)
-    const res = await fetch(`/api/organization/team/members/${member.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ role: newRole }),
-    })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) setFeedback({ type: "error", text: data.message || "Could not update the role." })
-    load()
+    setBusyMemberId(member.id)
+    try {
+      const res = await fetch(`/api/organization/team/members/${member.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: newRole }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) showFeedback(data.message || "Could not update the role.", "error")
+      else showFeedback(`${label}'s role is now ${ROLE_LABELS[newRole]}.`)
+      await load()
+    } finally {
+      setBusyMemberId(null)
+    }
   }
 
   const removeMember = async (member: Member) => {
     if (!window.confirm(`Permanently remove ${member.name || member.email || "this member"}? Their HelpLift account will be deleted and can’t be recovered. Documents they uploaded for your organization are kept.`)) return
     setFeedback(null)
-    const res = await fetch(`/api/organization/team/members/${member.id}`, { method: "DELETE" })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) setFeedback({ type: "error", text: data.message || "Could not remove the member." })
-    load()
+    setBusyMemberId(member.id)
+    try {
+      const res = await fetch(`/api/organization/team/members/${member.id}`, { method: "DELETE" })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) showFeedback(data.message || "Could not remove the member.", "error")
+      else showFeedback("Team member removed.")
+      await load()
+    } finally {
+      setBusyMemberId(null)
+    }
   }
 
   const revokeInvite = async (inv: PendingInvite) => {
     setFeedback(null)
-    const res = await fetch(`/api/organization/team/invitations/${inv.id}`, { method: "DELETE" })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) setFeedback({ type: "error", text: data.message || "Could not revoke the invitation." })
-    load()
+    setBusyInviteId(inv.id)
+    try {
+      const res = await fetch(`/api/organization/team/invitations/${inv.id}`, { method: "DELETE" })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) showFeedback(data.message || "Could not revoke the invitation.", "error")
+      else showFeedback("Invitation revoked.")
+      await load()
+    } finally {
+      setBusyInviteId(null)
+    }
   }
 
   return (
@@ -172,13 +196,25 @@ export function OrganizationTeam() {
                       <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 shrink-0" title="The original account holder can’t be demoted or removed">{ROLE_LABELS.owner} · account holder</span>
                     ) : (
                       <div className="flex items-center gap-2 shrink-0">
-                        <select value={member.role} onChange={e => changeRole(member, e.target.value as any)} className={selectClass} aria-label={`Role for ${member.name || member.email}`}>
+                        {busyMemberId === member.id && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
+                        <select
+                          value={member.role}
+                          onChange={e => changeRole(member, e.target.value as any)}
+                          disabled={busyMemberId === member.id}
+                          className={`${selectClass} disabled:opacity-60`}
+                          aria-label={`Role for ${member.name || member.email}`}
+                        >
                           <option value="owner">Owner</option>
                           <option value="manager">Manager</option>
                           <option value="viewer">Viewer</option>
                         </select>
                         {!member.is_you && (
-                          <button onClick={() => removeMember(member)} className="p-2 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40" aria-label="Remove member and delete their account">
+                          <button
+                            onClick={() => removeMember(member)}
+                            disabled={busyMemberId === member.id}
+                            className="p-2 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-60"
+                            aria-label="Remove member and delete their account"
+                          >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         )}
@@ -202,7 +238,10 @@ export function OrganizationTeam() {
                             {ROLE_LABELS[inv.role]} · expires {new Date(inv.expires_at).toLocaleDateString()}
                           </p>
                         </div>
-                        <button onClick={() => revokeInvite(inv)} className="text-xs font-bold text-red-600 hover:underline shrink-0">Revoke</button>
+                        <button onClick={() => revokeInvite(inv)} disabled={busyInviteId === inv.id} className="inline-flex items-center gap-1.5 text-xs font-bold text-red-600 hover:underline shrink-0 disabled:opacity-60">
+                          {busyInviteId === inv.id && <Loader2 className="w-3 h-3 animate-spin" />}
+                          Revoke
+                        </button>
                       </li>
                     ))}
                   </ul>

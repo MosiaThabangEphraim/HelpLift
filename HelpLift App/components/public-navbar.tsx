@@ -9,14 +9,37 @@ import {
   LogIn,
   UserPlus,
   Home,
-  Sparkles,
   ChevronLeft,
   ShieldCheck,
   HeartHandshake,
   Gift,
   Building2,
+  Contrast,
+  Moon,
+  Palette,
+  Sun,
+  LayoutDashboard,
 } from "lucide-react"
 import Link from "next/link"
+import { createClient } from "@/lib/supabase/client"
+
+const DASHBOARD_PATH: Record<string, string> = {
+  giver: "/givers-dashboard",
+  organization: "/organisation-dashboard",
+  admin: "/admin-dashboard",
+}
+
+// Same light → dark → high-contrast → grayscale cycle as
+// components/theme-toggle.tsx - see that file's comment for why this navbar
+// keeps its own copy of the control instead of just rendering the shared one.
+type ThemeMode = "light" | "dark" | "high-contrast" | "grayscale"
+const NEXT_THEME: Record<ThemeMode, ThemeMode> = { light: "dark", dark: "high-contrast", "high-contrast": "grayscale", grayscale: "light" }
+const THEME_LABEL: Record<ThemeMode, string> = {
+  light: "Switch to dark mode",
+  dark: "Switch to high-contrast mode",
+  "high-contrast": "Switch to grayscale mode",
+  grayscale: "Switch to light mode",
+}
 
 export default function PublicNavbar() {
   const router = useRouter()
@@ -24,13 +47,26 @@ export default function PublicNavbar() {
 
   const { theme, resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
+  // Signed-in state for this shared navbar - shown on /needs, /gift-library,
+  // /organizations, etc. Someone browsing those while already signed in
+  // otherwise saw "Log In" / "Register" with no indication they're already
+  // in - a link straight back to their dashboard instead.
+  const [dashboardPath, setDashboardPath] = useState<string | null>(null)
 
-  useEffect(() => setMounted(true), [])
+  useEffect(() => {
+    setMounted(true)
+    const supabase = createClient()
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+      if (profile?.role) setDashboardPath(DASHBOARD_PATH[profile.role] || null)
+    })
+  }, [])
 
   const pathnameLower = pathname.toLowerCase()
 
-  const isDarkMode =
-    mounted ? (resolvedTheme || theme) === "dark" : true // during hydration
+  const themeMode: ThemeMode = !mounted ? "dark" : ((resolvedTheme || theme) as ThemeMode) || "light"
+  const isDarkMode = themeMode === "dark" // kept for the rest of this file's existing checks
 
   // Do not show the public navbar on any dashboard page
   const isDashboardPage =
@@ -44,7 +80,7 @@ export default function PublicNavbar() {
   }
 
   const toggleDarkMode = () => {
-    setTheme(isDarkMode ? "light" : "dark")
+    setTheme(NEXT_THEME[themeMode])
   }
 
   const handleLoginRedirect = () => router.push("/login")
@@ -57,6 +93,8 @@ export default function PublicNavbar() {
   const isGiftLibraryPage = pathnameLower === "/gift-library"
   const isOrganizationsPage = pathnameLower === "/organizations"
 
+  const isAdminLoginPage = pathnameLower === "/admin-login"
+
   const isAuthView =
     isLoginPage || isRegisterPage || isVerifyPage || isForgotPasswordPage
 
@@ -67,7 +105,7 @@ export default function PublicNavbar() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center transition-transform group-hover:scale-105">
-              <Sparkles className="w-5 h-5 text-primary-foreground" />
+              <HeartHandshake className="w-5 h-5 text-primary-foreground" />
             </div>
             <span className="font-black tracking-tighter text-xl text-foreground">
               HelpLift
@@ -119,41 +157,16 @@ export default function PublicNavbar() {
 
           {/* Right Buttons */}
           <div className="flex items-center gap-2">
-            {/* Dark/Light Mode toggle */}
+            {/* Light / Dark / High-contrast / Grayscale toggle */}
             <button
               onClick={toggleDarkMode}
-              aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+              aria-label={THEME_LABEL[themeMode]}
               className="p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-all active:scale-90"
             >
-              {isDarkMode ? (
-                <svg
-                  className="w-6 h-6 md:w-5 md:h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
-                  />
-                </svg>
-              ) : (
-                <svg
-                  className="w-6 h-6 md:w-5 md:h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
-                  />
-                </svg>
-              )}
+              {themeMode === "light" && <Moon className="w-6 h-6 md:w-5 md:h-5" />}
+              {themeMode === "dark" && <Contrast className="w-6 h-6 md:w-5 md:h-5" />}
+              {themeMode === "high-contrast" && <Palette className="w-6 h-6 md:w-5 md:h-5" />}
+              {themeMode === "grayscale" && <Sun className="w-6 h-6 md:w-5 md:h-5" />}
             </button>
 
             {/* Verification Button */}
@@ -190,10 +203,12 @@ export default function PublicNavbar() {
               </Button>
             )}
 
-            {/* About Button — links to the homepage's #about section, so it
+            {/* About Button - links to the homepage's #about section, so it
                 only makes sense to show there; on other public pages like
                 /needs or /gift-library there's no matching anchor and it was
-                just a dead link. */}
+                just a dead link. On the admin portal it becomes a plain "Home"
+                link back to the main site instead, since there's no about
+                section to jump to from there. */}
             {!isNeedsPage && !isGiftLibraryPage && !isOrganizationsPage && (
               <>
                 <Button
@@ -204,10 +219,10 @@ export default function PublicNavbar() {
                   } gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-full px-2 md:px-4 transition-all overflow-hidden group`}
                   asChild
                 >
-                  <a href="/#about">
-                    <Info className="w-7 h-7 md:w-4 md:h-4 shrink-0" />
+                  <a href={isAdminLoginPage ? "/" : "/#about"}>
+                    {isAdminLoginPage ? <Home className="w-7 h-7 md:w-4 md:h-4 shrink-0" /> : <Info className="w-7 h-7 md:w-4 md:h-4 shrink-0" />}
                     <span className="font-bold max-w-0 md:max-w-[100px] inline-block transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden">
-                      About
+                      {isAdminLoginPage ? "Home" : "About"}
                     </span>
                   </a>
                 </Button>
@@ -220,34 +235,52 @@ export default function PublicNavbar() {
               </>
             )}
 
-            {/* Log In Button */}
-            {!isLoginPage && (
+            {dashboardPath ? (
+              /* Already signed in - one link back to their dashboard instead of Log In/Register. */
               <Button
                 variant="ghost"
                 size="sm"
+                onClick={() => router.push(dashboardPath)}
+                data-tip="You're signed in - go to your dashboard"
                 className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-full px-2 md:px-4 transition-all overflow-hidden group"
-                onClick={handleLoginRedirect}
               >
-                <LogIn className="w-7 h-7 md:w-4 md:h-4 shrink-0" />
-                <span className="font-bold max-w-0 md:max-w-[100px] inline-block transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden">
-                  Log In
+                <LayoutDashboard className="w-7 h-7 md:w-4 md:h-4 shrink-0" />
+                <span className="font-bold max-w-0 md:max-w-[140px] inline-block transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden">
+                  Dashboard
                 </span>
               </Button>
-            )}
+            ) : (
+              <>
+                {/* Log In Button */}
+                {!isLoginPage && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-full px-2 md:px-4 transition-all overflow-hidden group"
+                    onClick={handleLoginRedirect}
+                  >
+                    <LogIn className="w-7 h-7 md:w-4 md:h-4 shrink-0" />
+                    <span className="font-bold max-w-0 md:max-w-[100px] inline-block transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden">
+                      Log In
+                    </span>
+                  </Button>
+                )}
 
-            {/* Register Button */}
-            {!isRegisterPage && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.push("/register")}
-                className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-full px-2 md:px-4 transition-all overflow-hidden group"
-              >
-                <UserPlus className="w-7 h-7 md:w-4 md:h-4 shrink-0" />
-                <span className="font-bold max-w-0 md:max-w-[100px] inline-block transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden">
-                  Register
-                </span>
-              </Button>
+                {/* Register Button */}
+                {!isRegisterPage && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => router.push("/register")}
+                    className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-full px-2 md:px-4 transition-all overflow-hidden group"
+                  >
+                    <UserPlus className="w-7 h-7 md:w-4 md:h-4 shrink-0" />
+                    <span className="font-bold max-w-0 md:max-w-[100px] inline-block transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden">
+                      Register
+                    </span>
+                  </Button>
+                )}
+              </>
             )}
 
             {/* Home Button */}

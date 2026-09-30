@@ -4,10 +4,10 @@ import { createClient } from "@/lib/supabase/server"
 
 /**
  * Sends "Partner with us" contact form submissions (home page) via
- * lib/mailer.ts (Brevo's HTTP API — see that file for why not SMTP).
+ * lib/mailer.ts (Brevo's HTTP API - see that file for why not SMTP).
  *
  * This is intentionally separate from Supabase Auth's SMTP configuration
- * (Dashboard > Project Settings > Auth > SMTP Settings) — that config is
+ * (Dashboard > Project Settings > Auth > SMTP Settings) - that config is
  * used exclusively by Supabase's own GoTrue service to send its fixed set
  * of auth emails (signup confirmation, password reset, magic link, email
  * change) and isn't exposed as a general-purpose "send an email" API. There
@@ -57,7 +57,7 @@ export async function POST(req: Request) {
       `,
     })
 
-    return NextResponse.json({ success: true, message: "Thanks! Your message has been sent — we'll get back to you soon." })
+    return NextResponse.json({ success: true, message: "Thanks! Your message has been sent - we'll get back to you soon." })
   } catch (error) {
     console.error("Contact form send error:", error)
     return NextResponse.json({ success: false, message: "Unable to send your message right now. Please try again later." }, { status: 503 })

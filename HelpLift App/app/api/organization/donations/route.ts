@@ -13,7 +13,7 @@ export async function GET() {
 
     const { data: donations, error } = await supabase
       .from("donations")
-      .select("id, amount, payment_method, status, reference_code, created_at, needs(title), givers(name, email, profile_id)")
+      .select("id, amount, payment_method, status, reference_code, created_at, needs(title), gift_offerings(title), givers(name, email, profile_id)")
       .eq("organization_id", org.id)
       .order("created_at", { ascending: false })
     if (error) return NextResponse.json({ message: error.message }, { status: 400 })

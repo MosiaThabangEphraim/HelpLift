@@ -9,6 +9,7 @@ export type ReceiptData = {
   giverEmail: string
   orgName: string | null
   description: string
+  isPlatformDonation?: boolean
 }
 
 function formatCurrency(amount: number) {
@@ -85,14 +86,15 @@ function ReceiptDocument({ data }: { data: ReceiptData }) {
         </View>
 
         <Text style={styles.thanks}>
-          Thank you for your generosity. This receipt confirms that HelpLift received the above donation on
-          behalf of {data.orgName || "the listed organization"} and that it has been processed successfully.
+          {data.isPlatformDonation
+            ? "Thank you for your generosity. This donation goes directly to HelpLift, not to any organization - it helps us keep the platform running and growing, at no cost to the organizations and givers who rely on it."
+            : `Thank you for your generosity. This receipt confirms that HelpLift received the above donation on behalf of ${data.orgName || "the listed organization"} and that it has been processed successfully.`}
         </Text>
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>
             This receipt confirms payment received through the HelpLift platform. It is not, by itself, a Section
-            18A tax-deductibility certificate — where the receiving organization holds Section 18A status, they may
+            18A tax-deductibility certificate - where the receiving organization holds Section 18A status, they may
             issue that certificate separately. Please retain this receipt for your records.
           </Text>
         </View>

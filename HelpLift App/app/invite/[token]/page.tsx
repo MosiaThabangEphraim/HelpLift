@@ -18,7 +18,7 @@ type Invite = {
 }
 
 const ROLE_BLURBS: Record<OrgRole, string> = {
-  owner: "You’ll have full access, including managing the team and the organization’s profile and banking details.",
+  owner: "You’ll have full access, including managing the team, the organization’s profile and banking details, and requesting withdrawals.",
   manager: "You'll be able to create and edit needs, respond to interests, manage fulfillments, stories and documents.",
   viewer: "You'll have read-only access to the organization's needs, interests, donations and fulfillments.",
 }

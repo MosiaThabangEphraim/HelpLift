@@ -1,0 +1,437 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { Banknote, CheckCircle2, CreditCard, Heart, Loader2, UploadCloud } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { formatCurrency } from "@/lib/banking"
+import { useBankAccounts, type BankAccountOption } from "@/lib/use-bank-accounts"
+import { redirectToPayfast } from "@/lib/payfast-client"
+import { MicButton } from "@/components/mic-button"
+import { GrammarCheckButton } from "@/components/grammar-check-button"
+import { appendSpeech } from "@/lib/speech-to-text"
+import { OutcomeContentInline } from "@/components/outcome-banner"
+
+type GuestSupportPlatformDialogProps = {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onDone?: () => void
+}
+
+type Step = "form" | "details" | "upload" | "done"
+type Limits = { min: number; max: number | null }
+
+// Guest equivalent of components/support-platform-dialog.tsx - for a visitor
+// with no HelpLift account. Collects a name and email (for the receipt) in
+// place of a signed-in identity, and posts to the public, unauthenticated
+// endpoints under app/api/public/donations/platform instead of the
+// giver/org-only app/api/donations/platform. See
+// 20260926000600_guest_platform_donations.sql.
+//
+// PayFast/PayPal fully navigate the browser away, so the in-progress
+// donation's id + email are stashed in localStorage right before that
+// redirect - the homepage reads it back on return to resolve a cancelled
+// checkout (see app/page.tsx).
+const PENDING_KEY = "helplift_guest_platform_donation"
+
+export function GuestSupportPlatformDialog({ open, onOpenChange, onDone }: GuestSupportPlatformDialogProps) {
+  const { accounts: bankAccounts } = useBankAccounts()
+  const [limits, setLimits] = useState<Limits>({ min: 20, max: null })
+  const [step, setStep] = useState<Step>("form")
+  const [name, setName] = useState("")
+  const [email, setEmail] = useState("")
+  const [amount, setAmount] = useState("")
+  const [method, setMethod] = useState<"eft" | "payfast" | "paypal">("eft")
+  const [bank, setBank] = useState<string>("")
+  const [donation, setDonation] = useState<{ id: string; amount: number; reference_code: string } | null>(null)
+  const [paidAccount, setPaidAccount] = useState<BankAccountOption | null>(null)
+  const [proofFiles, setProofFiles] = useState<File[]>([])
+  const [payerNotes, setPayerNotes] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    fetch("/api/public/platform-donation-limits")
+      .then(res => res.json())
+      .then(data => { if (data.limits) setLimits(data.limits) })
+      .catch(() => {})
+  }, [])
+
+  // Default to the first available account once the live list loads.
+  useEffect(() => {
+    if (!bank && bankAccounts.length > 0) setBank(bankAccounts[0].key)
+  }, [bank, bankAccounts])
+
+  const reset = () => {
+    setStep("form")
+    setName("")
+    setEmail("")
+    setAmount("")
+    setMethod("eft")
+    setBank(bankAccounts[0]?.key || "")
+    setDonation(null)
+    setPaidAccount(null)
+    setProofFiles([])
+    setPayerNotes("")
+    setError("")
+  }
+
+  const close = () => {
+    onOpenChange(false)
+    setTimeout(reset, 200)
+  }
+
+  const createDonation = async () => {
+    const trimmedName = name.trim()
+    if (!trimmedName) {
+      setError("Enter your name.")
+      return
+    }
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setError("Enter a valid email address.")
+      return
+    }
+    const numericAmount = Number(amount)
+    if (!numericAmount || numericAmount <= 0) {
+      setError("Enter a donation amount greater than zero.")
+      return
+    }
+    if (numericAmount < limits.min) {
+      setError(`The minimum donation to the platform is ${formatCurrency(limits.min)}.`)
+      return
+    }
+    if (limits.max !== null && numericAmount > limits.max) {
+      setError(`The maximum donation to the platform is ${formatCurrency(limits.max)}.`)
+      return
+    }
+    setIsSubmitting(true)
+    setError("")
+    try {
+      const body = method === "eft"
+        ? { name: trimmedName, email: trimmedEmail, amount: numericAmount, payment_method: "eft", bank_name: bank }
+        : { name: trimmedName, email: trimmedEmail, amount: numericAmount, payment_method: method }
+      const res = await fetch("/api/public/donations/platform", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.message || "Unable to start this donation.")
+      if (method === "payfast" && data.payfast) {
+        try { localStorage.setItem(PENDING_KEY, JSON.stringify({ id: data.donation.id, email: trimmedEmail })) } catch {}
+        redirectToPayfast(data.payfast.action, data.payfast.fields)
+        return
+      }
+      if (method === "paypal" && data.paypal) {
+        try { localStorage.setItem(PENDING_KEY, JSON.stringify({ id: data.donation.id, email: trimmedEmail })) } catch {}
+        window.location.href = data.paypal.approveUrl
+        return
+      }
+      setDonation(data.donation)
+      setPaidAccount(data.bank || null)
+      setStep("details")
+    } catch (err: any) {
+      setError(err.message || "Unable to start this donation.")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const submitProof = async () => {
+    if (!donation || proofFiles.length === 0) {
+      setError("Attach your proof of payment to continue.")
+      return
+    }
+    setIsSubmitting(true)
+    setError("")
+    try {
+      const formData = new FormData()
+      proofFiles.forEach((file) => formData.append("proofs", file))
+      formData.append("payer_notes", payerNotes)
+      formData.append("email", email.trim())
+      const res = await fetch(`/api/public/donations/platform/${donation.id}`, { method: "PATCH", body: formData })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.message || "Unable to submit proof of payment.")
+      setStep("done")
+      onDone?.()
+    } catch (err: any) {
+      setError(err.message || "Unable to submit proof of payment.")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Heart className="w-5 h-5 text-pink-600" />
+            Support The Platform
+          </DialogTitle>
+        </DialogHeader>
+
+        {error && (
+          <div className="rounded-xl bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">
+            {error}
+          </div>
+        )}
+
+        {step === "form" && (
+          <div className="space-y-4 pt-1">
+            <div className="rounded-2xl bg-pink-50 dark:bg-pink-950/30 border border-pink-200 dark:border-pink-900 p-4 space-y-1.5">
+              <p className="text-sm font-semibold text-pink-800 dark:text-pink-300">
+                This donation goes directly to HelpLift - not to any organization.
+              </p>
+              <p className="text-xs text-pink-700 dark:text-pink-400">
+                You don't need an account to support us. Just leave your name and email below for your receipt,
+                and you're set. Thank you for believing in what we're doing. 💙
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Your name
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Jane Doe"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded-2xl text-sm font-semibold outline-none focus:border-pink-500 transition-colors"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Your email (for the receipt)
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="jane@example.com"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded-2xl text-sm font-semibold outline-none focus:border-pink-500 transition-colors"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Donation amount (ZAR)
+              </label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">R</span>
+                <input
+                  type="number"
+                  min={limits.min}
+                  step="0.01"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="100.00"
+                  className="w-full pl-8 pr-4 py-3 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded-2xl text-sm font-semibold outline-none focus:border-pink-500 transition-colors"
+                />
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Minimum {formatCurrency(limits.min)}{limits.max !== null ? `, maximum ${formatCurrency(limits.max)}` : ""}.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Payment method
+              </label>
+              <div className="grid grid-cols-3 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setMethod("eft")}
+                  className={`rounded-2xl border-2 p-3.5 text-left transition-colors ${
+                    method === "eft"
+                      ? "border-pink-500 bg-pink-50 dark:bg-pink-950/30"
+                      : "border-slate-200 dark:border-[#233350] hover:border-slate-300 dark:hover:border-[#2C3E63]"
+                  }`}
+                >
+                  <Banknote className="w-4 h-4 text-pink-600 mb-1.5" />
+                  <p className="text-sm font-bold">Bank Transfer (EFT)</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Manual, verified by admin</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMethod("payfast")}
+                  className={`rounded-2xl border-2 p-3.5 text-left transition-colors ${
+                    method === "payfast"
+                      ? "border-pink-500 bg-pink-50 dark:bg-pink-950/30"
+                      : "border-slate-200 dark:border-[#233350] hover:border-slate-300 dark:hover:border-[#2C3E63]"
+                  }`}
+                >
+                  <CreditCard className="w-4 h-4 text-pink-600 mb-1.5" />
+                  <p className="text-sm font-bold">PayFast</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Card, Instant EFT & more</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMethod("paypal")}
+                  className={`rounded-2xl border-2 p-3.5 text-left transition-colors ${
+                    method === "paypal"
+                      ? "border-pink-500 bg-pink-50 dark:bg-pink-950/30"
+                      : "border-slate-200 dark:border-[#233350] hover:border-slate-300 dark:hover:border-[#2C3E63]"
+                  }`}
+                >
+                  <CreditCard className="w-4 h-4 text-pink-600 mb-1.5" />
+                  <p className="text-sm font-bold">PayPal</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Pay with your PayPal balance or card</p>
+                </button>
+              </div>
+            </div>
+
+            {method === "eft" && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Choose a bank to pay into
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  {bankAccounts.length === 0 && (
+                    <p className="col-span-2 text-xs text-slate-400">Loading bank accounts...</p>
+                  )}
+                  {bankAccounts.map((account) => (
+                    <button
+                      key={account.key}
+                      type="button"
+                      onClick={() => setBank(account.key)}
+                      className={`rounded-2xl border-2 p-3.5 text-left transition-colors ${
+                        bank === account.key
+                          ? "border-pink-500 bg-pink-50 dark:bg-pink-950/30"
+                          : "border-slate-200 dark:border-[#233350] hover:border-slate-300 dark:hover:border-[#2C3E63]"
+                      }`}
+                    >
+                      <p className="text-sm font-bold">{account.bankName}</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{account.accountType}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <DialogFooter className="pt-2 gap-2">
+              <Button type="button" variant="outline" onClick={close}>Cancel</Button>
+              <Button type="button" onClick={createDonation} disabled={isSubmitting || (method === "eft" && !bank)} className="bg-pink-600 hover:bg-pink-700 text-white">
+                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Heart className="w-4 h-4" />}
+                <span>{isSubmitting ? "Preparing..." : method === "eft" ? "Get banking details" : method === "payfast" ? "Continue to PayFast" : "Continue to PayPal"}</span>
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
+
+        {step === "details" && donation && paidAccount && (
+          <div className="space-y-4 pt-1">
+            <div className="rounded-2xl border border-pink-200 dark:border-pink-900 bg-pink-50 dark:bg-pink-950/30 p-4 space-y-1">
+              <p className="text-xs font-bold uppercase tracking-wider text-pink-600 dark:text-pink-400">Amount to transfer</p>
+              <p className="text-2xl font-black text-slate-900 dark:text-white">{formatCurrency(donation.amount)}</p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 dark:border-[#233350] p-4 space-y-2.5">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{paidAccount.bankName}</p>
+              <DetailRow label="Account name" value={paidAccount.accountName} />
+              <DetailRow label="Account number" value={paidAccount.accountNumber} mono />
+              <DetailRow label="Branch code" value={paidAccount.branchCode} mono />
+              <DetailRow label="Account type" value={paidAccount.accountType} />
+              {paidAccount.swiftCode && <DetailRow label="SWIFT code" value={paidAccount.swiftCode} mono />}
+              <div className="pt-2 border-t border-slate-100 dark:border-[#233350]">
+                <DetailRow label="Payment reference (required)" value={donation.reference_code} mono highlight />
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Use the reference above so we can match your deposit. Once you've made the transfer, click below to upload your proof of payment.
+            </p>
+
+            <DialogFooter className="pt-2 gap-2">
+              <Button type="button" variant="outline" onClick={close}>I'll do this later</Button>
+              <Button type="button" onClick={() => setStep("upload")} className="bg-pink-600 hover:bg-pink-700 text-white">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>I've made the payment</span>
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
+
+        {step === "upload" && donation && (
+          <div className="space-y-4 pt-1">
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Upload your proof of payment - an official bank statement or your bank's Proof of Payment document (not a screenshot or photo) - for reference <span className="font-mono font-bold">{donation.reference_code}</span>.
+            </p>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Proof of payment</label>
+              <label className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 dark:border-[#233350] p-6 text-center cursor-pointer hover:border-pink-400 transition-colors">
+                <UploadCloud className="w-6 h-6 text-slate-400" />
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  {proofFiles.length === 0
+                    ? "Click to select file(s) - image or PDF"
+                    : proofFiles.length === 1
+                    ? proofFiles[0].name
+                    : `${proofFiles.length} files selected`}
+                </span>
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*,application/pdf"
+                  className="hidden"
+                  onChange={(e) => setProofFiles(Array.from(e.target.files || []))}
+                />
+              </label>
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Notes (optional)</label>
+                <GrammarCheckButton text={payerNotes} onTextChange={setPayerNotes} />
+              </div>
+              <div className="relative">
+                <textarea
+                  value={payerNotes}
+                  onChange={(e) => setPayerNotes(e.target.value)}
+                  placeholder="E.g., paid from a joint account, or any detail that may help verification..."
+                  className="w-full min-h-20 p-3 pr-11 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded-2xl text-sm outline-none focus:border-pink-500"
+                />
+                <MicButton className="top-2 right-2" onText={text => setPayerNotes(n => appendSpeech(n, text))} />
+              </div>
+            </div>
+            <DialogFooter className="pt-2 gap-2">
+              <Button type="button" variant="outline" onClick={() => setStep("details")}>Back</Button>
+              <Button type="button" onClick={submitProof} disabled={isSubmitting} className="bg-pink-600 hover:bg-pink-700 text-white">
+                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
+                <span>{isSubmitting ? "Submitting..." : "Submit for verification"}</span>
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
+
+        {step === "done" && donation && (
+          <OutcomeContentInline
+            variant="pending"
+            message={`Your proof of payment has been submitted. An administrator will review it and confirm your donation, then email your receipt to ${email.trim()}.`}
+            onDismiss={close}
+            detail={{ amount: donation.amount, date: new Date().toLocaleDateString("en-ZA", { year: "numeric", month: "short", day: "numeric" }), reference: donation.reference_code }}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function DetailRow({ label, value, mono, highlight }: { label: string; value: string; mono?: boolean; highlight?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-xs text-slate-500 dark:text-slate-400">{label}</span>
+      <span className={`text-sm font-bold text-right ${mono ? "font-mono" : ""} ${highlight ? "text-pink-600 dark:text-pink-400" : ""}`}>
+        {value}
+      </span>
+    </div>
+  )
+}

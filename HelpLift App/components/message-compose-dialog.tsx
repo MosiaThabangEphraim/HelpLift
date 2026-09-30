@@ -11,6 +11,9 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import { MicButton } from "@/components/mic-button"
+import { GrammarCheckButton } from "@/components/grammar-check-button"
+import { appendSpeech } from "@/lib/speech-to-text"
 
 type MessageComposeDialogProps = {
   open: boolean
@@ -20,7 +23,7 @@ type MessageComposeDialogProps = {
   target?: "admin"
   recipientId?: string
   onSent?: () => void
-  /** Pre-fills the message body (e.g. a thank-you template) — still editable before sending. */
+  /** Pre-fills the message body (e.g. a thank-you template) - still editable before sending. */
   defaultMessage?: string
   /** Set when replying: the message being answered (recorded with the reply, and quoted to the recipient). */
   replyTo?: { id: string; snippet: string }
@@ -89,7 +92,7 @@ export function MessageComposeDialog({ open, onOpenChange, recipientLabel, targe
         </DialogHeader>
         {sent ? (
           <p className="py-6 text-center text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-            Message sent — it will appear in {recipientLabel}'s notifications.
+            Message sent - it will appear in {recipientLabel}'s notifications.
           </p>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-3 pt-2">
@@ -105,16 +108,22 @@ export function MessageComposeDialog({ open, onOpenChange, recipientLabel, targe
               </blockquote>
             )}
             <div className="space-y-1">
-              <Label htmlFor="message-compose-body">{replyTo ? "Your reply" : "Message"}</Label>
-              <textarea
-                id="message-compose-body"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder={`Write your message to ${recipientLabel}...`}
-                required
-                maxLength={2000}
-                className="w-full min-h-32 rounded-xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              />
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="message-compose-body">{replyTo ? "Your reply" : "Message"}</Label>
+                <GrammarCheckButton text={message} onTextChange={setMessage} />
+              </div>
+              <div className="relative">
+                <textarea
+                  id="message-compose-body"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder={`Write your message to ${recipientLabel}...`}
+                  required
+                  maxLength={2000}
+                  className="w-full min-h-32 rounded-xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-3 py-2 pr-11 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                />
+                <MicButton className="top-2 right-2" onText={text => setMessage(m => appendSpeech(m, text))} />
+              </div>
             </div>
             <div className="space-y-1">
               <Label>Attachments (optional)</Label>

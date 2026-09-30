@@ -1,14 +1,14 @@
 -- Migration: 20260914001700_public_anon_access_and_details.sql
 -- Description: (1) Fixes a bug where the "public" needs/organizations pages
 -- (home page, /needs, /organizations/[id]) never actually worked for a
--- genuinely logged-out visitor — the existing SELECT policies only grant the
+-- genuinely logged-out visitor - the existing SELECT policies only grant the
 -- `authenticated` Postgres role, never `anon`, so anyone who wasn't already
 -- signed in got zero rows back from what's supposed to be public browsing
 -- (confirmed via direct anon-key REST calls). (2) Supports organizations
 -- viewing full giver contact details for givers who've expressed interest in
 -- their needs (name/email were already exposed via 20260914001600; this adds
 -- phone/account_type visibility, which was already granted by that same
--- policy — no policy change needed there, just noting it here for context).
+-- policy - no policy change needed there, just noting it here for context).
 
 -- Open needs: allow anonymous browsing, matching the policy's own name
 -- ("Anyone can view open needs") which was never actually true before this.

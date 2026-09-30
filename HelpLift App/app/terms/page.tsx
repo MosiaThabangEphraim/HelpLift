@@ -2,7 +2,7 @@ import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 
 export const metadata = {
-  title: "Terms of Service — HelpLift",
+  title: "Terms of Service - HelpLift",
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -36,9 +36,9 @@ export default function TermsOfServicePage() {
         <Section title="2. Who can use HelpLift">
           <p>HelpLift has three types of accounts:</p>
           <ul className="list-disc pl-5 space-y-1.5">
-            <li><strong className="text-slate-800 dark:text-slate-100">Givers</strong> — individuals, businesses, or groups who browse community needs, donate, or offer goods and services through the Gift Library. You must be at least 18 years old to register.</li>
-            <li><strong className="text-slate-800 dark:text-slate-100">Organizations</strong> — registered non-profits, NGOs, or similar community organizations who post needs and receive support. Organizations must complete our verification process (below) before their needs are made public or they can receive donations.</li>
-            <li><strong className="text-slate-800 dark:text-slate-100">Administrators</strong> — HelpLift staff who verify organizations, moderate content, and support users.</li>
+            <li><strong className="text-slate-800 dark:text-slate-100">Givers</strong> - individuals, businesses, or groups who browse community needs, donate, or offer goods and services through the Gift Library. You must be at least 18 years old to register.</li>
+            <li><strong className="text-slate-800 dark:text-slate-100">Organizations</strong> - registered non-profits, NGOs, or similar community organizations who post needs and receive support. Organizations must complete our verification process (below) before their needs are made public or they can receive donations.</li>
+            <li><strong className="text-slate-800 dark:text-slate-100">Administrators</strong> - HelpLift staff who verify organizations, moderate content, and support users.</li>
           </ul>
         </Section>
 
@@ -68,7 +68,7 @@ export default function TermsOfServicePage() {
             <li>HelpLift receives donation funds on behalf of the organization the donation is intended for, and is responsible for forwarding verified donations to that organization's registered bank account.</li>
             <li>A donation is only confirmed once an administrator has verified the corresponding proof of payment (for EFT) or the PayFast transaction has completed successfully.</li>
             <li>Donations made in good faith are generally non-refundable once confirmed, except where required by law or at HelpLift's discretion in cases of error or fraud.</li>
-            <li>Gift Library offerings (goods, services, or financial pledges) are subject to the same claim, review, and — for financial pledges — payment-verification process as donations.</li>
+            <li>Gift Library offerings (goods, services, or financial pledges) are subject to the same claim, review, and - for financial pledges - payment-verification process as donations.</li>
           </ul>
         </Section>
 

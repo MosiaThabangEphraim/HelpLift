@@ -1,6 +1,6 @@
 -- Organizations could already edit their own impact stories (see the
 -- "Organizations can update their impact stories" policy in
--- 20260914001200_mvp_extended_features.sql) but never delete them — only
+-- 20260914001200_mvp_extended_features.sql) but never delete them - only
 -- admins had that via the blanket "FOR ALL" policy. Add the matching DELETE
 -- policy scoped to the organization's own rows.
 

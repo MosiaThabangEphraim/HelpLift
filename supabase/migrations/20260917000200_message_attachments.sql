@@ -3,7 +3,7 @@
 -- only path that creates message_to_admin/admin_message/org_message rows)
 -- carry an optional file attachment. Storage bucket + policies mirror the
 -- existing donation-proofs pattern exactly (private bucket, upload gated to
--- the caller's own folder, read open to any authenticated user — the path's
+-- the caller's own folder, read open to any authenticated user - the path's
 -- random UUID is the actual protection, same trust model already used there).
 
 alter table public.notifications add column if not exists attachment_storage_path text;
@@ -28,7 +28,7 @@ using (bucket_id = 'message-attachments');
 
 -- send_notification() gains two optional trailing params. Function overload
 -- resolution is by full signature, not name, so the old 4-arg signature has
--- to be dropped explicitly — otherwise it coexists with the new 6-arg one
+-- to be dropped explicitly - otherwise it coexists with the new 6-arg one
 -- and PostgREST can no longer tell which overload a 4-key call means.
 drop function if exists public.send_notification(uuid, text, text, text);
 
@@ -68,7 +68,7 @@ begin
     v_allowed := true;
   end if;
 
-  -- A giver may message any organization — organizations are public
+  -- A giver may message any organization - organizations are public
   -- entities (listed on the needs board and their own profile page).
   if not v_allowed and v_sender_role = 'giver' and v_recipient_role = 'organization' then
     v_allowed := true;

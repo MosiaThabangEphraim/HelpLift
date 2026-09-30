@@ -106,6 +106,7 @@ export async function PATCH(
         await supabase.from("notifications").insert({
           recipient_id: adminId.data,
           sender_id: user.id,
+          sender_name: "HelpLift Notifications",
           type: "donation_proof_submitted",
           title: "Proof of payment submitted",
           message: `A donation of R${Number(donation.amount).toFixed(2)} (ref ${donation.reference_code}) is awaiting verification.`,

@@ -14,7 +14,7 @@ export async function GET() {
 
     const { data, error } = await supabase
       .from("fulfillments")
-      .select("id, status, notes, proof_storage_path, completed_at, created_at, organizations(id, name), givers(name, email), support_interests(needs(title))")
+      .select("id, status, notes, proof_storage_path, completed_at, created_at, organizations(id, name), givers(name, email), support_interests(needs(title)), gift_offerings(title, offering_type)")
       .order("created_at", { ascending: false })
     if (error) return NextResponse.json({ message: error.message, fulfillments: [] }, { status: 400 })
 

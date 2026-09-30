@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getOrgContext, roleAtLeast, insufficientRoleMessage } from "@/lib/organization-access"
 
 // Self-service update for an organization's OWN record. Deliberately does not
-// include `verification_status` in the allowlist — that field is admin-only
+// include `verification_status` in the allowlist - that field is admin-only
 // (see api/admin/organizations/[id]/route.ts). RLS already restricts organizations
 // to their own row (profile_id = auth.uid()), but the field allowlist is enforced
 // here too so an organization can never grant itself "approved" status by editing
@@ -114,7 +114,7 @@ export async function PATCH(request: Request) {
       }
     }
 
-    // Resubmitting for review after an admin requested more information —
+    // Resubmitting for review after an admin requested more information -
     // the only status transition an organization may make on its own, and
     // only enforced/allowed if current status really is 'more_info_requested'
     // (the organizations_guard_verification trigger rejects anything else).

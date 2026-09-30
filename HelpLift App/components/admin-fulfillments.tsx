@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { FileText, Loader2, PackageCheck } from "lucide-react"
+import { FileText, Loader2, PackageCheck, Trash2 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { firstOf } from "@/lib/utils"
@@ -16,6 +16,7 @@ export type AdminFulfillment = {
   organizations: { id: string; name: string } | { id: string; name: string }[] | null
   givers: { name: string; email: string } | { name: string; email: string }[] | null
   support_interests: { needs: { title: string } | { title: string }[] | null } | { needs: { title: string } | { title: string }[] | null }[] | null
+  gift_offerings: { title: string; offering_type: string } | { title: string; offering_type: string }[] | null
 }
 
 type Proof = { id: string; fileName: string | null; signedUrl: string | null }
@@ -28,12 +29,21 @@ const STATUS_STYLES: Record<AdminFulfillment["status"], string> = {
 }
 
 function needTitle(f: AdminFulfillment) {
-  return firstOf(firstOf(f.support_interests)?.needs)?.title || "Community need"
+  return firstOf(firstOf(f.support_interests)?.needs)?.title || firstOf(f.gift_offerings)?.title || "Community need"
+}
+
+// Gift Library fulfillments have no "need category" - a small badge next to
+// the title is enough to distinguish them in the list, instead of pretending
+// they're a need.
+function sourceBadge(f: AdminFulfillment) {
+  const gift = firstOf(f.gift_offerings)
+  if (!gift) return null
+  return <span className="rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-700 capitalize">Gift · {gift.offering_type}</span>
 }
 
 // Admin overview of deliveries, with a viewer for the proof (photos, receipts,
 // documents) the organization attached.
-export function AdminFulfillmentsView({ fulfillments }: { fulfillments: AdminFulfillment[] }) {
+export function AdminFulfillmentsView({ fulfillments, onDelete }: { fulfillments: AdminFulfillment[]; onDelete?: (id: string) => Promise<void> | void }) {
   const [filter, setFilter] = useState<"all" | "completed" | "in_progress" | "pending" | "cancelled">("all")
   const [selected, setSelected] = useState<AdminFulfillment | null>(null)
   const visible = filter === "all" ? fulfillments : fulfillments.filter(f => f.status === filter)
@@ -71,7 +81,7 @@ export function AdminFulfillmentsView({ fulfillments }: { fulfillments: AdminFul
                   className="flex cursor-pointer flex-col gap-2 rounded-2xl border border-slate-200 dark:border-[#233350] p-4 hover:border-blue-300 dark:hover:border-blue-800 md:flex-row md:items-center md:justify-between"
                 >
                   <div>
-                    <p className="font-semibold">{needTitle(f)}</p>
+                    <p className="flex items-center gap-2 font-semibold">{needTitle(f)} {sourceBadge(f)}</p>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
                       {firstOf(f.organizations)?.name || "Organization"} ← {firstOf(f.givers)?.name || "Giver"} · {new Date(f.created_at).toLocaleDateString()}
                     </p>
@@ -89,16 +99,44 @@ export function AdminFulfillmentsView({ fulfillments }: { fulfillments: AdminFul
         </CardContent>
       </Card>
 
-      <FulfillmentDetail fulfillment={selected} onClose={() => setSelected(null)} />
+      <FulfillmentDetail
+        fulfillment={selected}
+        onClose={() => setSelected(null)}
+        onDelete={onDelete ? async id => { await onDelete(id); setSelected(null) } : undefined}
+      />
     </>
   )
 }
 
-function FulfillmentDetail({ fulfillment, onClose }: { fulfillment: AdminFulfillment | null; onClose: () => void }) {
+function FulfillmentDetail({
+  fulfillment,
+  onClose,
+  onDelete,
+}: {
+  fulfillment: AdminFulfillment | null
+  onClose: () => void
+  onDelete?: (id: string) => Promise<void> | void
+}) {
   const [proofs, setProofs] = useState<Proof[]>([])
   const [legacyUrl, setLegacyUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const deletable = fulfillment?.status === "completed" || fulfillment?.status === "cancelled"
+
+  const handleDelete = async () => {
+    if (!fulfillment || !onDelete) return
+    setIsDeleting(true)
+    setError("")
+    try {
+      await onDelete(fulfillment.id)
+    } catch (e: any) {
+      setError(e?.message || "Could not delete this fulfillment.")
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   useEffect(() => {
     if (!fulfillment) return
@@ -135,10 +173,10 @@ function FulfillmentDetail({ fulfillment, onClose }: { fulfillment: AdminFulfill
         {fulfillment && (
           <div className="space-y-4 pt-2">
             <div>
-              <h3 className="text-lg font-bold">{needTitle(fulfillment)}</h3>
+              <h3 className="flex items-center gap-2 text-lg font-bold">{needTitle(fulfillment)} {sourceBadge(fulfillment)}</h3>
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                Organization: {firstOf(fulfillment.organizations)?.name || "—"}<br />
-                Giver: {firstOf(fulfillment.givers)?.name || "—"} {firstOf(fulfillment.givers)?.email ? `· ${firstOf(fulfillment.givers)?.email}` : ""}
+                Organization: {firstOf(fulfillment.organizations)?.name || "-"}<br />
+                Giver: {firstOf(fulfillment.givers)?.name || "-"} {firstOf(fulfillment.givers)?.email ? `· ${firstOf(fulfillment.givers)?.email}` : ""}
               </p>
               <span className={`mt-2 inline-block rounded-full px-3 py-1 text-xs font-bold capitalize ${STATUS_STYLES[fulfillment.status]}`}>{fulfillment.status.replace("_", " ")}</span>
               {fulfillment.completed_at && <span className="ml-2 text-xs text-slate-500">Completed {new Date(fulfillment.completed_at).toLocaleDateString()}</span>}
@@ -185,6 +223,21 @@ function FulfillmentDetail({ fulfillment, onClose }: { fulfillment: AdminFulfill
                 <p className="text-xs text-slate-400">No proof has been attached yet.</p>
               )}
             </div>
+
+            {deletable && onDelete && (
+              <div className="flex justify-end border-t border-slate-200 dark:border-[#233350] pt-3">
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  data-tip="Permanently delete this fulfillment record"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-red-200 dark:border-red-900 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-60"
+                >
+                  {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                  Delete record
+                </button>
+              </div>
+            )}
           </div>
         )}
       </DialogContent>

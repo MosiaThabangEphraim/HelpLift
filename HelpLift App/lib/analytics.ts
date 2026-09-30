@@ -12,6 +12,7 @@ const MAX_ALL_TIME_MONTHS = 36
 
 export type MonthPoint = { key: string; label: string; value: number }
 export type RankedPoint = { name: string; value: number }
+export type DateBounds = { start: Date | null; end: Date }
 
 function monthKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
@@ -28,11 +29,24 @@ export function rangeStart(range: AnalyticsRange): Date | null {
   return new Date(now.getFullYear(), now.getMonth() - (range - 1), 1)
 }
 
-export function inRange(value: string | null | undefined, start: Date | null): boolean {
+// Combines the quick preset (6/12 months/all time) with an optional custom
+// "From"/"To" override - either side can be set on its own (e.g. "from 1
+// March" with no "to" means "through today"). A custom date always wins
+// over the preset for that side, so picking a date field is a complete
+// override of the corresponding preset boundary, not an addition to it.
+export function resolveRange(range: AnalyticsRange, customFrom: string, customTo: string): DateBounds {
+  const start = customFrom ? new Date(customFrom) : rangeStart(range)
+  const end = customTo ? new Date(new Date(customTo).getTime() + 24 * 60 * 60 * 1000 - 1) : new Date()
+  return { start, end }
+}
+
+export function inRange(value: string | null | undefined, bounds: DateBounds): boolean {
   if (!value) return false
-  if (!start) return true
   const time = new Date(value).getTime()
-  return !Number.isNaN(time) && time >= start.getTime()
+  if (Number.isNaN(time)) return false
+  if (bounds.start && time < bounds.start.getTime()) return false
+  if (time > bounds.end.getTime()) return false
+  return true
 }
 
 // One point per calendar month, including months with nothing in them, so gaps
@@ -41,10 +55,10 @@ export function bucketByMonth<T>(
   items: T[],
   getDate: (item: T) => string | null | undefined,
   getValue: (item: T) => number,
-  range: AnalyticsRange
+  bounds: DateBounds
 ): MonthPoint[] {
-  const now = new Date()
-  let start = rangeStart(range)
+  const now = bounds.end
+  let start = bounds.start
   if (!start) {
     const times = items.map(item => new Date(getDate(item) || "").getTime()).filter(time => !Number.isNaN(time))
     const earliest = times.length ? new Date(Math.min(...times)) : now
@@ -54,7 +68,7 @@ export function bucketByMonth<T>(
   }
 
   const points = new Map<string, MonthPoint>()
-  for (let cursor = new Date(start); cursor <= now; cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1)) {
+  for (let cursor = new Date(start.getFullYear(), start.getMonth(), 1); cursor <= now; cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1)) {
     points.set(monthKey(cursor), { key: monthKey(cursor), label: monthLabel(cursor), value: 0 })
   }
   for (const item of items) {

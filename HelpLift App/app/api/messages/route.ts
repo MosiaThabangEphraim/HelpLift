@@ -3,12 +3,12 @@ import { createClient } from "@/lib/supabase/server"
 
 // Generic direct-messaging endpoint, backing three flows (all delivered as rows
 // in public.notifications, so recipients see them in their existing
-// notifications list — no separate inbox table):
+// notifications list - no separate inbox table):
 //   - target: "admin"      -> any authenticated giver/organization messaging an admin
 //   - recipientId given, sender is admin -> admin messaging any user/organization
 //   - recipientId given, sender is giver/organization -> messaging each other
 // Authorization is enforced inside the send_notification() SECURITY DEFINER
-// function (20260914002500), not via RLS on the insert itself — a proven,
+// function (20260914002500), not via RLS on the insert itself - a proven,
 // reproducible RLS anomaly on this exact policy shape meant the row was
 // rejected even when every check it depends on independently verified true.
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024 // 10MB

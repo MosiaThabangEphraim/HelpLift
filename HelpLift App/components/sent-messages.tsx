@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { CheckCircle2, Clock, Loader2 } from "lucide-react"
 import { MessageDetailDialog, type MessageDetail } from "@/components/message-detail-dialog"
+import { MessageStatus } from "@/components/message-status"
 
 type SentItem = {
   id: string
@@ -10,6 +11,8 @@ type SentItem = {
   recipient_role: string | null
   message: string
   created_at: string
+  delivered_at?: string | null
+  read_at?: string | null
   replied: boolean
 }
 
@@ -72,13 +75,18 @@ export function SentMessages({ canReply = true }: { canReply?: boolean }) {
               <span className="shrink-0 text-[11px] text-slate-400">{new Date(item.created_at).toLocaleString()}</span>
             </div>
             <p className="mt-1 truncate text-sm text-slate-600 dark:text-slate-300">You: {item.message}</p>
-            <span className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${
-              item.replied
-                ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
-                : "bg-slate-100 dark:bg-[#1A2740] text-slate-500 dark:text-slate-400"
-            }`}>
-              {item.replied ? <><CheckCircle2 className="h-3 w-3" /> Replied</> : <><Clock className="h-3 w-3" /> Awaiting reply</>}
-            </span>
+            <div className="mt-2 flex items-center gap-2 flex-wrap">
+              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                item.replied
+                  ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
+                  : "bg-slate-100 dark:bg-[#1A2740] text-slate-500 dark:text-slate-400"
+              }`}>
+                {item.replied ? <><CheckCircle2 className="h-3 w-3" /> Replied</> : <><Clock className="h-3 w-3" /> Awaiting reply</>}
+              </span>
+              <span className="inline-flex items-center text-[11px] text-slate-400">
+                <MessageStatus deliveredAt={item.delivered_at} readAt={item.read_at} />
+              </span>
+            </div>
           </div>
         ))
       )}

@@ -1,14 +1,16 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Download } from "lucide-react"
 import { formatCurrency } from "@/lib/banking"
 import { downloadCsv, toCsv } from "@/lib/csv"
 import {
-  bucketByMonth, byStatusOrder, countBy, firstOf, inRange, percent, rangeStart, sumBy, topN,
+  bucketByMonth, byStatusOrder, countBy, firstOf, inRange, percent, resolveRange, sumBy, topN,
   type AnalyticsRange, type MonthPoint,
 } from "@/lib/analytics"
-import { ChartCard, MonthlyColumns, RangeFilter, RankedBars, StatTile, VizRoot } from "@/components/analytics/chart-parts"
+import { ChartCard, DateRangeFilter, MonthlyArea, MonthlyLine, RangeFilter, RankedBars, StatTile, StatusPie, VizRoot } from "@/components/analytics/chart-parts"
+
+type Withdrawal = { amount: number; status: string; created_at: string }
 
 type Person = { name: string; email?: string | null }
 type NeedRef = { title: string }
@@ -63,6 +65,13 @@ const DELIVERY_STATUSES = [
   { key: "completed", label: "Completed" },
   { key: "cancelled", label: "Cancelled" },
 ]
+const WITHDRAWAL_STATUSES = [
+  { key: "pending", label: "Pending" },
+  { key: "approved", label: "Approved" },
+  { key: "paid", label: "Paid" },
+  { key: "rejected", label: "Rejected" },
+  { key: "cancelled", label: "Cancelled" },
+]
 const RANGE_LABEL: Record<string, string> = { "6": "last 6 months", "12": "last 12 months", all: "all time" }
 const money = (value: number) => formatCurrency(value)
 const whole = (value: number) => String(Math.round(value))
@@ -76,19 +85,39 @@ function peakNote(points: MonthPoint[], format: (value: number) => string, noun:
 // deliveries. Computed from data the dashboard has already loaded.
 export function OrganizationAnalytics({ needs, donations, interests, fulfillments }: Props) {
   const [range, setRange] = useState<AnalyticsRange>(12)
+  // An explicit date picked here always overrides the matching side of the
+  // quick preset above - see resolveRange in lib/analytics.ts.
+  const [customFrom, setCustomFrom] = useState("")
+  const [customTo, setCustomTo] = useState("")
+  const bounds = useMemo(() => resolveRange(range, customFrom, customTo), [range, customFrom, customTo])
+
+  // Withdrawals aren't passed down from the dashboard like everything else
+  // here - fetched directly (same endpoint organization-wallet.tsx already
+  // uses) so this component stays self-contained.
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([])
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/organization/wallet")
+      .then(res => res.json())
+      .then(data => { if (!cancelled) setWithdrawals(data.withdrawals || []) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   const view = useMemo(() => {
-    const start = rangeStart(range)
-    const successful = donations.filter(d => d.status === "successful" && inRange(d.created_at, start))
-    const awaiting = donations.filter(d => d.status === "pending" && inRange(d.created_at, start))
-    const offers = interests.filter(i => inRange(i.created_at, start))
-    const deliveries = fulfillments.filter(f => inRange(f.created_at, start))
-    const periodNeeds = needs.filter(n => inRange(n.created_at, start))
+    const successful = donations.filter(d => d.status === "successful" && inRange(d.created_at, bounds))
+    const awaiting = donations.filter(d => d.status === "pending" && inRange(d.created_at, bounds))
+    const offers = interests.filter(i => inRange(i.created_at, bounds))
+    const deliveries = fulfillments.filter(f => inRange(f.created_at, bounds))
+    const periodNeeds = needs.filter(n => inRange(n.created_at, bounds))
+    const periodWithdrawals = withdrawals.filter(w => inRange(w.created_at, bounds))
+    const paidWithdrawals = periodWithdrawals.filter(w => w.status === "paid")
 
     const funds = successful.reduce((total, d) => total + Number(d.amount || 0), 0)
     const acceptedOffers = offers.filter(i => i.status === "accepted").length
     const started = deliveries.filter(f => f.status !== "cancelled")
     const completed = deliveries.filter(f => f.status === "completed").length
+    const withdrawn = paidWithdrawals.reduce((total, w) => total + Number(w.amount || 0), 0)
 
     return {
       funds,
@@ -100,26 +129,31 @@ export function OrganizationAnalytics({ needs, donations, interests, fulfillment
       completionRate: percent(completed, started.length),
       openNeeds: needs.filter(n => n.status === "open" || n.status === "in_progress").length,
       createdNeeds: periodNeeds.length,
-      fundsByMonth: bucketByMonth(successful, d => d.created_at, d => Number(d.amount || 0), range),
-      offersByMonth: bucketByMonth(offers, i => i.created_at, () => 1, range),
+      withdrawn,
+      withdrawalCount: periodWithdrawals.length,
+      fundsByMonth: bucketByMonth(successful, d => d.created_at, d => Number(d.amount || 0), bounds),
+      offersByMonth: bucketByMonth(offers, i => i.created_at, () => 1, bounds),
+      withdrawalsByMonth: bucketByMonth(paidWithdrawals, w => w.created_at, w => Number(w.amount || 0), bounds),
       needsByStatus: byStatusOrder(countBy(periodNeeds, n => n.status), NEED_STATUSES),
       deliveriesByStatus: byStatusOrder(countBy(deliveries, f => f.status), DELIVERY_STATUSES),
+      withdrawalsByStatus: byStatusOrder(countBy(periodWithdrawals, w => w.status), WITHDRAWAL_STATUSES),
       topNeeds: topN(sumBy(successful, d => firstOf(d.needs)?.title || null, d => Number(d.amount || 0)), 5),
+      topSupporters: topN(sumBy(successful, d => firstOf(d.givers)?.name || null, d => Number(d.amount || 0)), 5),
     }
-  }, [needs, donations, interests, fulfillments, range])
+  }, [needs, donations, interests, fulfillments, withdrawals, bounds])
 
-  const nothingAtAll = needs.length + donations.length + interests.length + fulfillments.length === 0
+  const nothingAtAll = needs.length + donations.length + interests.length + fulfillments.length + withdrawals.length === 0
 
   // --- CSV exports: same data as the charts, for the chosen time range ---
   const stamp = new Date().toISOString().slice(0, 10)
-  const rangeName = range === "all" ? "all-time" : `last-${range}-months`
-  const start = rangeStart(range)
+  const rangeName = customFrom || customTo ? `${customFrom || "start"}-to-${customTo || "now"}` : range === "all" ? "all-time" : `last-${range}-months`
+  const rangeLabel = customFrom || customTo ? `${customFrom || "the start"} to ${customTo || "now"}` : RANGE_LABEL[String(range)]
   const person = (value: Person[] | Person | null | undefined) => firstOf(value)
 
   const exportSummary = () =>
     downloadCsv(`helplift-summary-${rangeName}-${stamp}.csv`, toCsv(
       [
-        { metric: "Period", value: RANGE_LABEL[String(range)] },
+        { metric: "Period", value: rangeLabel },
         { metric: "Funds received (confirmed donations, ZAR)", value: view.funds.toFixed(2) },
         { metric: "Confirmed donations", value: view.successfulCount },
         { metric: "Donations awaiting verification", value: view.awaitingCount },
@@ -129,6 +163,7 @@ export function OrganizationAnalytics({ needs, donations, interests, fulfillment
         { metric: "Deliveries completed (% of started)", value: view.completionRate ?? "" },
         { metric: "Open needs right now", value: view.openNeeds },
         { metric: "Needs created in this period", value: view.createdNeeds },
+        { metric: "Withdrawn (paid, ZAR)", value: view.withdrawn.toFixed(2) },
       ],
       [{ header: "Metric", value: r => r.metric }, { header: "Value", value: r => r.value }]
     ))
@@ -143,7 +178,7 @@ export function OrganizationAnalytics({ needs, donations, interests, fulfillment
   }
 
   const exportNeeds = () =>
-    downloadCsv(`helplift-needs-${rangeName}-${stamp}.csv`, toCsv(needs.filter(n => inRange(n.created_at, start)), [
+    downloadCsv(`helplift-needs-${rangeName}-${stamp}.csv`, toCsv(needs.filter(n => inRange(n.created_at, bounds)), [
       { header: "Title", value: n => n.title },
       { header: "Category", value: n => n.category },
       { header: "Status", value: n => n.status },
@@ -155,7 +190,7 @@ export function OrganizationAnalytics({ needs, donations, interests, fulfillment
     ]))
 
   const exportDonations = () =>
-    downloadCsv(`helplift-donations-${rangeName}-${stamp}.csv`, toCsv(donations.filter(d => inRange(d.created_at, start)), [
+    downloadCsv(`helplift-donations-${rangeName}-${stamp}.csv`, toCsv(donations.filter(d => inRange(d.created_at, bounds)), [
       { header: "Date", value: d => day(d.created_at) },
       { header: "Amount (ZAR)", value: d => Number(d.amount || 0).toFixed(2) },
       { header: "Status", value: d => d.status },
@@ -166,7 +201,7 @@ export function OrganizationAnalytics({ needs, donations, interests, fulfillment
     ]))
 
   const exportOffers = () =>
-    downloadCsv(`helplift-offers-of-support-${rangeName}-${stamp}.csv`, toCsv(interests.filter(i => inRange(i.created_at, start)), [
+    downloadCsv(`helplift-offers-of-support-${rangeName}-${stamp}.csv`, toCsv(interests.filter(i => inRange(i.created_at, bounds)), [
       { header: "Date", value: i => day(i.created_at) },
       { header: "Status", value: i => i.status },
       { header: "Need", value: i => firstOf(i.needs)?.title },
@@ -176,7 +211,7 @@ export function OrganizationAnalytics({ needs, donations, interests, fulfillment
     ]))
 
   const exportDeliveries = () =>
-    downloadCsv(`helplift-deliveries-${rangeName}-${stamp}.csv`, toCsv(fulfillments.filter(f => inRange(f.created_at, start)), [
+    downloadCsv(`helplift-deliveries-${rangeName}-${stamp}.csv`, toCsv(fulfillments.filter(f => inRange(f.created_at, bounds)), [
       { header: "Started", value: f => day(f.created_at) },
       { header: "Status", value: f => f.status },
       { header: "Need", value: f => firstOf(firstOf(f.support_interests)?.needs)?.title },
@@ -184,9 +219,19 @@ export function OrganizationAnalytics({ needs, donations, interests, fulfillment
       { header: "Completed", value: f => day(f.completed_at) },
     ]))
 
+  const exportWithdrawals = () =>
+    downloadCsv(`helplift-withdrawals-${rangeName}-${stamp}.csv`, toCsv(withdrawals.filter(w => inRange(w.created_at, bounds)), [
+      { header: "Requested", value: w => day(w.created_at) },
+      { header: "Amount (ZAR)", value: w => Number(w.amount || 0).toFixed(2) },
+      { header: "Status", value: w => w.status },
+    ]))
+
   return (
     <VizRoot>
-      <RangeFilter value={range} onChange={setRange} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <RangeFilter value={range} onChange={setRange} />
+        <DateRangeFilter from={customFrom} to={customTo} onFromChange={setCustomFrom} onToChange={setCustomTo} />
+      </div>
 
       {nothingAtAll && (
         <p className="rounded-2xl border border-dashed border-slate-300 dark:border-[#233350] p-6 text-center text-sm text-slate-500 dark:text-slate-400">
@@ -194,12 +239,13 @@ export function OrganizationAnalytics({ needs, donations, interests, fulfillment
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-        <StatTile label="Funds received" value={money(view.funds)} note={view.awaitingCount ? `${view.awaitingCount} awaiting verification` : "Confirmed donations"} />
-        <StatTile label="Donations" value={String(view.successfulCount)} note="Confirmed by an administrator" />
-        <StatTile label="Offers of support" value={String(view.offersCount)} note={view.acceptedShare === null ? "None yet" : `${view.acceptedShare}% accepted`} />
-        <StatTile label="Deliveries completed" value={String(view.completed)} note={view.completionRate === null ? "None started yet" : `${view.completionRate}% of started`} />
-        <StatTile label="Open needs" value={String(view.openNeeds)} note={`${view.createdNeeds} created in this period`} />
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <StatTile label="Funds received" value={view.funds} prefix="R" decimals={2} note={view.awaitingCount ? `${view.awaitingCount} awaiting verification` : "Confirmed donations"} />
+        <StatTile label="Donations" value={view.successfulCount} note="Confirmed by an administrator" />
+        <StatTile label="Offers of support" value={view.offersCount} note={view.acceptedShare === null ? "None yet" : `${view.acceptedShare}% accepted`} />
+        <StatTile label="Deliveries completed" value={view.completed} note={view.completionRate === null ? "None started yet" : `${view.completionRate}% of started`} />
+        <StatTile label="Open needs" value={view.openNeeds} note={`${view.createdNeeds} created in this period`} />
+        <StatTile label="Withdrawn" value={view.withdrawn} prefix="R" decimals={2} note={`${view.withdrawalCount} request${view.withdrawalCount === 1 ? "" : "s"} in this period`} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -211,7 +257,7 @@ export function OrganizationAnalytics({ needs, donations, interests, fulfillment
           rows={view.fundsByMonth.map(p => ({ label: p.label, value: money(p.value) }))}
           valueHeading="Amount"
         >
-          <MonthlyColumns data={view.fundsByMonth} seriesLabel="Funds received" format={money} />
+          <MonthlyArea data={view.fundsByMonth} seriesLabel="Funds received" format={money} />
         </ChartCard>
 
         <ChartCard
@@ -222,7 +268,7 @@ export function OrganizationAnalytics({ needs, donations, interests, fulfillment
           rows={view.offersByMonth.map(p => ({ label: p.label, value: String(p.value) }))}
           valueHeading="Offers"
         >
-          <MonthlyColumns data={view.offersByMonth} seriesLabel="Offers of support" format={whole} />
+          <MonthlyLine data={view.offersByMonth} seriesLabel="Offers of support" format={whole} />
         </ChartCard>
 
         <ChartCard
@@ -244,7 +290,7 @@ export function OrganizationAnalytics({ needs, donations, interests, fulfillment
           rows={view.needsByStatus.map(p => ({ label: p.name, value: String(p.value) }))}
           valueHeading="Needs"
         >
-          <RankedBars data={view.needsByStatus} seriesLabel="Needs" format={whole} />
+          <StatusPie data={view.needsByStatus} format={whole} />
         </ChartCard>
 
         <ChartCard
@@ -255,7 +301,40 @@ export function OrganizationAnalytics({ needs, donations, interests, fulfillment
           rows={view.deliveriesByStatus.map(p => ({ label: p.name, value: String(p.value) }))}
           valueHeading="Deliveries"
         >
-          <RankedBars data={view.deliveriesByStatus} seriesLabel="Deliveries" format={whole} />
+          <StatusPie data={view.deliveriesByStatus} format={whole} />
+        </ChartCard>
+
+        <ChartCard
+          title="Withdrawals"
+          description={peakNote(view.withdrawalsByMonth, money, "") || "Paid out per month"}
+          isEmpty={view.withdrawalsByMonth.every(p => p.value === 0)}
+          emptyText="No paid withdrawals in this period."
+          rows={view.withdrawalsByMonth.map(p => ({ label: p.label, value: money(p.value) }))}
+          valueHeading="Amount"
+        >
+          <MonthlyArea data={view.withdrawalsByMonth} seriesLabel="Withdrawals" format={money} />
+        </ChartCard>
+
+        <ChartCard
+          title="Withdrawals by status"
+          description="Where requests made in this period stand"
+          isEmpty={view.withdrawalCount === 0}
+          emptyText="No withdrawal requests in this period."
+          rows={view.withdrawalsByStatus.map(p => ({ label: p.name, value: String(p.value) }))}
+          valueHeading="Requests"
+        >
+          <StatusPie data={view.withdrawalsByStatus} format={whole} />
+        </ChartCard>
+
+        <ChartCard
+          title="Top supporters"
+          description="Confirmed donations, largest first (top 5)"
+          isEmpty={view.topSupporters.length === 0}
+          emptyText="No confirmed donations from named givers yet."
+          rows={view.topSupporters.map(p => ({ label: p.name, value: money(p.value) }))}
+          valueHeading="Amount"
+        >
+          <RankedBars data={view.topSupporters} seriesLabel="Donated" format={money} />
         </ChartCard>
       </div>
 
@@ -263,7 +342,7 @@ export function OrganizationAnalytics({ needs, donations, interests, fulfillment
         <div>
           <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Export your data (CSV)</h3>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Downloads open in Excel or Google Sheets and cover the time range chosen above ({RANGE_LABEL[String(range)]}).
+            Downloads open in Excel or Google Sheets and cover the time range chosen above ({rangeLabel}).
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -273,6 +352,7 @@ export function OrganizationAnalytics({ needs, donations, interests, fulfillment
           <ExportButton label="donations" onClick={exportDonations} />
           <ExportButton label="offers of support" onClick={exportOffers} />
           <ExportButton label="deliveries" onClick={exportDeliveries} />
+          <ExportButton label="withdrawals" onClick={exportWithdrawals} />
         </div>
       </section>
     </VizRoot>

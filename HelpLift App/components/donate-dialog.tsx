@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Banknote, CheckCircle2, Clock, CreditCard, Loader2, Sparkles, UploadCloud } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Banknote, CheckCircle2, CreditCard, Loader2, Sparkles, UploadCloud } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -10,35 +10,60 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { BANK_ACCOUNTS, formatCurrency, type BankKey } from "@/lib/banking"
+import { formatCurrency } from "@/lib/banking"
+import { useBankAccounts, type BankAccountOption } from "@/lib/use-bank-accounts"
 import { redirectToPayfast } from "@/lib/payfast-client"
+import { MicButton } from "@/components/mic-button"
+import { GrammarCheckButton } from "@/components/grammar-check-button"
+import { appendSpeech } from "@/lib/speech-to-text"
+import { OutcomeContentInline } from "@/components/outcome-banner"
 
 type DonateDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   need: { id: string; title: string } | null
   onDone?: () => void
+  /** Retrying a donation that never went through - prefills the amount and
+   * payment method so the giver doesn't have to re-enter them. This still
+   * creates a brand-new donation row (with its own reference code); the
+   * original unsuccessful one is untouched. */
+  initialAmount?: number
+  initialMethod?: "eft" | "payfast" | "paypal"
 }
 
 type Step = "form" | "details" | "upload" | "done"
 
-export function DonateDialog({ open, onOpenChange, need, onDone }: DonateDialogProps) {
+export function DonateDialog({ open, onOpenChange, need, onDone, initialAmount, initialMethod }: DonateDialogProps) {
+  const { accounts: bankAccounts } = useBankAccounts()
   const [step, setStep] = useState<Step>("form")
   const [amount, setAmount] = useState("")
-  const [method, setMethod] = useState<"eft" | "payfast">("eft")
-  const [bank, setBank] = useState<BankKey>("absa")
+  const [method, setMethod] = useState<"eft" | "payfast" | "paypal">("eft")
+  const [bank, setBank] = useState<string>("")
   const [donation, setDonation] = useState<{ id: string; amount: number; reference_code: string } | null>(null)
+  const [paidAccount, setPaidAccount] = useState<BankAccountOption | null>(null)
   const [proofFiles, setProofFiles] = useState<File[]>([])
   const [payerNotes, setPayerNotes] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
 
+  // Default to the first available account once the live list loads.
+  useEffect(() => {
+    if (!bank && bankAccounts.length > 0) setBank(bankAccounts[0].key)
+  }, [bank, bankAccounts])
+
+  // Prefill from a retried donation each time the dialog opens.
+  useEffect(() => {
+    if (open && initialAmount) setAmount(String(initialAmount))
+    if (open && initialMethod) setMethod(initialMethod)
+  }, [open, initialAmount, initialMethod])
+
   const reset = () => {
     setStep("form")
     setAmount("")
     setMethod("eft")
-    setBank("absa")
+    setBank(bankAccounts[0]?.key || "")
     setDonation(null)
+    setPaidAccount(null)
     setProofFiles([])
     setPayerNotes("")
     setError("")
@@ -61,7 +86,7 @@ export function DonateDialog({ open, onOpenChange, need, onDone }: DonateDialogP
     try {
       const body = method === "eft"
         ? { need_id: need.id, amount: numericAmount, payment_method: "eft", bank_name: bank }
-        : { need_id: need.id, amount: numericAmount, payment_method: "payfast" }
+        : { need_id: need.id, amount: numericAmount, payment_method: method }
       const res = await fetch("/api/giver/donations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -73,7 +98,12 @@ export function DonateDialog({ open, onOpenChange, need, onDone }: DonateDialogP
         redirectToPayfast(data.payfast.action, data.payfast.fields)
         return
       }
+      if (method === "paypal" && data.paypal) {
+        window.location.href = data.paypal.approveUrl
+        return
+      }
       setDonation(data.donation)
+      setPaidAccount(data.bank || null)
       setStep("details")
     } catch (err: any) {
       setError(err.message || "Unable to start this donation.")
@@ -105,7 +135,6 @@ export function DonateDialog({ open, onOpenChange, need, onDone }: DonateDialogP
     }
   }
 
-  const account = BANK_ACCOUNTS[bank]
 
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
@@ -147,7 +176,7 @@ export function DonateDialog({ open, onOpenChange, need, onDone }: DonateDialogP
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Payment method
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <button
                   type="button"
                   onClick={() => setMethod("eft")}
@@ -174,6 +203,19 @@ export function DonateDialog({ open, onOpenChange, need, onDone }: DonateDialogP
                   <p className="text-sm font-bold">PayFast</p>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Card, Instant EFT & more</p>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setMethod("paypal")}
+                  className={`rounded-2xl border-2 p-3.5 text-left transition-colors ${
+                    method === "paypal"
+                      ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30"
+                      : "border-slate-200 dark:border-[#233350] hover:border-slate-300 dark:hover:border-[#2C3E63]"
+                  }`}
+                >
+                  <CreditCard className="w-4 h-4 text-blue-600 mb-1.5" />
+                  <p className="text-sm font-bold">PayPal</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Pay with your PayPal balance or card</p>
+                </button>
               </div>
             </div>
 
@@ -183,19 +225,22 @@ export function DonateDialog({ open, onOpenChange, need, onDone }: DonateDialogP
                   Choose a bank to pay into
                 </label>
                 <div className="grid grid-cols-2 gap-3">
-                  {(Object.keys(BANK_ACCOUNTS) as BankKey[]).map((key) => (
+                  {bankAccounts.length === 0 && (
+                    <p className="col-span-2 text-xs text-slate-400">Loading bank accounts...</p>
+                  )}
+                  {bankAccounts.map((account) => (
                     <button
-                      key={key}
+                      key={account.key}
                       type="button"
-                      onClick={() => setBank(key)}
+                      onClick={() => setBank(account.key)}
                       className={`rounded-2xl border-2 p-3.5 text-left transition-colors ${
-                        bank === key
+                        bank === account.key
                           ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30"
                           : "border-slate-200 dark:border-[#233350] hover:border-slate-300 dark:hover:border-[#2C3E63]"
                       }`}
                     >
-                      <p className="text-sm font-bold">{BANK_ACCOUNTS[key].bankName}</p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{BANK_ACCOUNTS[key].accountType}</p>
+                      <p className="text-sm font-bold">{account.bankName}</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{account.accountType}</p>
                     </button>
                   ))}
                 </div>
@@ -204,15 +249,15 @@ export function DonateDialog({ open, onOpenChange, need, onDone }: DonateDialogP
 
             <DialogFooter className="pt-2 gap-2">
               <Button type="button" variant="outline" onClick={close}>Cancel</Button>
-              <Button type="button" onClick={createDonation} disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white">
+              <Button type="button" onClick={createDonation} disabled={isSubmitting || (method === "eft" && !bank)} className="bg-blue-600 hover:bg-blue-700 text-white">
                 {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                <span>{isSubmitting ? "Preparing..." : method === "eft" ? "Get banking details" : "Continue to PayFast"}</span>
+                <span>{isSubmitting ? "Preparing..." : method === "eft" ? "Get banking details" : method === "payfast" ? "Continue to PayFast" : "Continue to PayPal"}</span>
               </Button>
             </DialogFooter>
           </div>
         )}
 
-        {step === "details" && donation && (
+        {step === "details" && donation && paidAccount && (
           <div className="space-y-4 pt-1">
             <div className="rounded-2xl border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/30 p-4 space-y-1">
               <p className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Amount to transfer</p>
@@ -220,12 +265,12 @@ export function DonateDialog({ open, onOpenChange, need, onDone }: DonateDialogP
             </div>
 
             <div className="rounded-2xl border border-slate-200 dark:border-[#233350] p-4 space-y-2.5">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{account.bankName}</p>
-              <DetailRow label="Account name" value={account.accountName} />
-              <DetailRow label="Account number" value={account.accountNumber} mono />
-              <DetailRow label="Branch code" value={account.branchCode} mono />
-              <DetailRow label="Account type" value={account.accountType} />
-              <DetailRow label="SWIFT code" value={account.swiftCode} mono />
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{paidAccount.bankName}</p>
+              <DetailRow label="Account name" value={paidAccount.accountName} />
+              <DetailRow label="Account number" value={paidAccount.accountNumber} mono />
+              <DetailRow label="Branch code" value={paidAccount.branchCode} mono />
+              <DetailRow label="Account type" value={paidAccount.accountType} />
+              {paidAccount.swiftCode && <DetailRow label="SWIFT code" value={paidAccount.swiftCode} mono />}
               <div className="pt-2 border-t border-slate-100 dark:border-[#233350]">
                 <DetailRow label="Payment reference (required)" value={donation.reference_code} mono highlight />
               </div>
@@ -248,7 +293,7 @@ export function DonateDialog({ open, onOpenChange, need, onDone }: DonateDialogP
         {step === "upload" && donation && (
           <div className="space-y-4 pt-1">
             <p className="text-sm text-slate-600 dark:text-slate-300">
-              Upload your proof of payment (bank receipt, screenshot, or statement) for reference <span className="font-mono font-bold">{donation.reference_code}</span>.
+              Upload your proof of payment - an official bank statement or your bank's Proof of Payment document (not a screenshot or photo) - for reference <span className="font-mono font-bold">{donation.reference_code}</span>.
             </p>
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Proof of payment</label>
@@ -256,7 +301,7 @@ export function DonateDialog({ open, onOpenChange, need, onDone }: DonateDialogP
                 <UploadCloud className="w-6 h-6 text-slate-400" />
                 <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                   {proofFiles.length === 0
-                    ? "Click to select file(s) — image or PDF"
+                    ? "Click to select file(s) - image or PDF"
                     : proofFiles.length === 1
                     ? proofFiles[0].name
                     : `${proofFiles.length} files selected`}
@@ -271,13 +316,19 @@ export function DonateDialog({ open, onOpenChange, need, onDone }: DonateDialogP
               </label>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Notes (optional)</label>
-              <textarea
-                value={payerNotes}
-                onChange={(e) => setPayerNotes(e.target.value)}
-                placeholder="E.g., paid from a joint account, or any detail that may help verification..."
-                className="w-full min-h-20 p-3 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded-2xl text-sm outline-none focus:border-blue-500"
-              />
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Notes (optional)</label>
+                <GrammarCheckButton text={payerNotes} onTextChange={setPayerNotes} />
+              </div>
+              <div className="relative">
+                <textarea
+                  value={payerNotes}
+                  onChange={(e) => setPayerNotes(e.target.value)}
+                  placeholder="E.g., paid from a joint account, or any detail that may help verification..."
+                  className="w-full min-h-20 p-3 pr-11 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded-2xl text-sm outline-none focus:border-blue-500"
+                />
+                <MicButton className="top-2 right-2" onText={text => setPayerNotes(n => appendSpeech(n, text))} />
+              </div>
             </div>
             <DialogFooter className="pt-2 gap-2">
               <Button type="button" variant="outline" onClick={() => setStep("details")}>Back</Button>
@@ -289,19 +340,13 @@ export function DonateDialog({ open, onOpenChange, need, onDone }: DonateDialogP
           </div>
         )}
 
-        {step === "done" && (
-          <div className="py-6 text-center space-y-3">
-            <div className="w-14 h-14 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 flex items-center justify-center mx-auto text-amber-600 dark:text-amber-400">
-              <Clock className="w-7 h-7" />
-            </div>
-            <h3 className="text-lg font-bold">Pending verification</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-              Thank you! Your proof of payment has been submitted. An administrator will verify your deposit and confirm the donation.
-            </p>
-            <Button type="button" onClick={close} className="bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 mt-2">
-              Close
-            </Button>
-          </div>
+        {step === "done" && donation && (
+          <OutcomeContentInline
+            variant="pending"
+            message="Your proof of payment has been submitted. An administrator will review it and confirm your donation - you'll be notified either way."
+            onDismiss={close}
+            detail={{ amount: donation.amount, date: new Date().toLocaleDateString("en-ZA", { year: "numeric", month: "short", day: "numeric" }), reference: donation.reference_code }}
+          />
         )}
       </DialogContent>
     </Dialog>

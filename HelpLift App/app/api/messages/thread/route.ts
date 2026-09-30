@@ -23,7 +23,7 @@ export async function GET(request: Request) {
 
     const { data: rows, error } = await supabase
       .from("notifications")
-      .select("id, sender_id, sender_name, sender_role, recipient_id, message, created_at, fanned_from, attachment_storage_path, attachment_file_name")
+      .select("id, sender_id, sender_name, sender_role, recipient_id, message, created_at, read_at, delivered_at, fanned_from, attachment_storage_path, attachment_file_name")
       .eq("thread_id", threadId)
       .order("created_at", { ascending: true })
       .limit(200)
@@ -32,6 +32,21 @@ export async function GET(request: Request) {
     // A copy made for a teammate duplicates its original; show each message once.
     const ids = new Set((rows || []).map(row => row.id))
     const messages = (rows || []).filter(row => !row.fanned_from || !ids.has(row.fanned_from))
+
+    // Opening the conversation counts as reading every message in it that's
+    // addressed to you - mirrors the mark-as-read PATCH on a single message,
+    // just applied to the whole thread at once. Read implies delivered.
+    const now = new Date().toISOString()
+    const unreadMine = messages.filter(row => row.recipient_id === user.id && !row.read_at).map(row => row.id)
+    if (unreadMine.length > 0) {
+      await supabase.from("notifications").update({ read_at: now, delivered_at: now }).in("id", unreadMine)
+      for (const row of messages) {
+        if (unreadMine.includes(row.id)) {
+          row.read_at = now
+          row.delivered_at = now
+        }
+      }
+    }
 
     // "Yours" also covers messages sent by teammates in your organization.
     const { data: myMembership } = await supabase.from("organization_members").select("organization_id").eq("profile_id", user.id).maybeSingle()
@@ -66,6 +81,8 @@ export async function GET(request: Request) {
         message: row.message,
         created_at: row.created_at,
         mine: row.sender_id === user.id || (!!row.sender_id && teammateIds.has(row.sender_id)),
+        delivered_at: row.delivered_at,
+        read_at: row.read_at,
         attachments,
       }
     }))

@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
+// First-time moderation of a goods/services listing only (pending ->
+// approved/rejected). Financial pledges are moderated via the linked
+// donation's review instead (see admin/donations/[id]). Reviewing a *claim*
+// on an already-approved listing is a separate concern now that an offering
+// can have several claims at once - see admin/gifts/claims/[claimId].
 export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> }
@@ -14,75 +19,59 @@ export async function PATCH(
     if (profile?.role !== "admin") return NextResponse.json({ message: "Administrator access required." }, { status: 403 })
 
     const { id } = await context.params
-    const { status, claim_notes, rejection_reason } = await request.json()
+    const { status, rejection_reason } = await request.json()
     const cleanRejectionReason = typeof rejection_reason === "string" && rejection_reason.trim() ? rejection_reason.trim() : null
 
-    if (!["pending", "approved", "pending_claim", "claimed", "expired", "rejected"].includes(status)) {
+    if (!["approved", "rejected"].includes(status)) {
       return NextResponse.json({ message: "Invalid gift status." }, { status: 400 })
     }
 
     const { data: current, error: currentError } = await supabase
       .from("gift_offerings")
-      .select("id, title, status, giver_id, claimed_by_org_id, organizations(name, profile_id)")
+      .select("id, title, status, giver_id, offering_type")
       .eq("id", id)
       .single()
     if (currentError || !current) return NextResponse.json({ message: "Gift offering not found." }, { status: 404 })
-
-    // A claim is in review — status "approved" here means "reject the claim,
-    // send it back to the pool" rather than the initial-listing approval.
-    const isRejectingClaim = current.status === "pending_claim" && status === "approved"
-    // Finalizing a claim: the org that requested it actually receives the item.
-    const isApprovingClaim = current.status === "pending_claim" && status === "claimed"
-    // First-time moderation of a goods/services listing (financial pledges are
-    // moderated via the linked donation's review instead — see admin donations route).
-    const isInitialModeration = current.status === "pending" && ["approved", "rejected"].includes(status)
-
-    const payload: Record<string, any> = { status }
-    if (isInitialModeration) payload.rejection_reason = status === "rejected" ? cleanRejectionReason : null
-    if (isRejectingClaim) {
-      payload.claimed_by_org_id = null
-      payload.claim_notes = claim_notes || null
+    if (current.status !== "pending") {
+      return NextResponse.json({ message: "This listing has already been reviewed." }, { status: 400 })
+    }
+    if (current.offering_type === "financial" && status === "approved") {
+      return NextResponse.json({ message: "A financial pledge is approved automatically once its donation is confirmed - it can only be cancelled here, not manually approved." }, { status: 400 })
     }
 
     const { data: gift, error } = await supabase
       .from("gift_offerings")
-      .update(payload)
+      .update({ status, rejection_reason: status === "rejected" ? cleanRejectionReason : null })
       .eq("id", id)
       .select()
       .single()
-
     if (error) return NextResponse.json({ message: error.message }, { status: 400 })
 
-    try {
-      const orgField = (current as any).organizations
-      const org = Array.isArray(orgField) ? orgField[0] : orgField
-      const notifications: Record<string, any>[] = []
-      const { data: giver } = await supabase.from("givers").select("profile_id").eq("id", current.giver_id).single()
+    // Cancelling a financial pledge's listing would otherwise leave its
+    // linked donation dangling - still "pending" forever, with nothing
+    // pointing back at the fact that the pledge itself was cancelled. Only
+    // touches a donation still awaiting payment; one already confirmed
+    // successful/unsuccessful (e.g. by a payment gateway) is left alone.
+    if (current.offering_type === "financial" && status === "rejected") {
+      const { error: donationError } = await supabase
+        .from("donations")
+        .update({ status: "unsuccessful", reviewed_at: new Date().toISOString() })
+        .eq("gift_offering_id", id)
+        .eq("status", "pending")
+      if (donationError) console.warn("Gift cancel: linked donation cleanup warning:", donationError.message)
+    }
 
-      if (isApprovingClaim) {
-        if (org?.profile_id) notifications.push({
-          recipient_id: org.profile_id, sender_id: user.id, type: "gift_claim_approved",
-          title: "Gift claim approved", message: `Your claim on "${current.title}" has been approved. Coordinate with the donor to receive it.`,
-        })
-        if (giver?.profile_id) notifications.push({
-          recipient_id: giver.profile_id, sender_id: user.id, type: "gift_claim_approved",
-          title: "Your gift offering was claimed", message: `"${current.title}" has been confirmed as claimed by ${org?.name || "an organization"}.`,
-        })
-      } else if (isRejectingClaim) {
-        if (org?.profile_id) notifications.push({
-          recipient_id: org.profile_id, sender_id: user.id, type: "gift_claim_rejected",
-          title: "Gift claim declined", message: `Your claim on "${current.title}" was declined by an administrator.${claim_notes ? ` Note: ${claim_notes}` : ""}`,
-        })
-      } else if (isInitialModeration && giver?.profile_id) {
-        notifications.push({
-          recipient_id: giver.profile_id, sender_id: user.id, type: "gift_offering_reviewed",
+    try {
+      const { data: giver } = await supabase.from("givers").select("profile_id").eq("id", current.giver_id).single()
+      if (giver?.profile_id) {
+        await supabase.from("notifications").insert({
+          recipient_id: giver.profile_id, sender_id: user.id, sender_name: "HelpLift Notifications", type: "gift_offering_reviewed",
           title: `Gift offering ${status}`,
           message: `Your offering "${current.title}" was ${status} by an administrator.${status === "approved" ? " It is now listed in the Gift Library." : cleanRejectionReason ? ` Reason: ${cleanRejectionReason}` : ""}`,
         })
       }
-      if (notifications.length) await supabase.from("notifications").insert(notifications)
     } catch (notifyErr) {
-      console.warn("Gift claim review notification warning:", notifyErr)
+      console.warn("Gift listing review notification warning:", notifyErr)
     }
 
     return NextResponse.json({ success: true, gift })

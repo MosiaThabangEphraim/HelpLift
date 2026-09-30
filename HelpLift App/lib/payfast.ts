@@ -29,7 +29,7 @@ export function generateSignature(data: Record<string, string | undefined | null
 
 // For INCOMING ITN payloads: PayFast always posts a fixed set of fields
 // (custom_str1-5, custom_int1-5, etc.), blank or not, and signs all of them.
-// Unlike the outgoing case, we must not filter anything out here — every
+// Unlike the outgoing case, we must not filter anything out here - every
 // field they sent (even empty ones) has to be included, in the order
 // received, or the recomputed hash won't match theirs.
 export function generateItnSignature(data: Record<string, string>, passphrase?: string) {

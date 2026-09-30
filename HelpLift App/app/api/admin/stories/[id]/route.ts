@@ -33,6 +33,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         await supabase.from("notifications").insert({
           recipient_id: orgProfileId,
           sender_id: user.id,
+          sender_name: "HelpLift Notifications",
           type: "impact_story_review",
           title: status === "approved" ? "Impact story published" : "Impact story rejected",
           message: status === "approved"

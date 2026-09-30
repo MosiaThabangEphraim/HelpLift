@@ -12,6 +12,9 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import { MicButton } from "@/components/mic-button"
+import { GrammarCheckButton } from "@/components/grammar-check-button"
+import { appendSpeech } from "@/lib/speech-to-text"
 
 const RATING_WORDS = ["", "Poor", "Fair", "Good", "Very good", "Excellent"]
 
@@ -123,15 +126,21 @@ export function FeedbackButton({ className = "" }: { className?: string }) {
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="feedback-message">How can we improve? <span className="text-xs font-normal text-slate-400">(optional)</span></Label>
-                <textarea
-                  id="feedback-message"
-                  value={message}
-                  onChange={e => setMessage(e.target.value)}
-                  maxLength={2000}
-                  placeholder="What's working well? What's confusing, missing or could be better?"
-                  className="w-full min-h-32 rounded-xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                />
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="feedback-message">How can we improve? <span className="text-xs font-normal text-slate-400">(optional)</span></Label>
+                  <GrammarCheckButton text={message} onTextChange={setMessage} />
+                </div>
+                <div className="relative">
+                  <textarea
+                    id="feedback-message"
+                    value={message}
+                    onChange={e => setMessage(e.target.value)}
+                    maxLength={2000}
+                    placeholder="What's working well? What's confusing, missing or could be better?"
+                    className="w-full min-h-32 rounded-xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-3 py-2 pr-11 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  />
+                  <MicButton className="top-2 right-2" onText={text => setMessage(m => appendSpeech(m, text))} />
+                </div>
                 <p className="text-right text-[11px] text-slate-400">{message.length}/2000</p>
               </div>
 

@@ -78,6 +78,7 @@ export async function PATCH(
         await supabase.from("notifications").insert({
           recipient_id: organizationOwner.profile_id,
           sender_id: user.id,
+          sender_name: "HelpLift Notifications",
           type: "organization_verification",
           title: status === "more_info_requested" ? "Additional information requested" : `Organization ${status}`,
           message: `${organizationOwner.name} was ${verdictText} by an administrator.${update.verification_notes ? ` Note: ${update.verification_notes}` : ""}`,

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import { generateItnSignature, payfastValidateUrl } from "@/lib/payfast"
+import { sendDonationReceipt } from "@/lib/donation-receipt"
 
 // PayFast calls this server-to-server (no browser session, no cookies), so it
-// runs with the service role key and bypasses RLS — the checks below (signature,
+// runs with the service role key and bypasses RLS - the checks below (signature,
 // the validate() call back to PayFast, and the amount match) are what stand in
 // for auth here.
 function serviceClient() {
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
     const supabase = serviceClient()
     const { data: donation, error: fetchError } = await supabase
       .from("donations")
-      .select("id, amount, status, payment_method, gift_offering_id")
+      .select("id, amount, status, payment_method, gift_offering_id, reference_code, donor_profile_id, givers(profile_id)")
       .eq("id", donationId)
       .single()
     if (fetchError || !donation) {
@@ -85,7 +86,7 @@ export async function POST(request: Request) {
       }
 
       // A financial Gift Library pledge's listing stays hidden ('pending')
-      // until its payment is confirmed — same cascade the admin donation
+      // until its payment is confirmed - same cascade the admin donation
       // review route applies for EFT, since PayFast has no admin step.
       if (donation.gift_offering_id) {
         try {
@@ -105,14 +106,38 @@ export async function POST(request: Request) {
           if (adminId.data) {
             await supabase.from("notifications").insert({
               recipient_id: adminId.data,
+              sender_name: "HelpLift Notifications",
               type: "donation_confirmed",
               title: "PayFast donation confirmed",
               message: `A donation of R${Number(donation.amount).toFixed(2)} was confirmed automatically via PayFast.`,
             })
           }
+          // PayFast has no admin review step, so this is the giver's only
+          // confirmation that their donation went through - the EFT path's
+          // equivalent (donation_reviewed) is sent when an admin approves it.
+          // A platform donation has no givers row at all (giver_id is null,
+          // even for a giver or an organization donating to the platform -
+          // see 20260926000400_platform_donations.sql), so fall back to
+          // donor_profile_id the same way the EFT review route and the
+          // receipt's own recipient lookup (loadReceiptData) already do.
+          const giver = Array.isArray((donation as any).givers) ? (donation as any).givers[0] : (donation as any).givers
+          const recipientProfileId = giver?.profile_id || donation.donor_profile_id
+          if (recipientProfileId) {
+            await supabase.from("notifications").insert({
+              recipient_id: recipientProfileId,
+              sender_name: "HelpLift Notifications",
+              type: "donation_reviewed",
+              title: "Donation confirmed as successful",
+              message: `Your donation of R${Number(donation.amount).toFixed(2)} (ref ${donation.reference_code}) was confirmed as successful.`,
+            })
+          }
         } catch (notifyErr) {
           console.warn("PayFast ITN notification warning:", notifyErr)
         }
+
+        // Receipt is emailed automatically - an admin can still resend it
+        // manually from the donation dialog.
+        await sendDonationReceipt(supabase, donationId)
       }
     }
 

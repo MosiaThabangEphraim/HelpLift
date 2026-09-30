@@ -1,11 +1,11 @@
 -- Migration: 20260914002600_admin_can_correct_donation_amount.sql
 -- Description: An admin verifying proof of payment may find the amount
 -- actually paid (per the bank receipt) differs from what the giver typed
--- when starting the donation — e.g. they rounded up, or paid extra. Let
+-- when starting the donation - e.g. they rounded up, or paid extra. Let
 -- admins correct the recorded amount at review time. The tamper guard
 -- previously blocked amount changes for everyone, admins included; this
 -- drops that restriction from the admin branch only (the non-admin/giver
--- branch is untouched — a giver still can never change their own amount).
+-- branch is untouched - a giver still can never change their own amount).
 create or replace function public.prevent_donation_tamper()
 returns trigger
 language plpgsql

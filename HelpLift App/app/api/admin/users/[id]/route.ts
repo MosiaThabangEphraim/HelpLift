@@ -32,6 +32,7 @@ export async function PATCH(
     const body = await request.json()
 
     const profileUpdate: Record<string, any> = {}
+    let roleChange: { from: string; to: string } | null = null
 
     if (typeof body.full_name === "string") {
       if (!body.full_name.trim()) return NextResponse.json({ message: "Full name cannot be empty." }, { status: 400 })
@@ -42,7 +43,31 @@ export async function PATCH(
       if (!ALLOWED_ROLES.includes(body.role)) {
         return NextResponse.json({ message: `Invalid role. Must be one of: ${ALLOWED_ROLES.join(", ")}.` }, { status: 400 })
       }
-      profileUpdate.role = body.role
+      // Only actually-changed roles are checked, so saving other fields with the same role is always fine.
+      const { data: target } = await supabase.from("profiles").select("role, full_name, email").eq("id", id).single()
+      if (!target) return NextResponse.json({ message: "User not found." }, { status: 404 })
+      if (target.role !== body.role) {
+        if (id === currentUser.id) {
+          return NextResponse.json({ message: "You can't change your own role. Ask another administrator." }, { status: 400 })
+        }
+        // Organization accounts own an organization record and giver accounts a giver profile, so
+        // the only safe platform moves are giver <-> admin. Team roles inside an organization are
+        // changed separately.
+        if (target.role === "organization" || body.role === "organization") {
+          return NextResponse.json({ message: "Organization accounts can't be converted. Change their team role instead, or delete the account." }, { status: 400 })
+        }
+        if (body.role === "giver") {
+          // A former admin has no giver profile yet; create one so the giver dashboard works.
+          const admin = serviceClient()
+          const { data: existing } = await admin.from("givers").select("id").eq("profile_id", id).maybeSingle()
+          if (!existing) {
+            const { error: giverError } = await admin.from("givers").insert({ profile_id: id, name: target.full_name, email: target.email })
+            if (giverError) return NextResponse.json({ message: giverError.message }, { status: 400 })
+          }
+        }
+        profileUpdate.role = body.role
+        roleChange = { from: target.role as string, to: body.role as string }
+      }
     }
 
     if (typeof body.suspended === "boolean") {
@@ -59,7 +84,7 @@ export async function PATCH(
       passwordChanged = true
       const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
       if (!serviceRoleKey) {
-        console.warn("SUPABASE_SERVICE_ROLE_KEY not set — skipping auth.admin password reset.")
+        console.warn("SUPABASE_SERVICE_ROLE_KEY not set - skipping auth.admin password reset.")
       } else {
         const serviceClient = createServerClient(
           process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -96,11 +121,27 @@ export async function PATCH(
       if (error) return NextResponse.json({ message: error.message }, { status: 400 })
       profile = data
 
+      if (roleChange) {
+        try {
+          await supabase.from("notifications").insert({
+            recipient_id: id,
+            sender_id: currentUser.id,
+            sender_name: "HelpLift Notifications",
+            type: "role_changed",
+            title: "Your account role changed",
+            message: `An administrator changed your HelpLift role from ${roleChange.from} to ${roleChange.to}.${roleChange.to === "admin" ? " You now have access to the admin dashboard." : ""}`,
+          })
+        } catch (notifyErr) {
+          console.warn("Role change notification warning:", notifyErr)
+        }
+      }
+
       if ("suspended" in profileUpdate && profileUpdate.suspended !== wasSuspendedBeforeUpdate) {
         try {
           await supabase.from("notifications").insert({
             recipient_id: id,
             sender_id: currentUser.id,
+            sender_name: "HelpLift Notifications",
             type: profileUpdate.suspended ? "account_suspended" : "account_unsuspended",
             title: profileUpdate.suspended ? "Your account has been suspended" : "Your account has been restored",
             message: profileUpdate.suspended
@@ -130,7 +171,7 @@ export async function PATCH(
 // Permanently deletes the auth.users row, which cascades down through
 // profiles -> organizations/givers -> everything referencing them (needs,
 // donations, gift_offerings, notifications, etc. are all FK'd with
-// on delete cascade) — a full account wipe in one call, no manual cleanup.
+// on delete cascade) - a full account wipe in one call, no manual cleanup.
 export async function DELETE(
   request: Request,
   context: { params: Promise<{ id: string }> }
@@ -146,7 +187,7 @@ export async function DELETE(
 
     const { id } = await context.params
     if (id === currentUser.id) {
-      return NextResponse.json({ message: "You cannot delete your own admin account from here." }, { status: 400 })
+      return NextResponse.json({ message: "You can't delete the account you're currently signed in as. Sign in as another administrator to delete this one." }, { status: 400 })
     }
 
     const { error } = await serviceClient().auth.admin.deleteUser(id)

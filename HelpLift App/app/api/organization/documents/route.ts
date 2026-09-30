@@ -9,9 +9,13 @@ export async function GET() {
   const orgCtx = await getOrgContext<{ id: any }>(supabase, user.id, "id")
     const organization = orgCtx?.organization ?? null
   if (!organization) return NextResponse.json({ message: "Organization profile not found." }, { status: 404 })
-  const { data, error } = await supabase.from("organization_documents").select("id, file_name, document_type, created_at").eq("organization_id", organization.id).order("created_at", { ascending: false })
+  const { data, error } = await supabase.from("organization_documents").select("id, file_name, document_type, storage_path, created_at").eq("organization_id", organization.id).order("created_at", { ascending: false })
   if (error) return NextResponse.json({ message: error.message }, { status: 400 })
-  return NextResponse.json({ documents: data || [] })
+  const withLinks = await Promise.all((data || []).map(async document => {
+    const { data: signed } = await supabase.storage.from("organization-documents").createSignedUrl(document.storage_path, 300)
+    return { id: document.id, file_name: document.file_name, document_type: document.document_type, created_at: document.created_at, signed_url: signed?.signedUrl || null }
+  }))
+  return NextResponse.json({ documents: withLinks })
 }
 
 export async function POST(request: Request) {

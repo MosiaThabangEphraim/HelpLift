@@ -8,15 +8,15 @@
 --
 -- Until now an organization was a single login (organizations.profile_id is
 -- unique), so there was nobody to give a role to. This adds:
---   * organization_members     — who belongs to which organization, and as what
---   * organization_invitations — email invitations (token stored hashed)
---   * has_org_role()           — one helper the policies and API routes share
+--   * organization_members     - who belongs to which organization, and as what
+--   * organization_invitations - email invitations (token stored hashed)
+--   * has_org_role()           - one helper the policies and API routes share
 --
 -- Roles (higher includes everything below it):
---   viewer  — read-only access to the organization's data
---   manager — viewer + create/edit needs, handle interests, fulfillments,
+--   viewer  - read-only access to the organization's data
+--   manager - viewer + create/edit needs, handle interests, fulfillments,
 --             stories, documents, gift claims
---   owner   — manager + manage the team, edit the organization profile and
+--   owner   - manager + manage the team, edit the organization profile and
 --             banking details, delete the account (the original login)
 --
 -- Existing "o.profile_id = auth.uid()" policies are deliberately LEFT ALONE.
@@ -587,7 +587,7 @@ begin
     v_allowed := true;
   end if;
 
-  -- A giver may message any organization — organizations are public
+  -- A giver may message any organization - organizations are public
   -- entities (listed on the needs board and their own profile page).
   if not v_allowed and v_sender_role = 'giver' and v_recipient_role = 'organization' then
     v_allowed := true;
@@ -759,7 +759,7 @@ begin
     raise exception 'Your account is suspended. You may only message an administrator.';
   end if;
 
-  -- Admins may message anyone; anyone may message an admin — except a
+  -- Admins may message anyone; anyone may message an admin - except a
   -- read-only organization viewer, who may not.
   if v_sender_role = 'admin' or v_recipient_role = 'admin' then
     if v_sender_role = 'organization' and exists (
@@ -771,7 +771,7 @@ begin
     v_allowed := true;
   end if;
 
-  -- A giver may message any organization — organizations are public
+  -- A giver may message any organization - organizations are public
   -- entities (listed on the needs board and their own profile page).
   if not v_allowed and v_sender_role = 'giver' and v_recipient_role = 'organization' then
     v_allowed := true;

@@ -6,12 +6,12 @@
 -- policy on public.givers queries public.donations in a correlated subquery.
 -- Reading donations requires Postgres to evaluate ITS OWN policies, including
 -- "Givers can view their own donations", which queries public.givers. That
--- re-enters the very policy being evaluated — givers -> donations -> givers ->
--- donations -> ... — infinite recursion. Identical failure pattern to
+-- re-enters the very policy being evaluated - givers -> donations -> givers ->
+-- donations -> ... - infinite recursion. Identical failure pattern to
 -- 20260914001800_fix_givers_rls_recursion.sql, just via the donations table
 -- instead of support_interests.
 --
--- Fix: same approach — move the cross-table check into a SECURITY DEFINER
+-- Fix: same approach - move the cross-table check into a SECURITY DEFINER
 -- function, which bypasses RLS entirely for its own internal queries, so
 -- evaluating it never re-triggers the policies on givers/donations/
 -- organizations in the first place.

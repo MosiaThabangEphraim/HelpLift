@@ -6,8 +6,8 @@
 -- a correlated subquery. Reading support_interests requires Postgres to evaluate
 -- ITS OWN policies, including "Givers can view their interests"
 -- (20260914000300_core_needs_and_interests.sql), which queries public.givers.
--- That re-enters the very policy being evaluated — givers -> support_interests
--- -> givers -> support_interests -> ... — infinite recursion. Same failure
+-- That re-enters the very policy being evaluated - givers -> support_interests
+-- -> givers -> support_interests -> ... - infinite recursion. Same failure
 -- pattern as the earlier `needs` self-reference bug (20260914001500), just
 -- across two tables instead of one.
 --

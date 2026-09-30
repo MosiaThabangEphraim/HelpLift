@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useState, FormEvent } from "react"
+import { useEffect, useMemo, useRef, useState, FormEvent } from "react"
 import { useRouter } from "next/navigation"
+import { showFeedback } from "@/lib/inline-feedback"
 import {
   Building2,
   CheckCircle2,
@@ -22,15 +23,21 @@ import {
   Mail,
   X,
   Banknote,
+  Wallet,
   Phone,
   MapPin,
   FileText,
+  UploadCloud,
   BarChart3,
   Download,
   History,
   Paperclip,
   Megaphone,
-  Star
+  Settings,
+  Bell,
+  Star,
+  Heart,
+  Globe
 } from "lucide-react"
 import {
   Area,
@@ -57,9 +64,11 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import { firstOf } from "@/lib/utils"
 import { DonationDetailDialog, statusBadgeClasses, type DonationSummary } from "@/components/donation-detail-dialog"
-import { GiftDetailDialog, type GiftDetailSummary } from "@/components/gift-detail-dialog"
+import { GiftDetailDialog, type GiftDetailSummary, type GiftClaimSummary } from "@/components/gift-detail-dialog"
+import { NeedDetailDialog, type NeedDetailSummary } from "@/components/need-detail-dialog"
 import { formatCurrency } from "@/lib/banking"
 import { toCsv, downloadCsv } from "@/lib/csv"
+import { downloadChartAsImage } from "@/lib/chart-export"
 import {
   Dialog,
   DialogContent,
@@ -69,17 +78,34 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import { SettingsDialog } from "@/components/settings-dialog"
+import { LiveClock } from "@/components/live-clock"
+import { ChangeEmailFlow, ChangePasswordFlow } from "@/components/account-security"
+import { MicButton } from "@/components/mic-button"
+import { GrammarCheckButton } from "@/components/grammar-check-button"
+import { appendSpeech } from "@/lib/speech-to-text"
+import { activateOnKey } from "@/lib/keyboard"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { MessageComposeDialog } from "@/components/message-compose-dialog"
 import { RejectReasonDialog } from "@/components/reject-reason-dialog"
 import { MessageViewToggle, SentMessages } from "@/components/sent-messages"
 import { AdminFeedback } from "@/components/admin-feedback"
 import { AdminFulfillmentsView, type AdminFulfillment } from "@/components/admin-fulfillments"
+import { PlatformSettingsAdmin } from "@/components/platform-settings-admin"
 import { MessageDetailDialog } from "@/components/message-detail-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { AnnouncementComposeDialog } from "@/components/announcement-compose-dialog"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { CountUp } from "@/components/count-up"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -116,8 +142,7 @@ type Organization = {
   created_at: string
 }
 type Profile = { id: string; full_name: string; email: string; role: "admin" | "organization" | "giver" | string; suspended?: boolean; suspended_reason?: string | null; created_at: string; phone?: string | null; account_type?: string | null }
-type Need = { id: string; title: string; description: string; category: string; urgency?: string; status: "draft" | "open" | "in_progress" | "fulfilled" | "closed" | "rejected"; rejection_reason?: string | null; organizations: { name: string }[] | { name: string } | null; created_at: string }
-type Interest = { id: string; status: "pending" | "accepted" | "declined"; message: string | null; needs: { title: string }[] | { title: string } | null; givers: { name: string; email: string }[] | { name: string; email: string } | null; created_at: string }
+type Need = { id: string; title: string; description: string; category: string; urgency?: string; status: "draft" | "open" | "in_progress" | "fulfilled" | "closed" | "rejected" | "reopen_pending"; rejection_reason?: string | null; reopen_reason?: string | null; organizations: { name: string }[] | { name: string } | null; created_at: string; location?: string | null; quantity?: string | null; target_amount?: number | string | null; due_date?: string | null; need_attachments?: { id: string; storage_path: string; file_name: string | null; url: string }[] }
 type AdminMessage = { id: string; title: string; message: string; sender_name?: string | null; sender_role?: string | null; read_at: string | null; created_at: string; attachment_file_name?: string | null; attachmentUrl?: string | null; attachments?: { id: string; file_name: string | null; url: string | null }[] }
 type OrganizationDocument = { id: string; organization_id: string; file_name: string; document_type: string; signed_url?: string | null }
 type OrgVerificationHistoryEntry = {
@@ -138,13 +163,36 @@ type AdminGift = {
   conditions?: string | null
   location?: string | null
   expiry_date?: string | null
-  status: "pending" | "approved" | "pending_claim" | "rejected" | "claimed"
-  claim_notes?: string | null
-  claim_motivation?: string | null
+  status: "pending" | "approved" | "rejected" | "claimed"
+  rejection_reason?: string | null
+  claims: GiftClaimSummary[]
   created_at: string
   givers?: { name: string; email: string } | null
   organizations?: { name: string } | null
+  photos?: { id: string; file_name: string | null; url: string | null }[]
 }
+
+function toGiftDetailSummary(gift: AdminGift): GiftDetailSummary {
+  return {
+    id: gift.id,
+    title: gift.title,
+    offering_type: gift.offering_type,
+    description: gift.description,
+    quantity_or_value: gift.quantity_or_value,
+    conditions: gift.conditions,
+    location: gift.location,
+    expiry_date: gift.expiry_date,
+    status: gift.status,
+    rejection_reason: gift.rejection_reason,
+    claims: gift.claims,
+    created_at: gift.created_at,
+    giverName: gift.givers?.name,
+    giverEmail: gift.givers?.email,
+    claimedByOrgName: gift.organizations?.name,
+    photos: gift.photos,
+  }
+}
+
 type AdminDonation = {
   id: string
   amount: number
@@ -160,6 +208,25 @@ type AdminDonation = {
   needs: ({ title: string; organizations: { name: string }[] | { name: string } | null }[] | { title: string; organizations: { name: string }[] | { name: string } | null }) | null
   gift_offerings: { title: string }[] | { title: string } | null
   givers: { name: string; email: string }[] | { name: string; email: string } | null
+  is_platform_donation?: boolean
+  donor?: { full_name: string; email: string }[] | { full_name: string; email: string } | null
+  guest_name?: string | null
+  guest_email?: string | null
+}
+
+type AdminWithdrawal = {
+  id: string
+  amount: number
+  status: "pending" | "approved" | "rejected" | "paid" | "cancelled"
+  rejection_reason: string | null
+  proof_storage_path: string | null
+  proof_file_name: string | null
+  proof_url: string | null
+  paid_at: string | null
+  reviewed_at: string | null
+  created_at: string
+  organizations: { id: string; name: string; bank_name: string | null; bank_account_holder: string | null; bank_account_number: string | null; bank_branch_code: string | null; bank_account_type: string | null }[] | { id: string; name: string; bank_name: string | null; bank_account_holder: string | null; bank_account_number: string | null; bank_branch_code: string | null; bank_account_type: string | null } | null
+  requester: { full_name: string; email: string }[] | { full_name: string; email: string } | null
 }
 
 export default function AdminDashboardPage() {
@@ -168,7 +235,6 @@ export default function AdminDashboardPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [needs, setNeeds] = useState<Need[]>([])
-  const [interests, setInterests] = useState<Interest[]>([])
   const [documents, setDocuments] = useState<OrganizationDocument[]>([])
   const [verificationHistory, setVerificationHistory] = useState<OrgVerificationHistoryEntry[]>([])
   const [gifts, setGifts] = useState<AdminGift[]>([])
@@ -182,12 +248,25 @@ export default function AdminDashboardPage() {
   const [selectedDonation, setSelectedDonation] = useState<DonationSummary | null>(null)
   const [selectedGift, setSelectedGift] = useState<GiftDetailSummary | null>(null)
   const [selectedOrgDetail, setSelectedOrgDetail] = useState<Organization | null>(null)
+  const [selectedNeedDetail, setSelectedNeedDetail] = useState<Need | null>(null)
+  const [withdrawals, setWithdrawals] = useState<AdminWithdrawal[]>([])
   const [selectedUserDetail, setSelectedUserDetail] = useState<Profile | null>(null)
-  const [activeTab, setActiveTab] = useState<"organizations" | "needs" | "interests" | "users" | "gifts" | "messages" | "donations" | "stories" | "fulfillments" | "reports">("organizations")
+  const [activeTab, setActiveTab] = useState<"organizations" | "needs" | "users" | "gifts" | "messages" | "donations" | "withdrawals" | "stories" | "fulfillments" | "reports">("organizations")
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState("")
-  const [adminForm, setAdminForm] = useState({ full_name: "", email: "", password: "" })
+  // Distinct from the setError(...) alias below - this one gates the whole
+  // page (loadData() failing outright, e.g. "not actually an admin"), so it
+  // has to be real, persistent state, not a bubble that fades after a few
+  // seconds.
+  const [loadError, setLoadError] = useState("")
+  // Thin alias, kept under its original name so its many call sites below
+  // don't need to change - shows next to whatever button triggered it
+  // instead of a banner at the top of the page.
+  const setError = (text: string) => showFeedback(text, "error")
+  const [adminInviteEmail, setAdminInviteEmail] = useState("")
   const [isCreatingAdmin, setIsCreatingAdmin] = useState(false)
+  const [adminInviteFeedback, setAdminInviteFeedback] = useState<{ ok: boolean; text: string } | null>(null)
+  const [adminInvitations, setAdminInvitations] = useState<{ id: string; email: string; expires_at: string; created_at: string }[]>([])
+  const [revokingInviteId, setRevokingInviteId] = useState<string | null>(null)
 
   const [editingOrganization, setEditingOrganization] = useState<Organization | null>(null)
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null)
@@ -196,193 +275,287 @@ export default function AdminDashboardPage() {
   const [messagingRecipient, setMessagingRecipient] = useState<{ id: string; label: string } | null>(null)
   const [selectedMessage, setSelectedMessage] = useState<AdminMessage | null>(null)
   const [isAnnouncing, setIsAnnouncing] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [settingsMode, setSettingsMode] = useState<"menu" | "email" | "password" | "platform">("menu")
+  const [ownEmail, setOwnEmail] = useState("")
+  const [settingsMessage, setSettingsMessage] = useState("")
 
   const loadData = async () => {
     let firstError = ""
+    const recordError = (msg: string) => { firstError = firstError || msg }
+
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return router.replace("/admin-login")
+    if (user.email) setOwnEmail(user.email)
     const { data: currentProfile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
     if (currentProfile?.role !== "admin") {
       if (currentProfile?.role === "organization") return router.replace("/organisation-dashboard")
       if (currentProfile?.role === "giver") return router.replace("/givers-dashboard")
-      setError("This dashboard is restricted to administrators.")
+      setLoadError("This dashboard is restricted to administrators.")
       setIsLoading(false)
       return
     }
 
-    // --- Organizations (load full fields needed for edit dialog)
-    try {
-      const { data, error: err } = await supabase
-        .from("organizations")
-        .select("id, profile_id, name, type, registration_number, contact_name, contact_role, contact_email, verification_status, verification_notes, phone, address, city, province, mission, bank_name, bank_account_holder, bank_account_number, bank_branch_code, bank_account_type, logo_url, created_at")
-        .order("created_at", { ascending: false })
-      if (err) throw err
-      setOrganizations((data || []) as Organization[])
-    } catch (e: any) {
-      const msg = e?.message || "Organizations load failed."
-      firstError = firstError || msg
-      console.error("Admin orgs load error:", e)
-    }
-
-    // --- Users / Profiles
-    try {
-      const { data, error: err } = await supabase
-        .from("profiles")
-        .select("id, full_name, email, role, suspended, suspended_reason, created_at")
-        .order("created_at", { ascending: false })
-      if (err) throw err
-
-      const { data: giverRows } = await supabase.from("givers").select("profile_id, phone, account_type")
-      const giverByProfileId: Record<string, { phone: string | null; account_type: string | null }> = {}
-      for (const row of giverRows || []) {
-        giverByProfileId[row.profile_id] = { phone: row.phone, account_type: row.account_type }
-      }
-
-      const withGiverDetails = (data || []).map((profile) => ({
-        ...profile,
-        phone: giverByProfileId[profile.id]?.phone ?? null,
-        account_type: giverByProfileId[profile.id]?.account_type ?? null,
-      }))
-      setProfiles(withGiverDetails as Profile[])
-    } catch (e: any) {
-      const msg = e?.message || "Users load failed."
-      firstError = firstError || msg
-      console.error("Admin users load error:", e)
-    }
-
-    // --- Needs (with urgency fallback retry — exactly matching org dashboard fix)
-    try {
-      let needsQuery = supabase
-        .from("needs")
-        .select("id, title, description, category, urgency, status, rejection_reason, organizations(name), created_at")
-        .order("created_at", { ascending: false })
-      let { data: needsData, error: needsErr } = await needsQuery
-      if (needsErr && needsErr.message?.toLowerCase().includes("urgency")) {
-        const fallback: any = await supabase
-          .from("needs")
-          .select("id, title, description, category, status, rejection_reason, organizations(name), created_at")
-          .order("created_at", { ascending: false })
-        needsData = (fallback.data || []).map((item: any) => ({ ...item, urgency: "medium" }))
-        needsErr = fallback.error
-      }
-      if (needsErr) throw needsErr
-      setNeeds((needsData || []) as unknown as Need[])
-    } catch (e: any) {
-      const msg = e?.message || "Needs load failed."
-      firstError = firstError || msg
-      console.error("Admin needs load error:", e)
-      setNeeds([])
-    }
-
-    // --- Support Interests
-    try {
-      const { data, error: err } = await supabase
-        .from("support_interests")
-        .select("id, status, message, needs(title), givers(name, email), created_at")
-        .order("created_at", { ascending: false })
-      if (err) throw err
-      setInterests((data || []) as unknown as Interest[])
-    } catch (e: any) {
-      const msg = e?.message || "Interests load failed."
-      firstError = firstError || msg
-      console.error("Admin interests load error:", e)
-    }
-
-    // --- Org Documents (keep mixed source fallback)
-    let docsFallback: OrganizationDocument[] = []
-    try {
-      const { data, error: err } = await supabase
-        .from("organization_documents")
-        .select("id, organization_id, file_name, document_type")
-        .order("created_at", { ascending: false })
-      if (!err) docsFallback = (data || []) as OrganizationDocument[]
-    } catch (e: any) {
-      console.error("Admin docs direct load error:", e)
-    }
-    const documentsResponse = await fetch("/api/admin/documents")
-    setDocuments(documentsResponse.ok ? (await documentsResponse.json()).documents || [] : docsFallback)
-
-    // --- Organization verification history (audit trail)
-    try {
-      const { data, error: err } = await supabase
-        .from("organization_verification_history")
-        .select("id, organization_id, previous_status, new_status, notes, created_at, profiles(full_name)")
-        .order("created_at", { ascending: false })
-      if (err) throw err
-      setVerificationHistory((data || []) as unknown as OrgVerificationHistoryEntry[])
-    } catch (e: any) {
-      console.error("Admin verification history load error:", e)
-    }
-
-    // --- Gift Library
-    try {
-      const giftsRes = await fetch("/api/admin/gifts")
-      if (giftsRes.ok) {
-        const gData = await giftsRes.json()
-        setGifts(gData.gifts || [])
-      }
-    } catch (e: any) {
-      console.error("Admin gifts load error:", e)
-    }
-
-    // --- Messages sent to admin (direct messages from users/organizations,
-    // plus public "Partner with us" contact-form inquiries)
-    try {
-      const { data, error: err } = await supabase
-        .from("notifications")
-        .select("id, type, title, message, sender_id, sender_name, sender_role, reply_to_snippet, read_at, created_at, attachment_storage_path, attachment_file_name")
-        .in("type", ["message_to_admin", "contact_inquiry", "platform_feedback"])
-        .order("created_at", { ascending: false })
-      if (err) throw err
-      const withAttachments = await Promise.all((data || []).map(async (item) => {
-        let attachmentUrl: string | null = null
-        if (item.attachment_storage_path) {
-          const { data: signed } = await supabase.storage
-            .from("message-attachments")
-            .createSignedUrl(item.attachment_storage_path, 60 * 60)
-          attachmentUrl = signed?.signedUrl || null
+    // Every section below is independent of every other, so they're fired
+    // off together instead of one after another - previously this was ~12
+    // sequential round trips (plus a redundant, always-run documents fetch,
+    // and an N+1 loop per message attachment), which alone could add up to
+    // 10-15s. Run concurrently, the wall-clock cost is roughly the single
+    // slowest section rather than the sum of all of them.
+    await Promise.allSettled([
+      // --- Organizations (load full fields needed for edit dialog)
+      (async () => {
+        try {
+          const orgColumns = "id, profile_id, name, type, registration_number, contact_name, contact_role, contact_email, verification_status, verification_notes, phone, address, city, province, mission, bank_name, bank_account_holder, bank_account_number, bank_branch_code, bank_account_type, logo_url, created_at"
+          // profiles(registration_complete): a Google sign-up isn't a real
+          // registration until /register/complete is finished (see
+          // 20260920001000_google_signup_completion.sql) - hide those placeholder
+          // orgs until then. Falls back to no filtering if that migration hasn't
+          // been applied yet.
+          let { data, error: err } = await supabase
+            .from("organizations")
+            .select(`${orgColumns}, profiles(registration_complete)`)
+            .order("created_at", { ascending: false })
+          if (err && err.message?.toLowerCase().includes("registration_complete")) {
+            const fallback = await supabase.from("organizations").select(orgColumns).order("created_at", { ascending: false })
+            data = fallback.data as any
+            err = fallback.error
+          }
+          if (err) throw err
+          setOrganizations(
+            (data || [])
+              .filter((org: any) => org.profiles?.registration_complete !== false)
+              .map(({ profiles, ...org }: any) => org) as Organization[]
+          )
+        } catch (e: any) {
+          recordError(e?.message || "Organizations load failed.")
+          console.error("Admin orgs load error:", e)
         }
-        const { data: attachmentRows } = await supabase
-          .from("notification_attachments")
-          .select("id, storage_path, file_name")
-          .eq("notification_id", item.id)
-          .order("created_at", { ascending: true })
-        const attachments = await Promise.all((attachmentRows || []).map(async (row) => {
-          const { data: signed } = await supabase.storage.from("message-attachments").createSignedUrl(row.storage_path, 60 * 60)
-          return { id: row.id, file_name: row.file_name, url: signed?.signedUrl || null }
-        }))
-        return { ...item, attachmentUrl, attachments }
-      }))
-      setMessages(withAttachments as AdminMessage[])
-    } catch (e: any) {
-      console.error("Admin messages load error:", e)
-    }
+      })(),
 
-    // --- Fulfillments (deliveries) and their proof
-    try {
-      const fulfillmentsRes = await fetch("/api/admin/fulfillments")
-      if (fulfillmentsRes.ok) setFulfillments((await fulfillmentsRes.json()).fulfillments || [])
-    } catch (e: any) {
-      console.error("Admin fulfillments load error:", e)
-    }
+      // --- Users / Profiles
+      (async () => {
+        try {
+          let { data, error: err } = await supabase
+            .from("profiles")
+            .select("id, full_name, email, role, suspended, suspended_reason, created_at, registration_complete")
+            .order("created_at", { ascending: false })
+          if (err && err.message?.toLowerCase().includes("registration_complete")) {
+            const fallback = await supabase.from("profiles").select("id, full_name, email, role, suspended, suspended_reason, created_at").order("created_at", { ascending: false })
+            data = fallback.data as any
+            err = fallback.error
+          }
+          if (err) throw err
 
-    // --- Impact stories awaiting review
-    try {
-      const storiesRes = await fetch("/api/admin/stories")
-      if (storiesRes.ok) setStories((await storiesRes.json()).stories || [])
-    } catch (e: any) {
-      console.error("Admin stories load error:", e)
-    }
+          const { data: giverRows } = await supabase.from("givers").select("profile_id, phone, account_type")
+          const giverByProfileId: Record<string, { phone: string | null; account_type: string | null }> = {}
+          for (const row of giverRows || []) {
+            giverByProfileId[row.profile_id] = { phone: row.phone, account_type: row.account_type }
+          }
 
-    // --- Donations
-    try {
-      const donationsRes = await fetch("/api/admin/donations")
-      if (donationsRes.ok) setDonations((await donationsRes.json()).donations || [])
-    } catch (e: any) {
-      console.error("Admin donations load error:", e)
-    }
+          const withGiverDetails = (data || [])
+            // A Google sign-up that hasn't finished /register/complete yet isn't a
+            // real account to moderate - same rule as organizations above.
+            .filter((profile: any) => profile.registration_complete !== false)
+            .map((profile) => ({
+              ...profile,
+              phone: giverByProfileId[profile.id]?.phone ?? null,
+              account_type: giverByProfileId[profile.id]?.account_type ?? null,
+            }))
+          setProfiles(withGiverDetails as Profile[])
+        } catch (e: any) {
+          recordError(e?.message || "Users load failed.")
+          console.error("Admin users load error:", e)
+        }
+      })(),
 
-    if (firstError) setError(firstError)
+      // --- Pending admin invitations
+      (async () => {
+        try {
+          const res = await fetch("/api/admin/invitations")
+          const data = await res.json().catch(() => ({}))
+          if (res.ok) setAdminInvitations(data.invitations || [])
+        } catch (e) {
+          console.error("Admin invitations load error:", e)
+        }
+      })(),
+
+      // --- Withdrawals
+      (async () => {
+        try {
+          const res = await fetch("/api/admin/withdrawals")
+          const data = await res.json().catch(() => ({}))
+          if (res.ok) setWithdrawals(data.withdrawals || [])
+        } catch (e) {
+          console.error("Admin withdrawals load error:", e)
+        }
+      })(),
+
+      // --- Needs (with urgency fallback retry - exactly matching org dashboard fix)
+      (async () => {
+        try {
+          const needColumns = "id, title, description, category, urgency, status, rejection_reason, reopen_reason, location, quantity, target_amount, due_date, organizations(name), created_at, need_attachments(id, storage_path, file_name)"
+          let needsQuery = supabase
+            .from("needs")
+            .select(needColumns)
+            .order("created_at", { ascending: false })
+          let { data: needsData, error: needsErr } = await needsQuery
+          if (needsErr && needsErr.message?.toLowerCase().includes("urgency")) {
+            const fallback: any = await supabase
+              .from("needs")
+              .select(needColumns.replace("urgency, ", ""))
+              .order("created_at", { ascending: false })
+            needsData = (fallback.data || []).map((item: any) => ({ ...item, urgency: "medium" }))
+            needsErr = fallback.error
+          }
+          if (needsErr) throw needsErr
+          setNeeds(((needsData || []) as any[]).map(item => ({
+            ...item,
+            need_attachments: (item.need_attachments || []).map((a: any) => ({
+              ...a,
+              url: supabase.storage.from("need-attachments").getPublicUrl(a.storage_path).data.publicUrl,
+            })),
+          })) as unknown as Need[])
+        } catch (e: any) {
+          recordError(e?.message || "Needs load failed.")
+          console.error("Admin needs load error:", e)
+          setNeeds([])
+        }
+      })(),
+
+      // --- Org Documents. The direct-query fallback only ever ran to cover
+      // the API route failing, but it used to run unconditionally on every
+      // load either way - now it only fires when the API call actually fails.
+      (async () => {
+        try {
+          const documentsResponse = await fetch("/api/admin/documents")
+          if (documentsResponse.ok) {
+            setDocuments((await documentsResponse.json()).documents || [])
+            return
+          }
+          throw new Error(`Documents API responded with ${documentsResponse.status}`)
+        } catch (e) {
+          console.error("Admin docs API load error, falling back to direct query:", e)
+          try {
+            const { data, error: err } = await supabase
+              .from("organization_documents")
+              .select("id, organization_id, file_name, document_type")
+              .order("created_at", { ascending: false })
+            if (!err) setDocuments((data || []) as OrganizationDocument[])
+          } catch (e2: any) {
+            console.error("Admin docs direct load error:", e2)
+          }
+        }
+      })(),
+
+      // --- Organization verification history (audit trail)
+      (async () => {
+        try {
+          const { data, error: err } = await supabase
+            .from("organization_verification_history")
+            .select("id, organization_id, previous_status, new_status, notes, created_at, profiles(full_name)")
+            .order("created_at", { ascending: false })
+          if (err) throw err
+          setVerificationHistory((data || []) as unknown as OrgVerificationHistoryEntry[])
+        } catch (e: any) {
+          console.error("Admin verification history load error:", e)
+        }
+      })(),
+
+      // --- Gift Library
+      (async () => {
+        try {
+          const giftsRes = await fetch("/api/admin/gifts")
+          if (giftsRes.ok) {
+            const gData = await giftsRes.json()
+            setGifts(gData.gifts || [])
+          }
+        } catch (e: any) {
+          console.error("Admin gifts load error:", e)
+        }
+      })(),
+
+      // --- Messages sent to admin (direct messages from users/organizations,
+      // plus public "Partner with us" contact-form inquiries)
+      (async () => {
+        try {
+          const { data, error: err } = await supabase
+            .from("notifications")
+            .select("id, type, title, message, sender_id, sender_name, sender_role, reply_to_snippet, read_at, delivered_at, created_at, attachment_storage_path, attachment_file_name")
+            .in("type", ["message_to_admin", "contact_inquiry", "platform_feedback"])
+            .order("created_at", { ascending: false })
+          if (err) throw err
+
+          // An admin viewing this list is the "delivered" moment for anything
+          // that hasn't reached that state yet (see /api/notifications for
+          // the same idea on the giver/org side).
+          const undelivered = (data || []).filter(item => !item.delivered_at).map(item => item.id)
+          if (undelivered.length > 0) {
+            const deliveredAt = new Date().toISOString()
+            await supabase.from("notifications").update({ delivered_at: deliveredAt }).in("id", undelivered)
+            for (const item of data || []) {
+              if (undelivered.includes(item.id)) item.delivered_at = deliveredAt
+            }
+          }
+          // Attachment lookups for every message also run together rather
+          // than one message at a time (still one round trip per message -
+          // see the loadData fetch-consolidation note above for the next step).
+          const withAttachments = await Promise.all((data || []).map(async (item) => {
+            let attachmentUrl: string | null = null
+            const signedUrlPromise = item.attachment_storage_path
+              ? supabase.storage.from("message-attachments").createSignedUrl(item.attachment_storage_path, 60 * 60)
+              : Promise.resolve({ data: null })
+            const attachmentRowsPromise = supabase
+              .from("notification_attachments")
+              .select("id, storage_path, file_name")
+              .eq("notification_id", item.id)
+              .order("created_at", { ascending: true })
+            const [{ data: signed }, { data: attachmentRows }] = await Promise.all([signedUrlPromise, attachmentRowsPromise])
+            attachmentUrl = signed?.signedUrl || null
+            const attachments = await Promise.all((attachmentRows || []).map(async (row) => {
+              const { data: rowSigned } = await supabase.storage.from("message-attachments").createSignedUrl(row.storage_path, 60 * 60)
+              return { id: row.id, file_name: row.file_name, url: rowSigned?.signedUrl || null }
+            }))
+            return { ...item, attachmentUrl, attachments }
+          }))
+          setMessages(withAttachments as AdminMessage[])
+        } catch (e: any) {
+          console.error("Admin messages load error:", e)
+        }
+      })(),
+
+      // --- Fulfillments (deliveries) and their proof
+      (async () => {
+        try {
+          const fulfillmentsRes = await fetch("/api/admin/fulfillments")
+          if (fulfillmentsRes.ok) setFulfillments((await fulfillmentsRes.json()).fulfillments || [])
+        } catch (e: any) {
+          console.error("Admin fulfillments load error:", e)
+        }
+      })(),
+
+      // --- Impact stories awaiting review
+      (async () => {
+        try {
+          const storiesRes = await fetch("/api/admin/stories")
+          if (storiesRes.ok) setStories((await storiesRes.json()).stories || [])
+        } catch (e: any) {
+          console.error("Admin stories load error:", e)
+        }
+      })(),
+
+      // --- Donations
+      (async () => {
+        try {
+          const donationsRes = await fetch("/api/admin/donations")
+          if (donationsRes.ok) setDonations((await donationsRes.json()).donations || [])
+        } catch (e: any) {
+          console.error("Admin donations load error:", e)
+        }
+      })(),
+    ])
+
+    if (firstError) setLoadError(firstError)
     setIsLoading(false)
   }
 
@@ -424,40 +597,109 @@ export default function AdminDashboardPage() {
     else await loadData()
   }
 
-  const updateInterest = async (id: string, status: Interest["status"], reason?: string) => {
-    if (status === "declined" && reason === undefined) {
-      setRejectDialog({
-        title: "Decline support interest",
-        description: "The giver will be told their interest was declined. You can add a message explaining why.",
-        run: message => updateInterest(id, status, message),
-      })
-      return
-    }
-    const response = await fetch(`/api/admin/interests/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status, reason }),
-    })
-    if (!response.ok) setError((await response.json()).message || "Interest update failed.")
-    else await loadData()
+  // Housekeeping only - a fulfilled/closed need is a permanent record until
+  // an admin explicitly clears it out; see api/admin/needs/[id]/route.ts for
+  // why it's admin-only and only ever on those two end states.
+  const deleteNeedRecord = async (id: string) => {
+    const response = await fetch(`/api/admin/needs/${id}`, { method: "DELETE" })
+    if (!response.ok) setError((await response.json()).message || "Need deletion failed.")
+    else { showFeedback("Need deleted."); await loadData() }
   }
 
-  const updateGift = async (id: string, status: AdminGift["status"], claim_notes?: string, rejection_reason?: string) => {
-    if (status === "rejected" && claim_notes === undefined && rejection_reason === undefined) {
+  // Initial listing moderation only (pending -> approved/rejected). Reviewing
+  // a claim on an already-approved listing is a separate action - see
+  // reviewGiftClaim, since an offering can have several claims at once.
+  const updateGift = async (id: string, status: "approved" | "rejected", rejection_reason?: string) => {
+    if (status === "rejected" && rejection_reason === undefined) {
       setRejectDialog({
         title: "Reject gift offering",
         description: "The giver will be told their offering was rejected. You can add a message explaining why.",
-        run: reason => updateGift(id, status, undefined, reason),
+        run: reason => updateGift(id, status, reason),
       })
       return
     }
     const response = await fetch(`/api/admin/gifts/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status, claim_notes, rejection_reason }),
+      body: JSON.stringify({ status, rejection_reason }),
     })
     if (!response.ok) setError((await response.json()).message || "Gift update failed.")
     else await loadData()
+  }
+
+  const reviewGiftClaim = async (claimId: string, approve: boolean, notes?: string) => {
+    const response = await fetch(`/api/admin/gifts/claims/${claimId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ approve, notes }),
+    })
+    if (!response.ok) {
+      setError((await response.json()).message || "Could not review this claim.")
+      return
+    }
+    // Declining one claim leaves the dialog open (there may be other pending
+    // claims on the same offering still to review), so it needs fresh data -
+    // not just the rest of the dashboard - reflecting the decision just made.
+    const giftsRes = await fetch("/api/admin/gifts")
+    if (giftsRes.ok) {
+      const freshGifts: AdminGift[] = (await giftsRes.json()).gifts || []
+      setGifts(freshGifts)
+      setSelectedGift(prev => {
+        if (!prev) return prev
+        const fresh = freshGifts.find(g => g.id === prev.id)
+        return fresh ? toGiftDetailSummary(fresh) : prev
+      })
+    }
+  }
+
+  // Housekeeping only - see api/admin/gifts/claims/[claimId]/route.ts for why
+  // this is admin-only and blocked while a claim is still pending.
+  const deleteGiftClaim = async (claimId: string) => {
+    const response = await fetch(`/api/admin/gifts/claims/${claimId}`, { method: "DELETE" })
+    if (!response.ok) { setError((await response.json()).message || "Could not delete this claim."); return }
+    showFeedback("Claim deleted.")
+    const giftsRes = await fetch("/api/admin/gifts")
+    if (giftsRes.ok) setGifts((await giftsRes.json()).gifts || [])
+  }
+
+  // Housekeeping only - see api/admin/fulfillments/[id]/route.ts for why this
+  // is admin-only and blocked until the fulfillment is completed or cancelled.
+  const deleteFulfillmentRecord = async (id: string) => {
+    const response = await fetch(`/api/admin/fulfillments/${id}`, { method: "DELETE" })
+    if (!response.ok) { setError((await response.json()).message || "Could not delete this fulfillment."); return }
+    showFeedback("Fulfillment deleted.")
+    const fulfillmentsRes = await fetch("/api/admin/fulfillments")
+    if (fulfillmentsRes.ok) setFulfillments((await fulfillmentsRes.json()).fulfillments || [])
+  }
+
+  const reviewWithdrawal = async (id: string, status: "approved" | "rejected", rejection_reason?: string) => {
+    if (status === "rejected" && rejection_reason === undefined) {
+      setRejectDialog({
+        title: "Decline withdrawal",
+        description: "The organization will be told their withdrawal request was declined. You can add a message explaining why.",
+        run: reason => reviewWithdrawal(id, status, reason),
+      })
+      return
+    }
+    const response = await fetch(`/api/admin/withdrawals/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status, rejection_reason }),
+    })
+    if (!response.ok) setError((await response.json()).message || "Withdrawal update failed.")
+    else await loadData()
+  }
+
+  const uploadWithdrawalProof = async (id: string, file: File) => {
+    const formData = new FormData()
+    formData.set("file", file)
+    const response = await fetch(`/api/admin/withdrawals/${id}/proof`, { method: "POST", body: formData })
+    if (!response.ok) {
+      setError((await response.json()).message || "Could not attach proof of payment.")
+      return false
+    }
+    await loadData()
+    return true
   }
 
   const reviewStory = async (id: string, status: "approved" | "rejected", reason?: string) => {
@@ -485,19 +727,53 @@ export default function AdminDashboardPage() {
     setMessages(current => current.map(item => item.id === id ? { ...item, read_at: new Date().toISOString() } : item))
   }
 
+  // Messages to admin aren't scoped to one recipient the way a giver's or
+  // org's own notifications are (any admin can see and act on one), so this
+  // updates the same set of ids the Messages tab already has loaded directly,
+  // rather than /api/notifications/read-all (which only touches the caller's
+  // own recipient_id).
+  const markAllMessagesRead = async () => {
+    const unreadIds = messages.filter(m => !m.read_at).map(m => m.id)
+    if (unreadIds.length === 0) return
+    const now = new Date().toISOString()
+    setMessages(current => current.map(item => item.read_at ? item : { ...item, read_at: now }))
+    try {
+      await supabase.from("notifications").update({ read_at: now }).in("id", unreadIds)
+    } catch {}
+  }
+
   const openMessage = (item: AdminMessage) => {
     if (!item.read_at) markMessageRead(item.id)
     setSelectedMessage(item)
   }
 
-  const createAdministrator = async (event: React.FormEvent) => {
+  const inviteAdministrator = async (event: React.FormEvent) => {
     event.preventDefault()
     setIsCreatingAdmin(true)
-    setError("")
-    const response = await fetch("/api/admin/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(adminForm) })
-    if (!response.ok) setError((await response.json()).message || "Administrator creation failed.")
-    else { setAdminForm({ full_name: "", email: "", password: "" }); await loadData() }
+    setAdminInviteFeedback(null)
+    const response = await fetch("/api/admin/invitations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: adminInviteEmail }) })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      setAdminInviteFeedback({ ok: false, text: data.message || "Invitation failed." })
+    } else {
+      setAdminInviteEmail("")
+      setAdminInviteFeedback({
+        ok: true,
+        text: data.email_sent ? "Invitation email sent." : `Email couldn't be sent - share this link instead: ${data.invite_url}`,
+      })
+      await loadData()
+    }
     setIsCreatingAdmin(false)
+  }
+
+  const revokeAdminInvitation = async (id: string) => {
+    setRevokingInviteId(id)
+    try {
+      await fetch(`/api/admin/invitations/${id}`, { method: "DELETE" })
+      await loadData()
+    } finally {
+      setRevokingInviteId(null)
+    }
   }
 
   const saveOrganizationEdit = async (event: FormEvent<HTMLFormElement>) => {
@@ -581,26 +857,111 @@ export default function AdminDashboardPage() {
   }
 
   if (isLoading) return <main className="flex min-h-screen items-center justify-center bg-[#FAFAFA] dark:bg-[#0B1220]"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></main>
-  if (error && profiles.length === 0) return <main className="flex min-h-screen items-center justify-center bg-[#FAFAFA] dark:bg-[#0B1220] p-6"><div className="rounded-3xl border border-red-200 bg-red-50 p-6 text-red-700">{error}</div></main>
+  if (loadError && profiles.length === 0) return <main className="flex min-h-screen items-center justify-center bg-[#FAFAFA] dark:bg-[#0B1220] p-6"><div className="rounded border border-red-200 bg-red-50 p-6 text-red-700">{loadError}</div></main>
 
   const unreadMessages = messages.filter(m => !m.read_at).length
   const pendingApprovals = organizations.filter(o => o.verification_status === "pending").length
-  const pendingDonations = donations.filter(d => d.status === "pending").length
+  // "Pending" for donations means proof is actually on file to review - an
+  // EFT donation with no proof uploaded yet has nothing for an admin to act on.
+  const pendingDonations = donations.filter(d => d.status === "pending" && !!d.proof_storage_path).length
+  const pendingWithdrawals = withdrawals.filter(w => w.status === "pending" || w.status === "approved").length
   const fulfilledNeeds = needs.filter(n => n.status === "fulfilled").length
-  const unfulfilledNeeds = needs.filter(n => !["fulfilled", "closed"].includes(n.status)).length
-  const pendingGifts = gifts.filter(g => g.status === "pending").length
+  // Matches canModerate in NeedsView: drafts awaiting their first review,
+  // previously-rejected needs an org could resubmit for another look, and
+  // closed needs an org wants reopened.
+  const needsAwaitingReview = needs.filter(n => n.status === "draft" || n.status === "rejected" || n.status === "reopen_pending").length
+  // A listing awaiting its first review, or a claim on an already-approved
+  // listing awaiting approval - both need an admin's attention.
+  const pendingGifts = gifts.filter(g => g.status === "pending" || g.claims.some(c => c.status === "pending")).length
   const pendingStories = stories.filter(s => s.status === "pending").length
-  const pendingInterests = interests.filter(i => i.status === "pending").length
   const totalDonated = donations.filter(d => d.status === "successful").reduce((sum, d) => sum + Number(d.amount || 0), 0)
+
+  // The bell combines actual messages with everything else sitting in a
+  // moderation queue - a pending org, a need awaiting review, a gift/claim,
+  // a withdrawal, a story - so it reads as one "what needs me" inbox instead
+  // of messages-only. Queue items have no read/unread state of their own
+  // (they're "unread" for as long as they're still pending); opening one
+  // just switches to the tab where it's actually reviewed, since there's no
+  // message body to show for them the way MessageDetailDialog expects.
+  const notificationItems: {
+    id: string
+    icon: React.ComponentType<{ className?: string }>
+    title: string
+    subtitle: string
+    created_at: string
+    read: boolean
+    onOpen: () => void
+  }[] = [
+    ...messages.map(m => ({
+      id: `message-${m.id}`,
+      icon: Mail,
+      title: m.title,
+      subtitle: m.message,
+      created_at: m.created_at,
+      read: !!m.read_at,
+      onOpen: () => openMessage(m),
+    })),
+    ...organizations.filter(o => o.verification_status === "pending").map(o => ({
+      id: `org-${o.id}`,
+      icon: Building2,
+      title: "Organization awaiting approval",
+      subtitle: o.name,
+      created_at: o.created_at,
+      read: false,
+      onOpen: () => setActiveTab("organizations"),
+    })),
+    ...needs.filter(n => n.status === "draft" || n.status === "rejected" || n.status === "reopen_pending").map(n => ({
+      id: `need-${n.id}`,
+      icon: ClipboardList,
+      title: n.status === "draft" ? "Need awaiting review" : n.status === "reopen_pending" ? "Need reopen requested" : "Need resubmitted for review",
+      subtitle: n.title,
+      created_at: n.created_at,
+      read: false,
+      onOpen: () => setActiveTab("needs"),
+    })),
+    ...gifts.filter(g => g.status === "pending" || g.claims.some(c => c.status === "pending")).map(g => ({
+      id: `gift-${g.id}`,
+      icon: Gift,
+      title: g.status === "pending" ? "Gift offering awaiting review" : "Gift claim awaiting review",
+      subtitle: g.title,
+      created_at: g.created_at,
+      read: false,
+      onOpen: () => setActiveTab("gifts"),
+    })),
+    ...withdrawals.filter(w => w.status === "pending" || w.status === "approved").map(w => ({
+      id: `withdrawal-${w.id}`,
+      icon: Wallet,
+      title: "Withdrawal request",
+      subtitle: `${firstOf(w.organizations)?.name || "Organization"} · ${formatCurrency(Number(w.amount))}`,
+      created_at: w.created_at,
+      read: false,
+      onOpen: () => setActiveTab("withdrawals"),
+    })),
+    ...stories.filter(s => s.status === "pending").map(s => ({
+      id: `story-${s.id}`,
+      icon: FileText,
+      title: "Impact story awaiting review",
+      subtitle: `${firstOf(s.organizations)?.name || "Organization"} · ${s.title}`,
+      created_at: s.created_at,
+      read: false,
+      onOpen: () => setActiveTab("stories"),
+    })),
+  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+  const unreadNotifications = notificationItems.filter(item => !item.read).length
 
   return (
     <main className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100">
-      <div className="mx-auto max-w-7xl px-4 py-10 md:py-14 space-y-6">
+      <div className="mx-auto max-w-[2400px] px-4 md:px-10 py-10 md:py-14 space-y-6">
+
+        <div className="flex justify-end">
+          <LiveClock />
+        </div>
 
         {/* --- HEADER --- */}
         <header className="flex flex-wrap items-center justify-between gap-5">
           <div className="flex items-center gap-4">
-            <div className="rounded-2xl bg-gradient-to-br from-slate-800 to-slate-950 dark:from-blue-600 dark:to-indigo-600 p-3.5 text-white shadow-lg shadow-slate-900/20 dark:shadow-blue-600/20">
+            <div className="rounded bg-gradient-to-br from-slate-800 to-slate-950 dark:from-blue-600 dark:to-indigo-600 p-3.5 text-white shadow-lg shadow-slate-900/20 dark:shadow-blue-600/20">
               <ShieldCheck className="h-6 w-6" />
             </div>
             <div>
@@ -612,65 +973,130 @@ export default function AdminDashboardPage() {
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => setIsAnnouncing(true)}
-              className="inline-flex items-center gap-2 rounded-full border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 px-4 py-2 text-sm font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950/70"
+              className="inline-flex items-center gap-2 rounded border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 px-4 py-2 text-sm font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950/70"
             >
               <Megaphone className="h-4 w-4" /> Announcement
             </button>
+            <button
+              data-tip="Review and verify organization accounts"
+              onClick={() => setActiveTab("organizations")}
+              className="inline-flex items-center gap-2 rounded border border-slate-200 dark:border-[#233350] px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
+            >
+              <Building2 className="h-4 w-4" /> Organizations<CountBadge value={pendingApprovals} />
+            </button>
+            <button
+              data-tip="Change your login email or password"
+              onClick={() => { setSettingsMode("menu"); setSettingsMessage(""); setIsSettingsOpen(true) }}
+              className="inline-flex items-center gap-2 rounded border border-slate-200 dark:border-[#233350] px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
+            >
+              <Settings className="h-4 w-4" /> Settings
+            </button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  aria-label="Notifications"
+                  data-tip={unreadNotifications > 0 ? `Notifications: ${unreadNotifications} need attention. Click to see them.` : "Notifications. You're all caught up."}
+                  className="relative inline-flex h-9 w-9 items-center justify-center rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740] transition-colors">
+                  <Bell className="w-4 h-4" />
+                  {unreadNotifications > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
+                      {unreadNotifications > 9 ? "9+" : unreadNotifications}
+                    </span>
+                  )}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-80">
+                <div className="flex items-center justify-between gap-2 px-2 py-1.5">
+                  <DropdownMenuLabel className="p-0">Notifications</DropdownMenuLabel>
+                  {unreadMessages > 0 && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); markAllMessagesRead() }}
+                      data-tip="Mark every message as read (doesn't affect items still awaiting review below)"
+                      className="text-xs font-bold text-blue-600 hover:underline"
+                    >
+                      Mark all as read
+                    </button>
+                  )}
+                </div>
+                <DropdownMenuSeparator />
+                {notificationItems.length === 0 ? (
+                  <p className="px-2 py-4 text-center text-xs text-muted-foreground">No notifications yet.</p>
+                ) : (
+                  <div className="max-h-80 overflow-y-auto">
+                    {notificationItems.map(item => (
+                      <DropdownMenuItem
+                        key={item.id}
+                        onSelect={(e) => { e.preventDefault(); item.onOpen() }}
+                        className={`flex items-start gap-2 whitespace-normal ${!item.read ? "bg-blue-50 dark:bg-blue-950/30" : ""}`}
+                      >
+                        <item.icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                        <div className="flex flex-col items-start gap-0.5">
+                          <span className="font-semibold text-xs">{item.title}</span>
+                          <span className="text-xs text-muted-foreground line-clamp-2">{item.subtitle}</span>
+                        </div>
+                      </DropdownMenuItem>
+                    ))}
+                  </div>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <ThemeToggle className="h-9 w-9" />
-            <button onClick={logout} className="inline-flex items-center gap-2 rounded-full bg-slate-900 dark:bg-slate-100 px-4 py-2 text-sm font-semibold text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white">
+            <button onClick={logout} className="inline-flex items-center gap-2 rounded bg-slate-900 dark:bg-slate-100 px-4 py-2 text-sm font-semibold text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white">
               <LogOut className="h-4 w-4" /> Sign out
             </button>
           </div>
         </header>
 
-        {error && <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700"><XCircle className="h-5 w-5" />{error}</div>}
-
-        {/* --- STATS ROW --- */}
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">
-          <StatCard icon={Building2} label="Organizations" value={organizations.length} accent="blue" />
+        {/* --- STATS ROW: what needs an admin's attention right now, nothing
+             that's just a total (those live in the Reports tab instead) --- */}
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
           <StatCard icon={AlertTriangle} label="Pending Approvals" value={pendingApprovals} accent="amber" />
-          <StatCard icon={ClipboardList} label="Total Needs" value={needs.length} accent="emerald" />
-          <StatCard icon={PackageCheck} label="Fulfilled Needs" value={fulfilledNeeds} accent="emerald" />
-          <StatCard icon={Users} label="Total Users" value={profiles.length} accent="purple" />
+          <StatCard icon={ClipboardList} label="Needs Awaiting Review" value={needsAwaitingReview} accent="emerald" />
+          <StatCard icon={Gift} label="Pending Gifts" value={pendingGifts} accent="blue" />
           <StatCard icon={Banknote} label="Pending Donations" value={pendingDonations} accent="amber" />
+          <StatCard icon={Wallet} label="Pending Withdrawals" value={pendingWithdrawals} accent="pink" />
+          <StatCard icon={FileText} label="Pending Stories" value={pendingStories} accent="purple" />
+          <StatCard icon={Mail} label="Unread Messages" value={unreadMessages} accent="blue" />
         </div>
 
         {/* --- TABS --- */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="gap-6">
-          <TabsList className="w-full flex-wrap h-auto justify-start bg-white dark:bg-[#121B2E] border border-slate-200 dark:border-[#233350] p-1.5 rounded-2xl">
-            <TabsTrigger value="organizations" className="gap-1.5 rounded-xl"><Building2 className="w-4 h-4" />Organizations<CountBadge value={pendingApprovals} /></TabsTrigger>
-            <TabsTrigger value="needs" className="gap-1.5 rounded-xl"><ClipboardList className="w-4 h-4" />Needs<CountBadge value={unfulfilledNeeds} /></TabsTrigger>
-            <TabsTrigger value="gifts" className="gap-1.5 rounded-xl"><Gift className="w-4 h-4" />Gift Library<CountBadge value={pendingGifts} /></TabsTrigger>
-            <TabsTrigger value="interests" className="gap-1.5 rounded-xl"><CheckCircle2 className="w-4 h-4" />Interests<CountBadge value={pendingInterests} /></TabsTrigger>
-            <TabsTrigger value="donations" className="gap-1.5 rounded-xl"><Banknote className="w-4 h-4" />Donations<CountBadge value={pendingDonations} /></TabsTrigger>
-            <TabsTrigger value="stories" className="gap-1.5 rounded-xl"><FileText className="w-4 h-4" />Impact Stories<CountBadge value={pendingStories} /></TabsTrigger>
-            <TabsTrigger value="feedback" className="gap-1.5 rounded-xl"><Star className="w-4 h-4" />Feedback</TabsTrigger>
-            <TabsTrigger value="fulfillments" className="gap-1.5 rounded-xl"><PackageCheck className="w-4 h-4" />Fulfillments</TabsTrigger>
-            <TabsTrigger value="users" className="gap-1.5 rounded-xl"><Users className="w-4 h-4" />Users<CountBadge value={profiles.length} /></TabsTrigger>
-            <TabsTrigger value="messages" className="gap-1.5 rounded-xl"><Mail className="w-4 h-4" />Messages<CountBadge value={unreadMessages} /></TabsTrigger>
-            <TabsTrigger value="reports" className="gap-1.5 rounded-xl"><BarChart3 className="w-4 h-4" />Reports</TabsTrigger>
+          <TabsList className="w-full flex-nowrap justify-start overflow-x-auto">
+            <TabsTrigger value="needs" className="shrink-0 gap-1.5 px-2.5"><ClipboardList className="w-4 h-4" />Needs<CountBadge value={needsAwaitingReview} /></TabsTrigger>
+            <TabsTrigger value="gifts" className="shrink-0 gap-1.5 px-2.5"><Gift className="w-4 h-4" />Gift Library<CountBadge value={pendingGifts} /></TabsTrigger>
+            <TabsTrigger value="donations" className="shrink-0 gap-1.5 px-2.5"><Banknote className="w-4 h-4" />Donations<CountBadge value={pendingDonations} /></TabsTrigger>
+            <TabsTrigger value="withdrawals" className="shrink-0 gap-1.5 px-2.5"><Wallet className="w-4 h-4" />Withdrawals<CountBadge value={pendingWithdrawals} /></TabsTrigger>
+            <TabsTrigger value="stories" className="shrink-0 gap-1.5 px-2.5"><FileText className="w-4 h-4" />Impact Stories<CountBadge value={pendingStories} /></TabsTrigger>
+            <TabsTrigger value="feedback" className="shrink-0 gap-1.5 px-2.5"><Star className="w-4 h-4" />Feedback</TabsTrigger>
+            <TabsTrigger value="fulfillments" className="shrink-0 gap-1.5 px-2.5"><PackageCheck className="w-4 h-4" />Fulfillments</TabsTrigger>
+            <TabsTrigger value="users" className="shrink-0 gap-1.5 px-2.5"><Users className="w-4 h-4" />Users<CountBadge value={profiles.length} /></TabsTrigger>
+            <TabsTrigger value="messages" className="shrink-0 gap-1.5 px-2.5"><Mail className="w-4 h-4" />Messages<CountBadge value={unreadMessages} /></TabsTrigger>
+            <TabsTrigger value="reports" className="shrink-0 gap-1.5 px-2.5"><BarChart3 className="w-4 h-4" />Reports</TabsTrigger>
           </TabsList>
 
           <TabsContent value="organizations">
             <OrganizationsView organizations={organizations} documents={documents} onUpdate={updateOrganization} onEdit={setEditingOrganization} onMessage={(org) => setMessagingRecipient({ id: org.profile_id, label: org.name })} onSelect={setSelectedOrgDetail} />
           </TabsContent>
           <TabsContent value="needs">
-            <NeedsView needs={needs} onUpdate={updateNeed} />
+            <NeedsView needs={needs} onUpdate={updateNeed} onDelete={deleteNeedRecord} onSelect={setSelectedNeedDetail} />
           </TabsContent>
           <TabsContent value="gifts">
-            <GiftsView gifts={gifts} onUpdate={updateGift} onSelect={setSelectedGift} />
-          </TabsContent>
-          <TabsContent value="interests">
-            <InterestsView interests={interests} onUpdate={updateInterest} />
+            <GiftsView gifts={gifts} onUpdate={updateGift} onSelect={gift => setSelectedGift(toGiftDetailSummary(gift))} />
           </TabsContent>
           <TabsContent value="donations">
             <DonationsView donations={donations} onSelect={setSelectedDonation} />
+          </TabsContent>
+          <TabsContent value="withdrawals">
+            <WithdrawalsView withdrawals={withdrawals} onReview={reviewWithdrawal} onUploadProof={uploadWithdrawalProof} />
           </TabsContent>
           <TabsContent value="feedback">
             <AdminFeedback />
           </TabsContent>
           <TabsContent value="fulfillments">
-            <AdminFulfillmentsView fulfillments={fulfillments} />
+            <AdminFulfillmentsView fulfillments={fulfillments} onDelete={deleteFulfillmentRecord} />
           </TabsContent>
           <TabsContent value="stories">
             <StoriesView stories={stories} onReview={reviewStory} />
@@ -681,17 +1107,38 @@ export default function AdminDashboardPage() {
           <TabsContent value="users" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Add administrator</CardTitle>
+                <CardTitle>Invite administrator</CardTitle>
+                <CardDescription>They'll get an email with a link to set their own name and password.</CardDescription>
               </CardHeader>
-              <CardContent>
-                <form onSubmit={createAdministrator} className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto]">
-                  <input required placeholder="Admin name" value={adminForm.full_name} onChange={event => setAdminForm({ ...adminForm, full_name: event.target.value })} className="field" />
-                  <input required type="email" placeholder="Admin email" value={adminForm.email} onChange={event => setAdminForm({ ...adminForm, email: event.target.value })} className="field" />
-                  <input required minLength={8} type="password" placeholder="Password (8+ characters)" value={adminForm.password} onChange={event => setAdminForm({ ...adminForm, password: event.target.value })} className="field" />
-                  <button disabled={isCreatingAdmin} className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-900 px-4 py-3 text-sm font-bold text-white disabled:opacity-50">
-                    {isCreatingAdmin ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}Add admin
+              <CardContent className="space-y-3">
+                <form onSubmit={inviteAdministrator} className="grid gap-3 md:grid-cols-[1fr_auto]">
+                  <input required type="email" placeholder="Admin email" value={adminInviteEmail} onChange={event => setAdminInviteEmail(event.target.value)} className="field" />
+                  <button data-tip="Send an email invitation to become an administrator" disabled={isCreatingAdmin} className="inline-flex items-center justify-center gap-2 rounded bg-slate-900 px-4 py-3 text-sm font-bold text-white disabled:opacity-50">
+                    {isCreatingAdmin ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}Send invitation
                   </button>
                 </form>
+                {adminInviteFeedback && (
+                  <p className={`text-xs font-semibold break-all ${adminInviteFeedback.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                    {adminInviteFeedback.text}
+                  </p>
+                )}
+                {adminInvitations.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-[#233350]">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Pending invitations</p>
+                    {adminInvitations.map(invite => (
+                      <div key={invite.id} className="flex items-center justify-between gap-3 rounded bg-slate-50 dark:bg-[#0B1220] px-3 py-2 text-sm">
+                        <span className="truncate font-semibold">{invite.email}</span>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="text-xs text-slate-400">Expires {new Date(invite.expires_at).toLocaleDateString()}</span>
+                          <button type="button" data-tip="Cancel this invitation" disabled={revokingInviteId === invite.id} onClick={() => revokeAdminInvitation(invite.id)} className="inline-flex items-center gap-1 text-xs font-bold text-red-600 hover:underline disabled:opacity-60">
+                            {revokingInviteId === invite.id && <Loader2 className="w-3 h-3 animate-spin" />}
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
             <UsersView
@@ -708,7 +1155,7 @@ export default function AdminDashboardPage() {
             />
           </TabsContent>
           <TabsContent value="reports">
-            <ReportsView organizations={organizations} needs={needs} donations={donations} profiles={profiles} />
+            <ReportsView organizations={organizations} needs={needs} donations={donations} profiles={profiles} gifts={gifts} withdrawals={withdrawals} />
           </TabsContent>
         </Tabs>
       </div>
@@ -721,7 +1168,7 @@ export default function AdminDashboardPage() {
             <button aria-label="Close"
               type="button"
               onClick={() => setEditingOrganization(null)}
-              className="rounded-md p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
+              className="rounded p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
             >
               <X className="w-4 h-4" />
             </button>
@@ -763,7 +1210,7 @@ export default function AdminDashboardPage() {
                     id="edit-org-status"
                     name="verification_status"
                     defaultValue={editingOrganization.verification_status}
-                    className="w-full rounded-xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="pending">Pending</option>
                     <option value="more_info_requested">More info requested</option>
@@ -786,6 +1233,51 @@ export default function AdminDashboardPage() {
         </DialogContent>
       </Dialog>
 
+      {/* --- Admin's own Settings (email / password) --- */}
+      <SettingsDialog
+        open={isSettingsOpen && settingsMode === "menu"}
+        onOpenChange={open => setIsSettingsOpen(open)}
+        onChangeEmail={() => { setSettingsMessage(""); setSettingsMode("email") }}
+        onChangePassword={() => { setSettingsMessage(""); setSettingsMode("password") }}
+        onPlatformSettings={() => { setSettingsMessage(""); setSettingsMode("platform") }}
+      />
+      <Dialog open={isSettingsOpen && settingsMode !== "menu"} onOpenChange={open => !open && setSettingsMode("menu")}>
+        <DialogContent className={settingsMode === "platform" ? "sm:max-w-3xl max-h-[85vh] overflow-y-auto" : "sm:max-w-lg"}>
+          <DialogHeader className="flex flex-row items-center justify-between">
+            <DialogTitle>
+              {settingsMode === "email" ? "Change Login Email" : settingsMode === "password" ? "Change Password" : "Platform Settings"}
+            </DialogTitle>
+            <button aria-label="Close" type="button" onClick={() => setSettingsMode("menu")} className="rounded p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1A2740]">
+              <X className="w-4 h-4" />
+            </button>
+          </DialogHeader>
+          {settingsMessage && <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{settingsMessage}</p>}
+          {settingsMode === "email" && (
+            <ChangeEmailFlow
+              currentEmail={ownEmail}
+              onBack={() => setSettingsMode("menu")}
+              onUpdated={async (newEmail) => {
+                await fetch("/api/admin/profile", {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ login_email: newEmail }),
+                }).catch(() => {})
+                setOwnEmail(newEmail)
+                setSettingsMessage("Login email updated.")
+                setSettingsMode("menu")
+              }}
+            />
+          )}
+          {settingsMode === "password" && (
+            <ChangePasswordFlow
+              onBack={() => setSettingsMode("menu")}
+              onUpdated={() => { setSettingsMessage("Password updated."); setSettingsMode("menu") }}
+            />
+          )}
+          {settingsMode === "platform" && <PlatformSettingsAdmin />}
+        </DialogContent>
+      </Dialog>
+
       {/* --- Edit Profile Dialog --- */}
       <Dialog open={!!editingProfile} onOpenChange={open => !open && setEditingProfile(null)}>
         <DialogContent className="sm:max-w-lg">
@@ -794,7 +1286,7 @@ export default function AdminDashboardPage() {
             <button aria-label="Close"
               type="button"
               onClick={() => setEditingProfile(null)}
-              className="rounded-md p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
+              className="rounded p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
             >
               <X className="w-4 h-4" />
             </button>
@@ -810,24 +1302,12 @@ export default function AdminDashboardPage() {
                   <Label htmlFor="edit-profile-email">Email (read-only, used for login)</Label>
                   <Input id="edit-profile-email" name="email" defaultValue={editingProfile.email} readOnly className="bg-slate-100 dark:bg-[#1A2740] text-slate-500 dark:text-slate-400" />
                 </div>
-                <div className="space-y-1">
-                  <Label htmlFor="edit-profile-role">Role</Label>
-                  <select
-                    id="edit-profile-role"
-                    name="role"
-                    defaultValue={editingProfile.role}
-                    className="w-full rounded-xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="giver">Giver</option>
-                    <option value="organization">Organization</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
+                <RoleFields key={`role-${editingProfile.id}`} profile={editingProfile} />
                 <div className="space-y-1">
                   <Label htmlFor="edit-profile-password">Reset password (optional, 8+ chars)</Label>
                   <Input id="edit-profile-password" name="password" type="password" placeholder="Leave blank to keep current password" />
                 </div>
-                <SuspendFields key={editingProfile.id} profile={editingProfile} />
+                <SuspendFields key={`suspend-${editingProfile.id}`} profile={editingProfile} />
               </div>
               <DialogFooter className="pt-2 gap-2">
                 <Button type="button" variant="outline" onClick={() => setEditingProfile(null)}>
@@ -858,7 +1338,7 @@ export default function AdminDashboardPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Permanently delete this account?</AlertDialogTitle>
             <AlertDialogDescription>
-              This deletes {deletingProfile?.full_name}'s ({deletingProfile?.email}) account and all associated data — needs, donations, messages, everything linked to them. This cannot be undone.
+              This deletes {deletingProfile?.full_name}'s ({deletingProfile?.email}) account and all associated data - needs, donations, messages, everything linked to them. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -902,13 +1382,37 @@ export default function AdminDashboardPage() {
         onChanged={async () => { setSelectedDonation(null); await loadData() }}
       />
 
+      <NeedDetailDialog
+        open={!!selectedNeedDetail}
+        onOpenChange={(open) => !open && setSelectedNeedDetail(null)}
+        need={selectedNeedDetail ? {
+          id: selectedNeedDetail.id,
+          title: selectedNeedDetail.title,
+          description: selectedNeedDetail.description,
+          category: selectedNeedDetail.category,
+          urgency: selectedNeedDetail.urgency,
+          status: selectedNeedDetail.status,
+          rejection_reason: selectedNeedDetail.rejection_reason,
+          reopen_reason: selectedNeedDetail.reopen_reason,
+          organization_name: firstOf(selectedNeedDetail.organizations)?.name,
+          location: selectedNeedDetail.location,
+          quantity: selectedNeedDetail.quantity,
+          target_amount: selectedNeedDetail.target_amount,
+          due_date: selectedNeedDetail.due_date,
+          created_at: selectedNeedDetail.created_at,
+          attachments: selectedNeedDetail.need_attachments,
+        } as NeedDetailSummary : null}
+        onUpdate={async (id, status, rejection_reason) => { await updateNeed(id, status, rejection_reason); setSelectedNeedDetail(null) }}
+      />
+
       <GiftDetailDialog
         open={!!selectedGift}
         onOpenChange={(open) => !open && setSelectedGift(null)}
         gift={selectedGift}
         role="admin"
         onModerate={async (status) => { if (selectedGift) await updateGift(selectedGift.id, status); setSelectedGift(null) }}
-        onClaimReview={async (status, claimNotes) => { if (selectedGift) await updateGift(selectedGift.id, status, claimNotes); setSelectedGift(null) }}
+        onClaimReview={reviewGiftClaim}
+        onClaimDelete={deleteGiftClaim}
       />
 
       <OrganizationDetailDialog
@@ -959,7 +1463,7 @@ function UserDetailDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-slate-900 dark:bg-blue-600 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded bg-slate-900 dark:bg-blue-600 flex items-center justify-center shrink-0">
               <span className="text-white font-bold text-xs">{profile.full_name.charAt(0).toUpperCase()}</span>
             </div>
             {profile.full_name}
@@ -968,12 +1472,12 @@ function UserDetailDialog({
 
         <div className="space-y-4 pt-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-[#1A2740] capitalize">{profile.role}</span>
+            <span className="text-[11px] font-bold px-2.5 py-1 rounded bg-slate-100 dark:bg-[#1A2740] capitalize">{profile.role}</span>
             {profile.account_type && (
-              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-[#1A2740] capitalize">{profile.account_type} account</span>
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded bg-slate-100 dark:bg-[#1A2740] capitalize">{profile.account_type} account</span>
             )}
             {profile.suspended && (
-              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-700">Suspended</span>
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded bg-red-50 text-red-700">Suspended</span>
             )}
           </div>
 
@@ -995,7 +1499,7 @@ function UserDetailDialog({
           </div>
 
           {profile.suspended && profile.suspended_reason && (
-            <div className="rounded-xl bg-red-50 dark:bg-red-950/30 p-3 text-xs font-semibold text-red-800 dark:text-red-300">
+            <div className="rounded bg-red-50 dark:bg-red-950/30 p-3 text-xs font-semibold text-red-800 dark:text-red-300">
               Suspension reason: {profile.suspended_reason}
             </div>
           )}
@@ -1014,12 +1518,17 @@ function UserDetailDialog({
   )
 }
 
-function OrganizationsView({ organizations, documents, onUpdate, onEdit, onMessage, onSelect }: { organizations: Organization[]; documents: OrganizationDocument[]; onUpdate: (id: string, status: Organization["verification_status"], verification_notes?: string) => void; onEdit: (org: Organization) => void; onMessage: (org: Organization) => void; onSelect: (org: Organization) => void }) {
+function OrganizationsView({ organizations, documents, onUpdate, onEdit, onMessage, onSelect }: { organizations: Organization[]; documents: OrganizationDocument[]; onUpdate: (id: string, status: Organization["verification_status"], verification_notes?: string) => void | Promise<void>; onEdit: (org: Organization) => void; onMessage: (org: Organization) => void; onSelect: (org: Organization) => void }) {
   const [query, setQuery] = useState("")
   const [sort, setSort] = useState("newest")
   const [requestingInfoId, setRequestingInfoId] = useState<string | null>(null)
   const [infoNotes, setInfoNotes] = useState("")
   const [viewingDocsOrg, setViewingDocsOrg] = useState<Organization | null>(null)
+  const [busy, setBusy] = useState<{ id: string; action: string } | null>(null)
+  const run = async (id: string, action: string, fn: () => void | Promise<void>) => {
+    setBusy({ id, action })
+    try { await fn() } finally { setBusy(null) }
+  }
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -1067,7 +1576,7 @@ function OrganizationsView({ organizations, documents, onUpdate, onEdit, onMessa
       ) : visible.map(org => {
         const orgDocuments = documents.filter(document => document.organization_id === org.id)
         return (
-          <article key={org.id} role="button" tabIndex={0} onClick={() => onSelect(org)} className="row cursor-pointer">
+          <article key={org.id} role="button" tabIndex={0} onClick={() => onSelect(org)} onKeyDown={activateOnKey} className="row cursor-pointer">
             <div>
               <h3 className="font-bold text-base">{org.name}</h3>
               <p className="text-sm text-slate-500 dark:text-slate-400 break-all">
@@ -1096,22 +1605,29 @@ function OrganizationsView({ organizations, documents, onUpdate, onEdit, onMessa
               <button
                 type="button"
                 onClick={() => onEdit(org)}
-                className="inline-flex items-center gap-1 rounded-full border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                className="inline-flex items-center gap-1 rounded border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
               >
                 <Pencil className="w-3 h-3" /> Edit
               </button>
               <button
                 type="button"
                 onClick={() => onMessage(org)}
-                className="inline-flex items-center gap-1 rounded-full border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                className="inline-flex items-center gap-1 rounded border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
               >
                 <MessageSquare className="w-3 h-3" /> Message
               </button>
-              <span className="rounded-full bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-xs font-bold capitalize">{org.verification_status.replace(/_/g, " ")}</span>
+              <span className="rounded bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-xs font-bold capitalize">{org.verification_status.replace(/_/g, " ")}</span>
               {(org.verification_status === "pending" || org.verification_status === "more_info_requested") && (
                 <>
-                  <button onClick={() => onUpdate(org.id, "approved")} className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700">Approve</button>
-                  <button onClick={() => onUpdate(org.id, "rejected")} className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700">Reject</button>
+                  <button
+                    onClick={() => run(org.id, "approve", () => onUpdate(org.id, "approved"))}
+                    disabled={busy?.id === org.id}
+                    className="inline-flex items-center gap-1.5 rounded bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+                  >
+                    {busy?.id === org.id && busy.action === "approve" && <Loader2 className="w-3 h-3 animate-spin" />}
+                    Approve
+                  </button>
+                  <button onClick={() => onUpdate(org.id, "rejected")} disabled={busy?.id === org.id} className="rounded bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-60">Reject</button>
                   {requestingInfoId === org.id ? (
                     <div className="flex items-center gap-2 w-full mt-2 basis-full">
                       <input
@@ -1121,14 +1637,20 @@ function OrganizationsView({ organizations, documents, onUpdate, onEdit, onMessa
                         className="field flex-1 text-xs py-2"
                       />
                       <button
-                        onClick={() => { if (infoNotes.trim()) { onUpdate(org.id, "more_info_requested", infoNotes.trim()); setRequestingInfoId(null); setInfoNotes("") } }}
-                        className="rounded-full bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 shrink-0"
+                        onClick={() => {
+                          if (!infoNotes.trim()) return
+                          const notes = infoNotes.trim()
+                          run(org.id, "info", async () => { await onUpdate(org.id, "more_info_requested", notes); setRequestingInfoId(null); setInfoNotes("") })
+                        }}
+                        disabled={busy?.id === org.id}
+                        className="inline-flex items-center gap-1.5 rounded bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 shrink-0 disabled:opacity-60"
                       >
+                        {busy?.id === org.id && busy.action === "info" && <Loader2 className="w-3 h-3 animate-spin" />}
                         Send request
                       </button>
                     </div>
                   ) : (
-                    <button onClick={() => setRequestingInfoId(org.id)} className="rounded-full border border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-400 px-3 py-1.5 text-xs font-bold hover:bg-amber-50 dark:hover:bg-amber-950/30">Request Info</button>
+                    <button onClick={() => setRequestingInfoId(org.id)} className="rounded border border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-400 px-3 py-1.5 text-xs font-bold hover:bg-amber-50 dark:hover:bg-amber-950/30">Request Info</button>
                   )}
                 </>
               )}
@@ -1143,7 +1665,7 @@ function OrganizationsView({ organizations, documents, onUpdate, onEdit, onMessa
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5 text-blue-600" />
-            {viewingDocsOrg?.name} — Documents
+            {viewingDocsOrg?.name} - Documents
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-2 pt-1 max-h-[60vh] overflow-y-auto pr-1">
@@ -1151,7 +1673,7 @@ function OrganizationsView({ organizations, documents, onUpdate, onEdit, onMessa
             <p className="text-sm text-slate-400">No documents uploaded.</p>
           ) : (
             viewingDocsOrg && documents.filter(d => d.organization_id === viewingDocsOrg.id).map(document => (
-              <div key={document.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-[#233350] p-3">
+              <div key={document.id} className="flex items-center justify-between gap-3 rounded border border-slate-200 dark:border-[#233350] p-3">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <FileText className="w-4 h-4 text-blue-600 shrink-0" />
                   <div className="min-w-0">
@@ -1219,8 +1741,8 @@ function OrganizationDetailDialog({
 
         <div className="space-y-4 pt-1 max-h-[70vh] overflow-y-auto pr-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-[#1A2740] capitalize">{organization.type}</span>
-            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full capitalize ${
+            <span className="text-[11px] font-bold px-2.5 py-1 rounded bg-slate-100 dark:bg-[#1A2740] capitalize">{organization.type}</span>
+            <span className={`text-[11px] font-bold px-2.5 py-1 rounded capitalize ${
               organization.verification_status === "approved" ? "bg-emerald-50 text-emerald-700" :
               organization.verification_status === "rejected" ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"
             }`}>
@@ -1242,7 +1764,7 @@ function OrganizationDetailDialog({
             {(organization.contact_name || organization.contact_role) && (
               <div className="col-span-2">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Contact person</p>
-                <p className="font-semibold">{organization.contact_name || "—"}{organization.contact_role ? ` · ${organization.contact_role}` : ""}</p>
+                <p className="font-semibold">{organization.contact_name || "-"}{organization.contact_role ? ` · ${organization.contact_role}` : ""}</p>
               </div>
             )}
             <div className="col-span-2 flex items-center gap-1.5">
@@ -1268,19 +1790,19 @@ function OrganizationDetailDialog({
           </div>
 
           {(organization.bank_name || organization.bank_account_number) && (
-            <div className="rounded-xl border border-slate-200 dark:border-[#233350] p-3 space-y-1">
+            <div className="rounded border border-slate-200 dark:border-[#233350] p-3 space-y-1">
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Banking details (for payout reference)</p>
-              <p className="text-xs text-slate-600 dark:text-slate-300">{organization.bank_name || "—"}</p>
-              <p className="text-xs text-slate-600 dark:text-slate-300">{organization.bank_account_holder || "—"}</p>
+              <p className="text-xs text-slate-600 dark:text-slate-300">{organization.bank_name || "-"}</p>
+              <p className="text-xs text-slate-600 dark:text-slate-300">{organization.bank_account_holder || "-"}</p>
               <p className="text-xs font-mono text-slate-600 dark:text-slate-300">
-                Acc: {organization.bank_account_number || "—"} · Branch: {organization.bank_branch_code || "—"}
+                Acc: {organization.bank_account_number || "-"} · Branch: {organization.bank_branch_code || "-"}
               </p>
               {organization.bank_account_type && <p className="text-xs text-slate-600 dark:text-slate-300">{organization.bank_account_type}</p>}
             </div>
           )}
 
           {organization.verification_notes && (
-            <div className="rounded-xl bg-amber-50 dark:bg-amber-950/30 p-3 text-xs font-semibold text-amber-800 dark:text-amber-300">
+            <div className="rounded bg-amber-50 dark:bg-amber-950/30 p-3 text-xs font-semibold text-amber-800 dark:text-amber-300">
               Last admin note: {organization.verification_notes}
             </div>
           )}
@@ -1346,12 +1868,20 @@ function OrganizationDetailDialog({
           {canModerate && (
             <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-[#233350]">
               {showRequestInfo && (
-                <textarea
-                  value={infoNotes}
-                  onChange={e => setInfoNotes(e.target.value)}
-                  placeholder="What additional information is needed?"
-                  className="w-full min-h-16 p-3 mt-3 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded-2xl text-sm outline-none focus:border-amber-500"
-                />
+                <div className="mt-3">
+                  <div className="flex justify-end mb-1">
+                    <GrammarCheckButton text={infoNotes} onTextChange={setInfoNotes} />
+                  </div>
+                  <div className="relative">
+                    <textarea
+                      value={infoNotes}
+                      onChange={e => setInfoNotes(e.target.value)}
+                      placeholder="What additional information is needed?"
+                      className="w-full min-h-16 p-3 pr-11 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded text-sm outline-none focus:border-amber-500"
+                    />
+                    <MicButton className="top-2 right-2" onText={text => setInfoNotes(n => appendSpeech(n, text))} />
+                  </div>
+                </div>
               )}
               <DialogFooter className="pt-2 gap-2 flex-wrap">
                 {showRequestInfo ? (
@@ -1383,11 +1913,16 @@ function OrganizationDetailDialog({
   )
 }
 
-function NeedsView({ needs, onUpdate }: { needs: Need[]; onUpdate: (id: string, status: Need["status"], rejection_reason?: string) => void }) {
+function NeedsView({ needs, onUpdate, onDelete, onSelect }: { needs: Need[]; onUpdate: (id: string, status: Need["status"], rejection_reason?: string) => void | Promise<void>; onDelete: (id: string) => void | Promise<void>; onSelect: (need: Need) => void }) {
   const [query, setQuery] = useState("")
   const [sort, setSort] = useState("newest")
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState("")
+  const [busy, setBusy] = useState<{ id: string; action: string } | null>(null)
+  const run = async (id: string, action: string, fn: () => void | Promise<void>) => {
+    setBusy({ id, action })
+    try { await fn() } finally { setBusy(null) }
+  }
 
   const urgencyRank: Record<string, number> = { high: 0, medium: 1, low: 2 }
 
@@ -1433,45 +1968,81 @@ function NeedsView({ needs, onUpdate }: { needs: Need[]; onUpdate: (id: string, 
       ) : visible.length === 0 ? (
         <Empty text="No needs match your search." />
       ) : visible.map(need => {
-        const canModerate = need.status === "draft" || need.status === "rejected"
+        const isReopenRequest = need.status === "reopen_pending"
+        const canModerate = need.status === "draft" || need.status === "rejected" || isReopenRequest
         return (
-        <article key={need.id} className={`row ${need.status === "draft" ? "border-amber-200 bg-amber-50/40" : need.status === "rejected" ? "border-red-200 bg-red-50/40 dark:bg-red-950/10" : ""}`}>
+        <article
+          key={need.id}
+          role="button"
+          tabIndex={0}
+          onClick={() => onSelect(need)}
+          onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(need) } }}
+          className={`row cursor-pointer ${need.status === "draft" ? "border-amber-200 bg-amber-50/40 dark:border-amber-900 dark:bg-amber-950/10" : need.status === "rejected" ? "border-red-200 bg-red-50/40 dark:bg-red-950/10" : isReopenRequest ? "border-purple-200 bg-purple-50/40 dark:border-purple-900 dark:bg-purple-950/10" : ""}`}
+        >
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-bold text-base">{need.title}</h3>
-              {need.status === "draft" && <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700 border border-amber-200">Awaiting approval</span>}
-              {need.status === "rejected" && <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-100 text-red-700 border border-red-200">Rejected</span>}
-              {need.urgency === "high" && <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-100 text-red-700">High Urgency</span>}
+              {need.status === "draft" && <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-700 border border-amber-200">Awaiting approval</span>}
+              {need.status === "rejected" && <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-red-100 text-red-700 border border-red-200">Rejected</span>}
+              {isReopenRequest && <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-purple-100 text-purple-700 border border-purple-200">Reopen requested</span>}
+              {need.urgency === "high" && <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-red-100 text-red-700">High Urgency</span>}
             </div>
             <p className="text-sm text-slate-500 dark:text-slate-400">{firstOf(need.organizations)?.name || "Organization"} · {need.category}</p>
             {need.status === "rejected" && need.rejection_reason && (
               <p className="mt-1 text-xs italic text-red-700 dark:text-red-400">Reason: {need.rejection_reason}</p>
             )}
+            {isReopenRequest && need.reopen_reason && (
+              <p className="mt-1 text-xs italic text-purple-700 dark:text-purple-400">Motivation: {need.reopen_reason}</p>
+            )}
           </div>
-          <div className="flex items-center gap-2 flex-wrap justify-end">
-            <span className="rounded-full bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-xs font-bold capitalize">{need.status.replace(/_/g, " ")}</span>
-            {canModerate && <button onClick={() => onUpdate(need.id, "open")} className="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700">Approve &amp; Publish</button>}
+          <div className="flex items-center gap-2 flex-wrap justify-end" onClick={e => e.stopPropagation()}>
+            <span className="rounded bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-xs font-bold capitalize">{need.status.replace(/_/g, " ")}</span>
+            {canModerate && (
+              <button
+                onClick={() => run(need.id, "approve", () => onUpdate(need.id, "open"))}
+                disabled={busy?.id === need.id}
+                className="inline-flex items-center gap-1.5 rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-60"
+              >
+                {busy?.id === need.id && busy.action === "approve" && <Loader2 className="w-3 h-3 animate-spin" />}
+                {isReopenRequest ? "Approve reopen" : "Approve & Publish"}
+              </button>
+            )}
             {canModerate && (
               rejectingId === need.id ? (
                 <div className="flex items-center gap-2 w-full mt-2 basis-full">
                   <input
                     value={rejectReason}
                     onChange={e => setRejectReason(e.target.value)}
-                    placeholder="Reason for rejection (optional, shared with the organization)"
+                    placeholder={isReopenRequest ? "Reason for declining the reopen request (optional, shared with the organization)" : "Reason for rejection (optional, shared with the organization)"}
                     className="field flex-1 text-xs py-2"
                   />
                   <button
-                    onClick={() => { onUpdate(need.id, "rejected", rejectReason.trim() || undefined); setRejectingId(null); setRejectReason("") }}
-                    className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 shrink-0"
+                    onClick={() => {
+                      const reason = rejectReason.trim() || undefined
+                      run(need.id, "reject", async () => { await onUpdate(need.id, isReopenRequest ? "closed" : "rejected", reason); setRejectingId(null); setRejectReason("") })
+                    }}
+                    disabled={busy?.id === need.id}
+                    className="inline-flex items-center gap-1.5 rounded bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 shrink-0 disabled:opacity-60"
                   >
-                    Confirm reject
+                    {busy?.id === need.id && busy.action === "reject" && <Loader2 className="w-3 h-3 animate-spin" />}
+                    {isReopenRequest ? "Confirm decline" : "Confirm reject"}
                   </button>
                 </div>
               ) : (
-                <button onClick={() => setRejectingId(need.id)} className="rounded-full border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 px-3 py-1.5 text-xs font-bold hover:bg-red-50 dark:hover:bg-red-950/30">Reject</button>
+                <button onClick={() => setRejectingId(need.id)} disabled={busy?.id === need.id} className="rounded border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 px-3 py-1.5 text-xs font-bold hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-60">{isReopenRequest ? "Decline" : "Reject"}</button>
               )
             )}
-            {(need.status === "open" || need.status === "in_progress") && <button onClick={() => onUpdate(need.id, "closed")} className="rounded-full border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold hover:bg-slate-50 dark:hover:bg-[#1A2740]">Close</button>}
+            {(need.status === "fulfilled" || need.status === "closed") && (
+              <button
+                onClick={() => run(need.id, "delete", () => onDelete(need.id))}
+                disabled={busy?.id === need.id}
+                data-tip="Permanently delete this old need record - it's fulfilled/closed, so nothing else references it going forward"
+                className="inline-flex items-center gap-1.5 rounded border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 px-3 py-1.5 text-xs font-bold hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-60"
+              >
+                {busy?.id === need.id && busy.action === "delete" && <Loader2 className="w-3 h-3 animate-spin" />}
+                Delete
+              </button>
+            )}
           </div>
         </article>
         )
@@ -1480,11 +2051,14 @@ function NeedsView({ needs, onUpdate }: { needs: Need[]; onUpdate: (id: string, 
   )
 }
 
-function GiftsView({ gifts, onUpdate, onSelect }: { gifts: AdminGift[]; onUpdate: (id: string, status: AdminGift["status"], claim_notes?: string) => void; onSelect: (gift: GiftDetailSummary) => void }) {
+function GiftsView({ gifts, onUpdate, onSelect }: { gifts: AdminGift[]; onUpdate: (id: string, status: "approved" | "rejected") => void | Promise<void>; onSelect: (gift: AdminGift) => void }) {
   const [query, setQuery] = useState("")
   const [sort, setSort] = useState("newest")
-  const [rejectingClaimId, setRejectingClaimId] = useState<string | null>(null)
-  const [rejectNotes, setRejectNotes] = useState("")
+  const [busy, setBusy] = useState<{ id: string; action: string } | null>(null)
+  const run = async (id: string, action: string, fn: () => void | Promise<void>) => {
+    setBusy({ id, action })
+    try { await fn() } finally { setBusy(null) }
+  }
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -1528,149 +2102,76 @@ function GiftsView({ gifts, onUpdate, onSelect }: { gifts: AdminGift[]; onUpdate
         <Empty text="No gift offerings submitted yet." />
       ) : visible.length === 0 ? (
         <Empty text="No gift offerings match your search." />
-      ) : visible.map(gift => (
+      ) : visible.map(gift => {
+        const pendingClaims = gift.claims.filter(c => c.status === "pending")
+        return (
         <article
           key={gift.id}
           role="button"
           tabIndex={0}
-          onClick={() => onSelect({
-            id: gift.id,
-            title: gift.title,
-            offering_type: gift.offering_type,
-            description: gift.description,
-            quantity_or_value: gift.quantity_or_value,
-            conditions: gift.conditions,
-            location: gift.location,
-            expiry_date: gift.expiry_date,
-            status: gift.status,
-            claim_notes: gift.claim_notes,
-            claim_motivation: gift.claim_motivation,
-            created_at: gift.created_at,
-            giverName: gift.givers?.name,
-            giverEmail: gift.givers?.email,
-            claimedByOrgName: gift.organizations?.name,
-          })}
+          onClick={() => onSelect(gift)}
+          onKeyDown={activateOnKey}
           className="row flex-wrap cursor-pointer"
         >
-          <div className="space-y-1">
+          <div className="flex items-start gap-3 min-w-0">
+            {gift.photos && gift.photos.length > 0 && gift.photos[0].url && (
+              <img
+                src={gift.photos[0].url}
+                alt={gift.title}
+                className="w-16 h-16 object-cover rounded border border-slate-200 dark:border-[#233350] shrink-0"
+              />
+            )}
+            <div className="space-y-1 min-w-0">
             <div className="flex items-center gap-2">
               <h3 className="font-bold text-base">{gift.title}</h3>
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 capitalize">
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-purple-50 text-purple-700 capitalize">
                 {gift.offering_type}
               </span>
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">{gift.description}</p>
             <p className="text-xs text-slate-400">Pledged by: {gift.givers?.name || "Giver"} ({gift.givers?.email || "No email"})</p>
-            {(gift.status === "pending_claim" || gift.status === "claimed") && gift.organizations?.name && (
+            {gift.status === "claimed" && gift.organizations?.name && (
               <p className="text-xs font-semibold text-blue-600 dark:text-blue-400">Claimed by: {gift.organizations.name}</p>
             )}
-            {gift.claim_notes && <p className="text-xs text-red-600 dark:text-red-400 italic">Last claim note: {gift.claim_notes}</p>}
+            {pendingClaims.length > 0 && (
+              <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                {pendingClaims.length} pending claim{pendingClaims.length === 1 ? "" : "s"} - {pendingClaims.map(c => c.organization_name).join(", ")} (open to review)
+              </p>
+            )}
+            </div>
           </div>
           <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end" onClick={(e) => e.stopPropagation()}>
-            <span className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${
+            <span className={`rounded px-3 py-1 text-xs font-bold capitalize ${
               gift.status === "approved" ? "bg-emerald-50 text-emerald-700" :
-              gift.status === "claimed" ? "bg-blue-50 text-blue-700" :
-              gift.status === "pending_claim" ? "bg-amber-50 text-amber-700" : "bg-slate-100 dark:bg-[#1A2740] text-slate-700 dark:text-slate-300"
+              gift.status === "claimed" ? "bg-blue-50 text-blue-700" : "bg-slate-100 dark:bg-[#1A2740] text-slate-700 dark:text-slate-300"
             }`}>
-              {gift.status === "pending_claim" ? "Claim pending" : gift.status}
+              {gift.status}
             </span>
-            {gift.status === "pending" && (
+            {gift.status === "pending" && gift.offering_type === "financial" && (
               <>
-                <button onClick={() => onUpdate(gift.id, "approved")} className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700">Approve</button>
-                <button onClick={() => onUpdate(gift.id, "rejected")} className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700">Reject</button>
+                <span data-tip="This pledge is approved automatically once its donation is confirmed - it isn't reviewed here" className="rounded bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
+                  Awaiting payment
+                </span>
+                <button onClick={() => onUpdate(gift.id, "rejected")} disabled={busy?.id === gift.id} data-tip="Cancel this pledge, e.g. if it was abandoned and will never be paid" className="rounded bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-60">Cancel</button>
               </>
             )}
-            {gift.status === "pending_claim" && (
+            {gift.status === "pending" && gift.offering_type !== "financial" && (
               <>
-                <button onClick={() => onUpdate(gift.id, "claimed")} className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700">Approve Claim</button>
-                {rejectingClaimId === gift.id ? (
-                  <div className="flex items-center gap-2 w-full mt-2 basis-full">
-                    <input
-                      value={rejectNotes}
-                      onChange={e => setRejectNotes(e.target.value)}
-                      placeholder="Reason for declining the claim (optional)"
-                      className="field flex-1 text-xs py-2"
-                    />
-                    <button
-                      onClick={() => { onUpdate(gift.id, "approved", rejectNotes); setRejectingClaimId(null); setRejectNotes("") }}
-                      className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 shrink-0"
-                    >
-                      Confirm decline
-                    </button>
-                  </div>
-                ) : (
-                  <button onClick={() => setRejectingClaimId(gift.id)} className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700">Reject Claim</button>
-                )}
+                <button
+                  onClick={() => run(gift.id, "approve", () => onUpdate(gift.id, "approved"))}
+                  disabled={busy?.id === gift.id}
+                  className="inline-flex items-center gap-1.5 rounded bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  {busy?.id === gift.id && busy.action === "approve" && <Loader2 className="w-3 h-3 animate-spin" />}
+                  Approve
+                </button>
+                <button onClick={() => onUpdate(gift.id, "rejected")} disabled={busy?.id === gift.id} className="rounded bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-60">Reject</button>
               </>
             )}
           </div>
         </article>
-      ))}
-    </Panel>
-  )
-}
-
-function InterestsView({ interests, onUpdate }: { interests: Interest[]; onUpdate: (id: string, status: Interest["status"]) => void }) {
-  const [query, setQuery] = useState("")
-  const [sort, setSort] = useState("newest")
-
-  const visible = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    const filtered = q
-      ? interests.filter(interest =>
-          (firstOf(interest.needs)?.title || "").toLowerCase().includes(q) ||
-          (firstOf(interest.givers)?.name || "").toLowerCase().includes(q) ||
-          (firstOf(interest.givers)?.email || "").toLowerCase().includes(q) ||
-          interest.status.toLowerCase().includes(q)
         )
-      : interests
-    const sorted = [...filtered]
-    if (sort === "oldest") sorted.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-    else if (sort === "status") sorted.sort((a, b) => a.status.localeCompare(b.status))
-    else sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    return sorted
-  }, [interests, query, sort])
-
-  return (
-    <Panel
-      title="Support interests"
-      toolbar={
-        <SearchSortBar
-          query={query}
-          onQuery={setQuery}
-          placeholder="Search by need, giver name, email, or status..."
-          sort={sort}
-          onSort={setSort}
-          sortOptions={[
-            { value: "newest", label: "Newest first" },
-            { value: "oldest", label: "Oldest first" },
-            { value: "status", label: "Status" },
-          ]}
-        />
-      }
-    >
-      {interests.length === 0 ? (
-        <Empty text="No support interests have been submitted." />
-      ) : visible.length === 0 ? (
-        <Empty text="No interests match your search." />
-      ) : visible.map(interest => (
-        <article key={interest.id} className="row">
-          <div>
-            <h3 className="font-bold">{firstOf(interest.needs)?.title || "Need"}</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{firstOf(interest.givers)?.name || "Giver"} · {firstOf(interest.givers)?.email}</p>
-            {interest.message && <p className="mt-2 text-sm text-slate-600 dark:text-slate-300 italic">"{interest.message}"</p>}
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="rounded-full bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-xs font-bold capitalize">{interest.status}</span>
-            {interest.status === "pending" && (
-              <>
-                <button onClick={() => onUpdate(interest.id, "accepted")} className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700">Accept</button>
-                <button onClick={() => onUpdate(interest.id, "declined")} className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700">Decline</button>
-              </>
-            )}
-          </div>
-        </article>
-      ))}
+      })}
     </Panel>
   )
 }
@@ -1688,6 +2189,8 @@ function DonationsView({ donations, onSelect }: { donations: AdminDonation[]; on
           (firstOf(d.gift_offerings)?.title || "").toLowerCase().includes(q) ||
           (firstOf(d.givers)?.name || "").toLowerCase().includes(q) ||
           (firstOf(d.givers)?.email || "").toLowerCase().includes(q) ||
+          (firstOf(d.donor)?.full_name || "").toLowerCase().includes(q) ||
+          (firstOf(d.donor)?.email || "").toLowerCase().includes(q) ||
           d.reference_code.toLowerCase().includes(q) ||
           d.status.toLowerCase().includes(q)
         )
@@ -1727,8 +2230,11 @@ function DonationsView({ donations, onSelect }: { donations: AdminDonation[]; on
         const need = firstOf(item.needs)
         const gift = firstOf(item.gift_offerings)
         const giver = firstOf(item.givers)
+        const donor = firstOf(item.donor)
+        const donorName = giver?.name || donor?.full_name || item.guest_name
+        const donorEmail = giver?.email || donor?.email || item.guest_email
         const orgName = firstOf(need?.organizations)?.name
-        const displayTitle = need?.title || gift?.title || "Gift Library Pledge"
+        const displayTitle = item.is_platform_donation ? "Support The Platform" : need?.title || gift?.title || "Gift Library Pledge"
         return (
         <button
           key={item.id}
@@ -1747,20 +2253,23 @@ function DonationsView({ donations, onSelect }: { donations: AdminDonation[]; on
             created_at: item.created_at,
             needTitle: displayTitle,
             orgName,
-            giverName: giver?.name,
-            giverEmail: giver?.email,
+            giverName: donorName,
+            giverEmail: donorEmail,
           })}
           className="row w-full text-left"
         >
           <div>
-            <h3 className="font-bold">{displayTitle}</h3>
+            <h3 className="flex items-center gap-2 font-bold">
+              {displayTitle}
+              {item.is_platform_donation && <span className="rounded bg-pink-50 px-2 py-0.5 text-[10px] font-bold text-pink-700">Platform Support</span>}
+            </h3>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              {orgName || "General Fund"} · {giver?.name || "Giver"} ({giver?.email}) · Ref: {item.reference_code}
+              {item.is_platform_donation ? "HelpLift" : orgName || "General Fund"} · {donorName || "Donor"} ({donorEmail}) · Ref: {item.reference_code}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <span className="font-bold">{formatCurrency(Number(item.amount))}</span>
-            <span className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${statusBadgeClasses(item.status)}`}>
+            <span className={`rounded px-3 py-1 text-xs font-bold capitalize ${statusBadgeClasses(item.status)}`}>
               {item.status === "pending" ? (item.proof_storage_path ? "Pending Verification" : "Awaiting Payment") : item.status}
             </span>
           </div>
@@ -1768,6 +2277,252 @@ function DonationsView({ donations, onSelect }: { donations: AdminDonation[]; on
         )
       })}
     </Panel>
+  )
+}
+
+const WITHDRAWAL_STATUS_LABEL: Record<AdminWithdrawal["status"], string> = {
+  pending: "Pending review",
+  approved: "Approved - awaiting transfer",
+  rejected: "Declined",
+  paid: "Transfer Complete",
+  cancelled: "Cancelled by organization",
+}
+const WITHDRAWAL_STATUS_CLASSES: Record<AdminWithdrawal["status"], string> = {
+  pending: "bg-amber-50 text-amber-700",
+  approved: "bg-blue-50 text-blue-700",
+  rejected: "bg-red-50 text-red-700",
+  paid: "bg-emerald-50 text-emerald-700",
+  cancelled: "bg-slate-100 dark:bg-[#1A2740] text-slate-700 dark:text-slate-300",
+}
+
+function WithdrawalProofUpload({ withdrawal, onUploadProof }: { withdrawal: AdminWithdrawal; onUploadProof: (id: string, file: File) => Promise<boolean> }) {
+  const [file, setFile] = useState<File | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+
+  const submit = async () => {
+    if (!file) return
+    setIsUploading(true)
+    const ok = await onUploadProof(withdrawal.id, file)
+    setIsUploading(false)
+    if (ok) setFile(null)
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 pt-1">
+      <input
+        type="file"
+        accept="image/*,.pdf"
+        onChange={e => setFile(e.target.files?.[0] || null)}
+        className="text-xs file:mr-2 file:rounded file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-blue-700"
+      />
+      <button
+        type="button"
+        onClick={submit}
+        disabled={!file || isUploading}
+        className="inline-flex items-center gap-1.5 rounded bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+      >
+        {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UploadCloud className="w-3.5 h-3.5" />}
+        Attach proof & mark paid
+      </button>
+    </div>
+  )
+}
+
+function WithdrawalsView({
+  withdrawals,
+  onReview,
+  onUploadProof,
+}: {
+  withdrawals: AdminWithdrawal[]
+  onReview: (id: string, status: "approved" | "rejected", rejection_reason?: string) => void | Promise<void>
+  onUploadProof: (id: string, file: File) => Promise<boolean>
+}) {
+  const [query, setQuery] = useState("")
+  const [sort, setSort] = useState("pending_first")
+  const [busy, setBusy] = useState<{ id: string; action: string } | null>(null)
+  const run = async (id: string, action: string, fn: () => void | Promise<void>) => {
+    setBusy({ id, action })
+    try { await fn() } finally { setBusy(null) }
+  }
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const filtered = q
+      ? withdrawals.filter(w =>
+          (firstOf(w.organizations)?.name || "").toLowerCase().includes(q) ||
+          (firstOf(w.requester)?.full_name || "").toLowerCase().includes(q) ||
+          w.status.toLowerCase().includes(q)
+        )
+      : withdrawals
+    const sorted = [...filtered]
+    if (sort === "oldest") sorted.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    else if (sort === "amount") sorted.sort((a, b) => Number(b.amount) - Number(a.amount))
+    else if (sort === "pending_first") sorted.sort((a, b) => (a.status === "pending" ? -1 : 1) - (b.status === "pending" ? -1 : 1))
+    else sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    return sorted
+  }, [withdrawals, query, sort])
+
+  return (
+    <Panel
+      title="Withdrawal requests"
+      toolbar={
+        <SearchSortBar
+          query={query}
+          onQuery={setQuery}
+          placeholder="Search by organization, requester, or status..."
+          sort={sort}
+          onSort={setSort}
+          sortOptions={[
+            { value: "pending_first", label: "Pending first" },
+            { value: "newest", label: "Newest first" },
+            { value: "oldest", label: "Oldest first" },
+            { value: "amount", label: "Highest amount" },
+          ]}
+        />
+      }
+    >
+      {withdrawals.length === 0 ? (
+        <Empty text="No withdrawal requests yet." />
+      ) : visible.length === 0 ? (
+        <Empty text="No withdrawal requests match your search." />
+      ) : visible.map(w => {
+        const org = firstOf(w.organizations)
+        const requester = firstOf(w.requester)
+        return (
+          <article key={w.id} className="row items-start">
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-bold text-base">{org?.name || "Organization"}</h3>
+                <span className="font-bold text-blue-600">{formatCurrency(Number(w.amount))}</span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Requested by {requester?.full_name || "a team member"} · {new Date(w.created_at).toLocaleDateString()}
+              </p>
+              {org && (
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Bank: {org.bank_name || "-"} · {org.bank_account_holder || "-"} · Acc {org.bank_account_number || "-"} · Branch {org.bank_branch_code || "-"} · {org.bank_account_type || "-"}
+                </p>
+              )}
+              {w.status === "rejected" && w.rejection_reason && (
+                <p className="text-xs italic text-red-700 dark:text-red-400">Reason: {w.rejection_reason}</p>
+              )}
+              {w.status === "paid" && w.proof_url && (
+                <a href={w.proof_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:underline">
+                  <FileText className="w-3.5 h-3.5" /> View proof of payment{w.paid_at ? ` · ${new Date(w.paid_at).toLocaleDateString()}` : ""}
+                </a>
+              )}
+              {w.status === "approved" && <WithdrawalProofUpload withdrawal={w} onUploadProof={onUploadProof} />}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
+              <span className={`rounded px-3 py-1 text-xs font-bold capitalize ${WITHDRAWAL_STATUS_CLASSES[w.status]}`}>
+                {WITHDRAWAL_STATUS_LABEL[w.status]}
+              </span>
+              {w.status === "pending" && (
+                <>
+                  <button
+                    onClick={() => run(w.id, "approve", () => onReview(w.id, "approved"))}
+                    disabled={busy?.id === w.id}
+                    className="inline-flex items-center gap-1.5 rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-60"
+                  >
+                    {busy?.id === w.id && busy.action === "approve" && <Loader2 className="w-3 h-3 animate-spin" />}
+                    Approve
+                  </button>
+                  <button onClick={() => onReview(w.id, "rejected")} disabled={busy?.id === w.id} className="rounded border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 px-3 py-1.5 text-xs font-bold hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-60">Decline</button>
+                </>
+              )}
+            </div>
+          </article>
+        )
+      })}
+    </Panel>
+  )
+}
+
+const ROLE_HELP: Record<string, string> = {
+  owner: "Full control of the organization, including its profile, documents, team, and requesting withdrawals.",
+  manager: "Manages needs, donations and messages, but can't edit organization details.",
+  viewer: "Read-only access.",
+}
+
+// Role editing for one person. Platform role (admin / giver) is saved with the form; an
+// organization member's team role (owner / manager / viewer) is saved straight away.
+function RoleFields({ profile }: { profile: Profile }) {
+  const isOrgAccount = profile.role === "organization"
+  const [membership, setMembership] = useState<{ organization_name: string; role: string; is_primary_owner: boolean } | null>(null)
+  const [teamRole, setTeamRole] = useState("")
+  const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!isOrgAccount) return
+    fetch(`/api/admin/users/${profile.id}/team`)
+      .then(res => res.json())
+      .then(data => { if (data.membership) { setMembership(data.membership); setTeamRole(data.membership.role) } })
+      .catch(() => {})
+  }, [isOrgAccount, profile.id])
+
+  const saveTeamRole = async () => {
+    setSaving(true)
+    setStatus(null)
+    const res = await fetch(`/api/admin/users/${profile.id}/team`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role: teamRole }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) {
+      setMembership(data.membership)
+      setStatus({ ok: true, text: "Team role updated and the person was notified." })
+    } else {
+      setStatus({ ok: false, text: data.message || "Couldn't update the role." })
+      if (membership) setTeamRole(membership.role)
+    }
+    setSaving(false)
+  }
+
+  const selectClass = "w-full rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+
+  return (
+    <div className="space-y-3 rounded border border-slate-200 dark:border-[#233350] p-3">
+      <div className="space-y-1">
+        <Label htmlFor="edit-profile-role">Account role</Label>
+        {isOrgAccount ? (
+          <>
+            <input type="hidden" name="role" value="organization" />
+            <p className="rounded bg-slate-100 dark:bg-[#1A2740] px-3 py-2 text-sm font-semibold capitalize text-slate-600 dark:text-slate-300">Organization</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Organization accounts can't be converted to another account type.</p>
+          </>
+        ) : (
+          <>
+            <select id="edit-profile-role" name="role" defaultValue={profile.role} className={selectClass}>
+              <option value="giver">Giver</option>
+              <option value="admin">Admin (full access to this dashboard)</option>
+            </select>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Saved with "Save changes". The person is notified. You can't change your own role.</p>
+          </>
+        )}
+      </div>
+
+      {isOrgAccount && membership && (
+        <div className="space-y-1">
+          <Label htmlFor="edit-team-role">Role in {membership.organization_name}</Label>
+          <div className="flex gap-2">
+            <select id="edit-team-role" value={teamRole} onChange={e => setTeamRole(e.target.value)} className={selectClass} disabled={membership.is_primary_owner}>
+              <option value="owner">Owner</option>
+              <option value="manager">Manager</option>
+              <option value="viewer">Viewer</option>
+            </select>
+            <Button type="button" variant="outline" onClick={saveTeamRole} disabled={saving || teamRole === membership.role || membership.is_primary_owner}>
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Update"}
+            </Button>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {membership.is_primary_owner ? "Primary owner: this role can't be lowered." : ROLE_HELP[teamRole]}
+          </p>
+          {status && <p className={`text-xs font-semibold ${status.ok ? "text-emerald-600" : "text-red-600"}`}>{status.text}</p>}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -1818,14 +2573,17 @@ function UsersView({ profiles, onEdit, onMessage, onSelect }: { profiles: Profil
       ) : visible.map(profile => (
         <article
           key={profile.id}
+          role="button"
+          tabIndex={0}
           onClick={() => onSelect(profile)}
+          onKeyDown={activateOnKey}
           className="row cursor-pointer hover:border-blue-300 dark:hover:border-blue-800 transition-colors"
         >
           <div>
             <h3 className="font-bold flex items-center gap-2">
               {profile.full_name}
               {profile.suspended && (
-                <span className="rounded-full bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-400 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">Suspended</span>
+                <span className="rounded bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-400 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">Suspended</span>
               )}
             </h3>
             <p className="text-sm text-slate-500 dark:text-slate-400 break-all">
@@ -1839,18 +2597,18 @@ function UsersView({ profiles, onEdit, onMessage, onSelect }: { profiles: Profil
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onEdit(profile) }}
-              className="inline-flex items-center gap-1 rounded-full border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+              className="inline-flex items-center gap-1 rounded border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
             >
               <Pencil className="w-3 h-3" /> Edit
             </button>
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onMessage(profile) }}
-              className="inline-flex items-center gap-1 rounded-full border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+              className="inline-flex items-center gap-1 rounded border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
             >
               <MessageSquare className="w-3 h-3" /> Message
             </button>
-            <span className="rounded-full bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-xs font-bold capitalize">{profile.role}</span>
+            <span className="rounded bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-xs font-bold capitalize">{profile.role}</span>
           </div>
         </article>
       ))}
@@ -1869,8 +2627,11 @@ function MessagesView({ messages, onOpen }: { messages: AdminMessage[]; onOpen: 
       ) : messages.map(item => (
         <div
           key={item.id}
+          role="button"
+          tabIndex={0}
           onClick={() => onOpen(item)}
-          className={`w-full rounded-2xl border p-4 text-left cursor-pointer ${item.read_at ? "border-slate-200 dark:border-[#233350]" : "border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40"}`}
+          onKeyDown={activateOnKey}
+          className={`w-full rounded border p-4 text-left cursor-pointer ${item.read_at ? "border-slate-200 dark:border-[#233350]" : "border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40"}`}
         >
           <div className="flex items-center justify-between gap-3">
             <p className="font-bold text-sm">{item.sender_name || "Unknown sender"}</p>
@@ -1942,18 +2703,205 @@ const donationsChartConfig: ChartConfig = {
   amount: { label: "Donated", theme: { light: "#9333ea", dark: "#a855f7" } },
 }
 
+const platformSupportChartConfig: ChartConfig = {
+  amount: { label: "Platform Support", theme: { light: "#db2777", dark: "#ec4899" } },
+}
+
 const needsCategoryChartConfig: ChartConfig = {
   count: { label: "Needs", theme: { light: "#059669", dark: "#059669" } },
 }
 
-const orgStatusChartConfig: ChartConfig = {
+const claimsChartConfig: ChartConfig = {
+  claims: { label: "Claims", theme: { light: "#0891b2", dark: "#22d3ee" } },
+}
+
+const claimStatusChartConfig: ChartConfig = {
   approved: { label: "Approved", theme: { light: "#059669", dark: "#059669" } },
   pending: { label: "Pending", theme: { light: "#d97706", dark: "#d97706" } },
-  more_info_requested: { label: "More Info Requested", theme: { light: "#2563eb", dark: "#3b82f6" } },
   rejected: { label: "Rejected", theme: { light: "#e11d48", dark: "#e11d48" } },
 }
 
-function ReportsView({ organizations, needs, donations, profiles }: { organizations: Organization[]; needs: Need[]; donations: AdminDonation[]; profiles: Profile[] }) {
+const giftsChartConfig: ChartConfig = {
+  gifts: { label: "Gift offerings", theme: { light: "#7c3aed", dark: "#a78bfa" } },
+}
+
+const giftStatusChartConfig: ChartConfig = {
+  approved: { label: "Approved", theme: { light: "#059669", dark: "#059669" } },
+  pending: { label: "Pending", theme: { light: "#d97706", dark: "#d97706" } },
+  claimed: { label: "Claimed", theme: { light: "#2563eb", dark: "#3b82f6" } },
+  rejected: { label: "Rejected", theme: { light: "#e11d48", dark: "#e11d48" } },
+}
+
+const withdrawalsChartConfig: ChartConfig = {
+  amount: { label: "Paid out", theme: { light: "#059669", dark: "#10b981" } },
+}
+
+const withdrawalStatusChartConfig: ChartConfig = {
+  paid: { label: "Paid", theme: { light: "#059669", dark: "#059669" } },
+  approved: { label: "Approved", theme: { light: "#2563eb", dark: "#3b82f6" } },
+  pending: { label: "Pending", theme: { light: "#d97706", dark: "#d97706" } },
+  rejected: { label: "Rejected", theme: { light: "#e11d48", dark: "#e11d48" } },
+  cancelled: { label: "Cancelled", theme: { light: "#64748b", dark: "#94a3b8" } },
+}
+
+const siteVisitsChartConfig: ChartConfig = {
+  visits: { label: "Visits", theme: { light: "#2563eb", dark: "#3b82f6" } },
+  unique_visitors: { label: "Unique visitors", theme: { light: "#9333ea", dark: "#a855f7" } },
+}
+
+type SiteVisitDayRow = { day: string; visits: number; unique_visitors: number }
+type SiteVisitMonthRow = { month: string; visits: number; unique_visitors: number }
+type SiteVisitStats = {
+  today: { visits: number; unique_visitors: number }
+  thisMonth: { visits: number; unique_visitors: number }
+  daily: SiteVisitDayRow[]
+  monthly: SiteVisitMonthRow[]
+}
+
+function isoDateLocal(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+}
+
+// "Today" and "7/30/90 days" all end on today; only the start moves.
+function quickVisitRange(days: number) {
+  const to = new Date()
+  const from = new Date(to.getFullYear(), to.getMonth(), to.getDate() - (days - 1))
+  return { from: isoDateLocal(from), to: isoDateLocal(to) }
+}
+
+// Site visits: how many people (and how many distinct people) hit the site,
+// per day over a filterable range and per month over the last year. Its own
+// self-contained panel - own data fetch, own date filter - rather than
+// folded into the report-wide date range above, since it comes from a
+// completely different source (site_visits, recorded by
+// components/site-visit-tracker.tsx) than everything else on this tab.
+function SiteVisitsPanel() {
+  const [range, setRange] = useState(() => quickVisitRange(30))
+  const [stats, setStats] = useState<SiteVisitStats | null>(null)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/admin/analytics/site-visits?from=${range.from}&to=${range.to}`)
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data.message || "Could not load site-visit analytics.")
+        if (!cancelled) {
+          setStats(data)
+          setError("")
+        }
+      } catch (err: any) {
+        if (!cancelled) setError(err.message || "Could not load site-visit analytics.")
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [range.from, range.to])
+
+  const dailyData = (stats?.daily || []).map(row => ({
+    label: new Date(row.day).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+    visits: row.visits,
+    unique_visitors: row.unique_visitors,
+  }))
+  const monthlyData = (stats?.monthly || []).map(row => ({
+    label: new Date(row.month).toLocaleDateString(undefined, { month: "short", year: "2-digit" }),
+    visits: row.visits,
+    unique_visitors: row.unique_visitors,
+  }))
+  const presets = [
+    { label: "Today", days: 1 },
+    { label: "Last 7 days", days: 7 },
+    { label: "Last 30 days", days: 30 },
+    { label: "Last 90 days", days: 90 },
+  ]
+
+  return (
+    <Panel title="Site visits">
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="space-y-1">
+          <Label htmlFor="visits-from">From</Label>
+          <Input id="visits-from" type="date" value={range.from} onChange={e => setRange(r => ({ ...r, from: e.target.value }))} className="w-auto" />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="visits-to">To</Label>
+          <Input id="visits-to" type="date" value={range.to} onChange={e => setRange(r => ({ ...r, to: e.target.value }))} className="w-auto" />
+        </div>
+        <div className="flex items-center gap-1.5 pb-2.5 flex-wrap">
+          {presets.map(preset => (
+            <button
+              key={preset.label}
+              type="button"
+              onClick={() => setRange(quickVisitRange(preset.days))}
+              className="rounded bg-slate-100 dark:bg-[#1A2740] px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350]"
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {error ? (
+        <p className="rounded bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">{error}</p>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatCard icon={Globe} label="Visits today" value={stats?.today.visits ?? "-"} accent="blue" />
+            <StatCard icon={Users} label="Unique visitors today" value={stats?.today.unique_visitors ?? "-"} accent="purple" />
+            <StatCard icon={Globe} label="Visits this month" value={stats?.thisMonth.visits ?? "-"} accent="blue" />
+            <StatCard icon={Users} label="Unique visitors this month" value={stats?.thisMonth.unique_visitors ?? "-"} accent="purple" />
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Daily ({range.from} to {range.to})</p>
+              {dailyData.length === 0 ? (
+                <Empty text="No visits recorded in this range yet." />
+              ) : (
+                <ChartFrame filename={`site-visits-daily-${range.from}-to-${range.to}`}>
+                  <ChartContainer config={siteVisitsChartConfig} className="h-[260px] w-full">
+                    <LineChart data={dailyData} margin={{ left: 4, right: 12, top: 8, bottom: 0 }}>
+                      <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                      <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={11} minTickGap={16} />
+                      <YAxis tickLine={false} axisLine={false} fontSize={11} width={28} allowDecimals={false} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <ChartLegend content={<ChartLegendContent />} />
+                      <Line type="monotone" dataKey="visits" stroke="var(--color-visits)" strokeWidth={2} dot={{ r: 3 }} />
+                      <Line type="monotone" dataKey="unique_visitors" stroke="var(--color-unique_visitors)" strokeWidth={2} dot={{ r: 3 }} />
+                    </LineChart>
+                  </ChartContainer>
+                </ChartFrame>
+              )}
+            </div>
+
+            <div>
+              <p className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Monthly (last 12 months)</p>
+              {monthlyData.length === 0 ? (
+                <Empty text="No visits recorded yet." />
+              ) : (
+                <ChartFrame filename="site-visits-monthly">
+                  <ChartContainer config={siteVisitsChartConfig} className="h-[260px] w-full">
+                    <LineChart data={monthlyData} margin={{ left: 4, right: 12, top: 8, bottom: 0 }}>
+                      <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                      <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={11} />
+                      <YAxis tickLine={false} axisLine={false} fontSize={11} width={28} allowDecimals={false} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <ChartLegend content={<ChartLegendContent />} />
+                      <Line type="monotone" dataKey="visits" stroke="var(--color-visits)" strokeWidth={2} dot={{ r: 3 }} />
+                      <Line type="monotone" dataKey="unique_visitors" stroke="var(--color-unique_visitors)" strokeWidth={2} dot={{ r: 3 }} />
+                    </LineChart>
+                  </ChartContainer>
+                </ChartFrame>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </Panel>
+  )
+}
+
+function ReportsView({ organizations, needs, donations, profiles, gifts, withdrawals }: { organizations: Organization[]; needs: Need[]; donations: AdminDonation[]; profiles: Profile[]; gifts: AdminGift[]; withdrawals: AdminWithdrawal[] }) {
   const [from, setFrom] = useState("")
   const [to, setTo] = useState("")
 
@@ -1968,17 +2916,45 @@ function ReportsView({ organizations, needs, donations, profiles }: { organizati
   const filteredNeeds = useMemo(() => needs.filter(n => inRange(n.created_at)), [needs, from, to])
   const filteredDonations = useMemo(() => donations.filter(d => inRange(d.created_at)), [donations, from, to])
   const filteredProfiles = useMemo(() => profiles.filter(p => inRange(p.created_at)), [profiles, from, to])
+  const filteredGifts = useMemo(() => gifts.filter(g => inRange(g.created_at)), [gifts, from, to])
+  const filteredWithdrawals = useMemo(() => withdrawals.filter(w => inRange(w.created_at)), [withdrawals, from, to])
 
-  const approvedOrgs = filteredOrgs.filter(o => o.verification_status === "approved").length
-  const rejectedOrgs = filteredOrgs.filter(o => o.verification_status === "rejected").length
-  const fulfilledNeeds = filteredNeeds.filter(n => n.status === "fulfilled").length
+  // One gift offering can carry several claims (one per interested
+  // organization), so they're flattened out of `gifts` here rather than
+  // counted per-offering - "New Claims" means claims submitted, not
+  // offerings claimed. The parent offering's title/type comes along so the
+  // claims CSV export can show what each claim was actually for.
+  const allClaims = useMemo(
+    () => gifts.flatMap(g => g.claims.map(c => ({ ...c, gift_title: g.title, gift_offering_type: g.offering_type }))),
+    [gifts]
+  )
+  const filteredClaims = useMemo(() => allClaims.filter(c => inRange(c.created_at)), [allClaims, from, to])
+
+  // All-time totals for the overview tiles above the date filter - these are
+  // deliberately NOT scoped by from/to, since they sit above the "Report
+  // date range" panel and are meant to answer "how is the platform doing
+  // overall", not "what happened in the selected range" (that's what the
+  // charts below the filter are for).
+  const totalApprovedOrgs = organizations.filter(o => o.verification_status === "approved").length
+  const totalFulfilledNeeds = needs.filter(n => n.status === "fulfilled").length
+  const allSuccessfulDonations = donations.filter(d => d.status === "successful")
+  const totalDonatedAllTime = allSuccessfulDonations.reduce((sum, d) => sum + Number(d.amount || 0), 0)
+  const totalPlatformSupportAllTime = allSuccessfulDonations.filter(d => d.is_platform_donation).reduce((sum, d) => sum + Number(d.amount || 0), 0)
+  const totalPaidOutAllTime = withdrawals.filter(w => w.status === "paid").reduce((sum, w) => sum + Number(w.amount || 0), 0)
+
   const successfulDonations = filteredDonations.filter(d => d.status === "successful")
-  const totalDonated = successfulDonations.reduce((sum, d) => sum + Number(d.amount || 0), 0)
+  // "Support The Platform" donations (see 20260926000400_platform_donations.sql)
+  // are a subset of the same donations table - a direct gift to HelpLift
+  // itself, not toward any need. Broken out here rather than just a raw
+  // total so its trend over time is visible, same as every other figure
+  // on this tab.
+  const successfulPlatformDonations = successfulDonations.filter(d => d.is_platform_donation)
+  const paidWithdrawals = filteredWithdrawals.filter(w => w.status === "paid")
 
   const rangeLabel = from || to ? `${from || "the start"} to ${to || "now"}` : "all time"
 
   const timeline = useMemo(() => {
-    const allDates = [...filteredOrgs, ...filteredProfiles, ...filteredNeeds, ...filteredDonations].map(x => x.created_at)
+    const allDates = [...filteredOrgs, ...filteredProfiles, ...filteredNeeds, ...filteredDonations, ...filteredClaims, ...filteredGifts, ...filteredWithdrawals].map(x => x.created_at)
     if (allDates.length === 0) return { granularity: "month" as Granularity, keys: [] as string[] }
     const times = allDates.map(d => new Date(d).getTime())
     const startDate = from ? new Date(from) : new Date(Math.min(...times))
@@ -1993,7 +2969,7 @@ function ReportsView({ organizations, needs, donations, profiles }: { organizati
       guard++
     }
     return { granularity, keys }
-  }, [filteredOrgs, filteredProfiles, filteredNeeds, filteredDonations, from, to])
+  }, [filteredOrgs, filteredProfiles, filteredNeeds, filteredDonations, filteredClaims, filteredGifts, filteredWithdrawals, from, to])
 
   const growthData = useMemo(() => {
     const { granularity, keys } = timeline
@@ -2014,6 +2990,32 @@ function ReportsView({ organizations, needs, donations, profiles }: { organizati
     return keys.map(key => ({ period: bucketLabel(key, granularity), amount: amounts.get(key) || 0 }))
   }, [timeline, successfulDonations])
 
+  const platformSupportTrendData = useMemo(() => {
+    const { granularity, keys } = timeline
+    const amounts = sumByBucket(successfulPlatformDonations, d => d.created_at, d => Number(d.amount || 0), granularity)
+    return keys.map(key => ({ period: bucketLabel(key, granularity), amount: amounts.get(key) || 0 }))
+  }, [timeline, successfulPlatformDonations])
+
+  const claimsTrendData = useMemo(() => {
+    const { granularity, keys } = timeline
+    const counts = countByBucket(filteredClaims, c => c.created_at, granularity)
+    return keys.map(key => ({ period: bucketLabel(key, granularity), claims: counts.get(key) || 0 }))
+  }, [timeline, filteredClaims])
+
+  // Deliberately uses every claim, not filteredClaims - "how many claims are
+  // currently sitting in each status" is a snapshot of the review queue
+  // right now, not something tied to when they were submitted (same
+  // reasoning as giftStatusData/withdrawalStatusData further down).
+  const claimStatusData = useMemo(() => {
+    const counts: Record<string, number> = { approved: 0, pending: 0, rejected: 0 }
+    for (const c of allClaims) counts[c.status] = (counts[c.status] || 0) + 1
+    return [
+      { status: "approved", value: counts.approved },
+      { status: "pending", value: counts.pending },
+      { status: "rejected", value: counts.rejected },
+    ].filter(d => d.value > 0)
+  }, [allClaims])
+
   const needsByCategory = useMemo(() => {
     const counts = new Map<string, number>()
     for (const n of filteredNeeds) counts.set(n.category, (counts.get(n.category) || 0) + 1)
@@ -2023,19 +3025,69 @@ function ReportsView({ organizations, needs, donations, profiles }: { organizati
       .slice(0, 8)
   }, [filteredNeeds])
 
-  const orgStatusData = useMemo(() => {
-    const counts: Record<string, number> = { approved: 0, pending: 0, more_info_requested: 0, rejected: 0 }
-    for (const o of filteredOrgs) counts[o.verification_status] = (counts[o.verification_status] || 0) + 1
+  const giftsTrendData = useMemo(() => {
+    const { granularity, keys } = timeline
+    const counts = countByBucket(filteredGifts, g => g.created_at, granularity)
+    return keys.map(key => ({ period: bucketLabel(key, granularity), gifts: counts.get(key) || 0 }))
+  }, [timeline, filteredGifts])
+
+  // Every gift offering's CURRENT status, not filteredGifts - same reasoning
+  // as claimStatusData: "what's sitting in the library right now" is a
+  // snapshot, not tied to when each offering was originally submitted.
+  const giftStatusData = useMemo(() => {
+    const counts: Record<string, number> = { approved: 0, pending: 0, rejected: 0, claimed: 0 }
+    for (const g of gifts) counts[g.status] = (counts[g.status] || 0) + 1
     return [
       { status: "approved", value: counts.approved },
       { status: "pending", value: counts.pending },
-      { status: "more_info_requested", value: counts.more_info_requested },
+      { status: "claimed", value: counts.claimed },
       { status: "rejected", value: counts.rejected },
     ].filter(d => d.value > 0)
-  }, [filteredOrgs])
+  }, [gifts])
+
+  const withdrawalsTrendData = useMemo(() => {
+    const { granularity, keys } = timeline
+    const amounts = sumByBucket(paidWithdrawals, w => w.created_at, w => Number(w.amount || 0), granularity)
+    return keys.map(key => ({ period: bucketLabel(key, granularity), amount: amounts.get(key) || 0 }))
+  }, [timeline, paidWithdrawals])
+
+  // Every withdrawal request's CURRENT status, not filteredWithdrawals -
+  // same reasoning as giftStatusData/claimStatusData.
+  const withdrawalStatusData = useMemo(() => {
+    const counts: Record<string, number> = { pending: 0, approved: 0, paid: 0, rejected: 0, cancelled: 0 }
+    for (const w of withdrawals) counts[w.status] = (counts[w.status] || 0) + 1
+    return [
+      { status: "paid", value: counts.paid },
+      { status: "approved", value: counts.approved },
+      { status: "pending", value: counts.pending },
+      { status: "rejected", value: counts.rejected },
+      { status: "cancelled", value: counts.cancelled },
+    ].filter(d => d.value > 0)
+  }, [withdrawals])
 
   return (
     <div className="space-y-6">
+      <SiteVisitsPanel />
+
+      {/* All-time totals - the platform's overall state, unaffected by the
+          date filter below. A status breakdown (approved/rejected/pending/
+          etc.) for claims, gifts, orgs and withdrawals already has its own
+          chart further down, so it isn't repeated as a tile too. */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatCard icon={Building2} label="Organizations" value={organizations.length} accent="blue" />
+        <StatCard icon={CheckCircle2} label="Approved Orgs" value={totalApprovedOrgs} accent="emerald" />
+        <StatCard icon={Users} label="Users" value={profiles.length} accent="purple" />
+        <StatCard icon={ClipboardList} label="Needs" value={needs.length} accent="emerald" />
+        <StatCard icon={PackageCheck} label="Fulfilled Needs" value={totalFulfilledNeeds} accent="emerald" />
+        <StatCard icon={Banknote} label="Successful Donations" value={allSuccessfulDonations.length} accent="amber" />
+        <StatCard icon={Banknote} label="Total Donated" value={totalDonatedAllTime} prefix="R" decimals={2} accent="purple" />
+        <StatCard icon={Heart} label="Platform Support" value={totalPlatformSupportAllTime} prefix="R" decimals={2} accent="pink" />
+        <StatCard icon={Gift} label="Claims" value={allClaims.length} accent="blue" />
+        <StatCard icon={Gift} label="Gift Offerings" value={gifts.length} accent="purple" />
+        <StatCard icon={Wallet} label="Withdrawal Requests" value={withdrawals.length} accent="blue" />
+        <StatCard icon={Banknote} label="Paid Out" value={totalPaidOutAllTime} prefix="R" decimals={2} accent="emerald" />
+      </div>
+
       <Panel title="Report date range">
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
@@ -2055,34 +3107,25 @@ function ReportsView({ organizations, needs, donations, profiles }: { organizati
         </div>
       </Panel>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard icon={Building2} label="New Organizations" value={filteredOrgs.length} accent="blue" />
-        <StatCard icon={CheckCircle2} label="Approved Orgs" value={approvedOrgs} accent="emerald" />
-        <StatCard icon={XCircle} label="Rejected Orgs" value={rejectedOrgs} accent="amber" />
-        <StatCard icon={Users} label="New Users" value={filteredProfiles.length} accent="purple" />
-        <StatCard icon={ClipboardList} label="New Needs" value={filteredNeeds.length} accent="emerald" />
-        <StatCard icon={PackageCheck} label="Fulfilled Needs" value={fulfilledNeeds} accent="emerald" />
-        <StatCard icon={Banknote} label="Successful Donations" value={successfulDonations.length} accent="amber" />
-        <StatCard icon={Banknote} label="Total Donated" value={formatCurrency(totalDonated)} accent="purple" />
-      </div>
-
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <Panel title="Platform growth">
           {growthData.length === 0 ? (
             <Empty text="No activity in this range yet." />
           ) : (
-            <ChartContainer config={growthChartConfig} className="h-[280px] w-full">
-              <LineChart data={growthData} margin={{ left: 4, right: 12, top: 8, bottom: 0 }}>
-                <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                <XAxis dataKey="period" tickLine={false} axisLine={false} fontSize={11} />
-                <YAxis tickLine={false} axisLine={false} fontSize={11} width={28} allowDecimals={false} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <ChartLegend content={<ChartLegendContent />} />
-                <Line type="monotone" dataKey="organizations" stroke="var(--color-organizations)" strokeWidth={2} dot={{ r: 3 }} />
-                <Line type="monotone" dataKey="users" stroke="var(--color-users)" strokeWidth={2} dot={{ r: 3 }} />
-                <Line type="monotone" dataKey="needs" stroke="var(--color-needs)" strokeWidth={2} dot={{ r: 3 }} />
-              </LineChart>
-            </ChartContainer>
+            <ChartFrame filename="platform-growth">
+              <ChartContainer config={growthChartConfig} className="h-[280px] w-full">
+                <LineChart data={growthData} margin={{ left: 4, right: 12, top: 8, bottom: 0 }}>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                  <XAxis dataKey="period" tickLine={false} axisLine={false} fontSize={11} />
+                  <YAxis tickLine={false} axisLine={false} fontSize={11} width={28} allowDecimals={false} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <ChartLegend content={<ChartLegendContent />} />
+                  <Line type="monotone" dataKey="organizations" stroke="var(--color-organizations)" strokeWidth={2} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="users" stroke="var(--color-users)" strokeWidth={2} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="needs" stroke="var(--color-needs)" strokeWidth={2} dot={{ r: 3 }} />
+                </LineChart>
+              </ChartContainer>
+            </ChartFrame>
           )}
         </Panel>
 
@@ -2090,15 +3133,35 @@ function ReportsView({ organizations, needs, donations, profiles }: { organizati
           {donationsTrendData.every(d => d.amount === 0) ? (
             <Empty text="No successful donations in this range yet." />
           ) : (
-            <ChartContainer config={donationsChartConfig} className="h-[280px] w-full">
-              <AreaChart data={donationsTrendData} margin={{ left: 4, right: 12, top: 8, bottom: 0 }}>
-                <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                <XAxis dataKey="period" tickLine={false} axisLine={false} fontSize={11} />
-                <YAxis tickLine={false} axisLine={false} fontSize={11} width={64} tickFormatter={(v) => formatCurrency(Number(v))} />
-                <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
-                <Area type="monotone" dataKey="amount" stroke="var(--color-amount)" fill="var(--color-amount)" fillOpacity={0.15} strokeWidth={2} />
-              </AreaChart>
-            </ChartContainer>
+            <ChartFrame filename="donations-trend">
+              <ChartContainer config={donationsChartConfig} className="h-[280px] w-full">
+                <AreaChart data={donationsTrendData} margin={{ left: 4, right: 12, top: 8, bottom: 0 }}>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                  <XAxis dataKey="period" tickLine={false} axisLine={false} fontSize={11} />
+                  <YAxis tickLine={false} axisLine={false} fontSize={11} width={64} tickFormatter={(v) => formatCurrency(Number(v))} />
+                  <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
+                  <Area type="monotone" dataKey="amount" stroke="var(--color-amount)" fill="var(--color-amount)" fillOpacity={0.15} strokeWidth={2} />
+                </AreaChart>
+              </ChartContainer>
+            </ChartFrame>
+          )}
+        </Panel>
+
+        <Panel title="Platform support trend">
+          {platformSupportTrendData.every(d => d.amount === 0) ? (
+            <Empty text="No successful platform-support donations in this range yet." />
+          ) : (
+            <ChartFrame filename="platform-support-trend">
+              <ChartContainer config={platformSupportChartConfig} className="h-[280px] w-full">
+                <AreaChart data={platformSupportTrendData} margin={{ left: 4, right: 12, top: 8, bottom: 0 }}>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                  <XAxis dataKey="period" tickLine={false} axisLine={false} fontSize={11} />
+                  <YAxis tickLine={false} axisLine={false} fontSize={11} width={64} tickFormatter={(v) => formatCurrency(Number(v))} />
+                  <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
+                  <Area type="monotone" dataKey="amount" stroke="var(--color-amount)" fill="var(--color-amount)" fillOpacity={0.15} strokeWidth={2} />
+                </AreaChart>
+              </ChartContainer>
+            </ChartFrame>
           )}
         </Panel>
 
@@ -2106,33 +3169,131 @@ function ReportsView({ organizations, needs, donations, profiles }: { organizati
           {needsByCategory.length === 0 ? (
             <Empty text="No needs in this range yet." />
           ) : (
-            <ChartContainer config={needsCategoryChartConfig} className="h-[280px] w-full">
-              <BarChart data={needsByCategory} layout="vertical" margin={{ left: 12, right: 12, top: 8, bottom: 0 }}>
-                <CartesianGrid horizontal={false} strokeDasharray="3 3" />
-                <XAxis type="number" tickLine={false} axisLine={false} fontSize={11} allowDecimals={false} />
-                <YAxis type="category" dataKey="category" tickLine={false} axisLine={false} fontSize={11} width={110} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="count" fill="var(--color-count)" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ChartContainer>
+            <ChartFrame filename="needs-by-category">
+              <ChartContainer config={needsCategoryChartConfig} className="h-[280px] w-full">
+                <BarChart data={needsByCategory} layout="vertical" margin={{ left: 12, right: 12, top: 8, bottom: 0 }}>
+                  <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+                  <XAxis type="number" tickLine={false} axisLine={false} fontSize={11} allowDecimals={false} />
+                  <YAxis type="category" dataKey="category" tickLine={false} axisLine={false} fontSize={11} width={110} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="count" fill="var(--color-count)" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ChartContainer>
+            </ChartFrame>
           )}
         </Panel>
 
-        <Panel title="Organization verification status">
-          {orgStatusData.length === 0 ? (
-            <Empty text="No organizations in this range yet." />
+        <Panel title="Gift claims trend">
+          {claimsTrendData.every(d => d.claims === 0) ? (
+            <Empty text="No gift claims in this range yet." />
           ) : (
-            <ChartContainer config={orgStatusChartConfig} className="h-[280px] w-full">
-              <PieChart>
-                <ChartTooltip content={<ChartTooltipContent nameKey="status" />} />
-                <Pie data={orgStatusData} dataKey="value" nameKey="status" innerRadius={55} outerRadius={90} strokeWidth={2} stroke="var(--background)">
-                  {orgStatusData.map((entry) => (
-                    <Cell key={entry.status} fill={`var(--color-${entry.status})`} />
-                  ))}
-                </Pie>
-                <ChartLegend content={<ChartLegendContent nameKey="status" />} />
-              </PieChart>
-            </ChartContainer>
+            <ChartFrame filename="gift-claims-trend">
+              <ChartContainer config={claimsChartConfig} className="h-[280px] w-full">
+                <AreaChart data={claimsTrendData} margin={{ left: 4, right: 12, top: 8, bottom: 0 }}>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                  <XAxis dataKey="period" tickLine={false} axisLine={false} fontSize={11} />
+                  <YAxis tickLine={false} axisLine={false} fontSize={11} width={28} allowDecimals={false} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Area type="monotone" dataKey="claims" stroke="var(--color-claims)" fill="var(--color-claims)" fillOpacity={0.15} strokeWidth={2} />
+                </AreaChart>
+              </ChartContainer>
+            </ChartFrame>
+          )}
+        </Panel>
+
+        <Panel title="Gift claims by status">
+          {claimStatusData.length === 0 ? (
+            <Empty text="No gift claims yet." />
+          ) : (
+            <ChartFrame filename="gift-claims-by-status">
+              <ChartContainer config={claimStatusChartConfig} className="h-[280px] w-full">
+                <PieChart>
+                  <ChartTooltip content={<ChartTooltipContent nameKey="status" />} />
+                  <Pie data={claimStatusData} dataKey="value" nameKey="status" innerRadius={55} outerRadius={90} strokeWidth={2} stroke="var(--background)">
+                    {claimStatusData.map((entry) => (
+                      <Cell key={entry.status} fill={`var(--color-${entry.status})`} />
+                    ))}
+                  </Pie>
+                  <ChartLegend content={<ChartLegendContent nameKey="status" />} />
+                </PieChart>
+              </ChartContainer>
+            </ChartFrame>
+          )}
+        </Panel>
+
+        <Panel title="Gift Library trend">
+          {giftsTrendData.every(d => d.gifts === 0) ? (
+            <Empty text="No gift offerings in this range yet." />
+          ) : (
+            <ChartFrame filename="gift-library-trend">
+              <ChartContainer config={giftsChartConfig} className="h-[280px] w-full">
+                <AreaChart data={giftsTrendData} margin={{ left: 4, right: 12, top: 8, bottom: 0 }}>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                  <XAxis dataKey="period" tickLine={false} axisLine={false} fontSize={11} />
+                  <YAxis tickLine={false} axisLine={false} fontSize={11} width={28} allowDecimals={false} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Area type="monotone" dataKey="gifts" stroke="var(--color-gifts)" fill="var(--color-gifts)" fillOpacity={0.15} strokeWidth={2} />
+                </AreaChart>
+              </ChartContainer>
+            </ChartFrame>
+          )}
+        </Panel>
+
+        <Panel title="Gift Library by status">
+          {giftStatusData.length === 0 ? (
+            <Empty text="No gift offerings yet." />
+          ) : (
+            <ChartFrame filename="gift-library-by-status">
+              <ChartContainer config={giftStatusChartConfig} className="h-[280px] w-full">
+                <PieChart>
+                  <ChartTooltip content={<ChartTooltipContent nameKey="status" />} />
+                  <Pie data={giftStatusData} dataKey="value" nameKey="status" innerRadius={55} outerRadius={90} strokeWidth={2} stroke="var(--background)">
+                    {giftStatusData.map((entry) => (
+                      <Cell key={entry.status} fill={`var(--color-${entry.status})`} />
+                    ))}
+                  </Pie>
+                  <ChartLegend content={<ChartLegendContent nameKey="status" />} />
+                </PieChart>
+              </ChartContainer>
+            </ChartFrame>
+          )}
+        </Panel>
+
+        <Panel title="Withdrawals trend (paid out)">
+          {withdrawalsTrendData.every(d => d.amount === 0) ? (
+            <Empty text="No paid withdrawals in this range yet." />
+          ) : (
+            <ChartFrame filename="withdrawals-trend">
+              <ChartContainer config={withdrawalsChartConfig} className="h-[280px] w-full">
+                <AreaChart data={withdrawalsTrendData} margin={{ left: 4, right: 12, top: 8, bottom: 0 }}>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                  <XAxis dataKey="period" tickLine={false} axisLine={false} fontSize={11} />
+                  <YAxis tickLine={false} axisLine={false} fontSize={11} width={64} tickFormatter={(v) => formatCurrency(Number(v))} />
+                  <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />} />
+                  <Area type="monotone" dataKey="amount" stroke="var(--color-amount)" fill="var(--color-amount)" fillOpacity={0.15} strokeWidth={2} />
+                </AreaChart>
+              </ChartContainer>
+            </ChartFrame>
+          )}
+        </Panel>
+
+        <Panel title="Withdrawals by status">
+          {withdrawalStatusData.length === 0 ? (
+            <Empty text="No withdrawal requests yet." />
+          ) : (
+            <ChartFrame filename="withdrawals-by-status">
+              <ChartContainer config={withdrawalStatusChartConfig} className="h-[280px] w-full">
+                <PieChart>
+                  <ChartTooltip content={<ChartTooltipContent nameKey="status" />} />
+                  <Pie data={withdrawalStatusData} dataKey="value" nameKey="status" innerRadius={55} outerRadius={90} strokeWidth={2} stroke="var(--background)">
+                    {withdrawalStatusData.map((entry) => (
+                      <Cell key={entry.status} fill={`var(--color-${entry.status})`} />
+                    ))}
+                  </Pie>
+                  <ChartLegend content={<ChartLegendContent nameKey="status" />} />
+                </PieChart>
+              </ChartContainer>
+            </ChartFrame>
           )}
         </Panel>
       </div>
@@ -2187,6 +3348,44 @@ function ReportsView({ organizations, needs, donations, profiles }: { organizati
               { header: "Joined", value: p => new Date(p.created_at).toISOString() },
             ]))}
           />
+          <ExportButton
+            label="Gift Claims"
+            onClick={() => downloadCsv(`gift-claims-${Date.now()}.csv`, toCsv(filteredClaims, [
+              { header: "Gift Offering", value: c => c.gift_title },
+              { header: "Offering Type", value: c => c.gift_offering_type },
+              { header: "Organization", value: c => c.organization_name },
+              { header: "Motivation", value: c => c.motivation },
+              { header: "Status", value: c => c.status },
+              { header: "Notes", value: c => c.claim_notes },
+              { header: "Created", value: c => new Date(c.created_at).toISOString() },
+            ]))}
+          />
+          <ExportButton
+            label="Gift Library"
+            onClick={() => downloadCsv(`gift-library-${Date.now()}.csv`, toCsv(filteredGifts, [
+              { header: "Title", value: g => g.title },
+              { header: "Type", value: g => g.offering_type },
+              { header: "Giver", value: g => g.givers?.name },
+              { header: "Giver Email", value: g => g.givers?.email },
+              { header: "Quantity/Value", value: g => g.quantity_or_value },
+              { header: "Status", value: g => g.status },
+              { header: "Rejection Reason", value: g => g.rejection_reason },
+              { header: "Claims", value: g => g.claims.length },
+              { header: "Created", value: g => new Date(g.created_at).toISOString() },
+            ]))}
+          />
+          <ExportButton
+            label="Withdrawals"
+            onClick={() => downloadCsv(`withdrawals-${Date.now()}.csv`, toCsv(filteredWithdrawals, [
+              { header: "Organization", value: w => firstOf(w.organizations)?.name },
+              { header: "Requested By", value: w => firstOf(w.requester)?.full_name },
+              { header: "Amount", value: w => w.amount },
+              { header: "Status", value: w => w.status },
+              { header: "Rejection Reason", value: w => w.rejection_reason },
+              { header: "Paid At", value: w => w.paid_at ? new Date(w.paid_at).toISOString() : "" },
+              { header: "Created", value: w => new Date(w.created_at).toISOString() },
+            ]))}
+          />
         </div>
       </Panel>
     </div>
@@ -2198,7 +3397,7 @@ function ExportButton({ label, onClick }: { label: string; onClick: () => void }
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-[#233350] px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+      className="inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
     >
       <Download className="w-3.5 h-3.5" /> Export {label}
     </button>
@@ -2220,17 +3419,22 @@ type AdminStory = {
 }
 
 // Impact stories are only public once an administrator approves them.
-function StoriesView({ stories, onReview }: { stories: AdminStory[]; onReview: (id: string, status: "approved" | "rejected", reason?: string) => void }) {
+function StoriesView({ stories, onReview }: { stories: AdminStory[]; onReview: (id: string, status: "approved" | "rejected", reason?: string) => void | Promise<void> }) {
   const [filter, setFilter] = useState<"pending" | "all">("pending")
   const visible = filter === "pending" ? stories.filter(s => s.status === "pending") : stories
+  const [busy, setBusy] = useState<{ id: string; action: string } | null>(null)
+  const run = async (id: string, action: string, fn: () => void | Promise<void>) => {
+    setBusy({ id, action })
+    try { await fn() } finally { setBusy(null) }
+  }
 
   return (
     <Panel
       title="Impact stories"
       toolbar={
         <div className="flex items-center gap-2 text-xs font-bold">
-          <button onClick={() => setFilter("pending")} className={`rounded-full px-3 py-1.5 ${filter === "pending" ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-[#1A2740]"}`}>Awaiting review</button>
-          <button onClick={() => setFilter("all")} className={`rounded-full px-3 py-1.5 ${filter === "all" ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-[#1A2740]"}`}>All stories</button>
+          <button onClick={() => setFilter("pending")} className={`rounded px-3 py-1.5 ${filter === "pending" ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-[#1A2740]"}`}>Awaiting review</button>
+          <button onClick={() => setFilter("all")} className={`rounded px-3 py-1.5 ${filter === "all" ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-[#1A2740]"}`}>All stories</button>
         </div>
       }
     >
@@ -2243,21 +3447,33 @@ function StoriesView({ stories, onReview }: { stories: AdminStory[]; onReview: (
           : story.status === "rejected" ? "bg-red-100 text-red-700 border-red-200"
           : "bg-amber-100 text-amber-700 border-amber-200"
         return (
-          <article key={story.id} className="rounded-2xl border border-slate-200 dark:border-[#233350] p-4 space-y-3">
+          <article key={story.id} className="rounded border border-slate-200 dark:border-[#233350] p-4 space-y-3">
             <div className="flex items-start justify-between gap-3 flex-wrap">
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="font-bold text-base">{story.title}</h3>
-                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border capitalize ${badge}`}>{story.status === "pending" ? "Awaiting review" : story.status}</span>
+                  <span className={`px-2 py-0.5 rounded text-[11px] font-bold border capitalize ${badge}`}>{story.status === "pending" ? "Awaiting review" : story.status}</span>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400">{org?.name || "Organization"} · {story.author_role || "Staff"} · {new Date(story.created_at).toLocaleDateString()}</p>
               </div>
               <div className="flex items-center gap-2">
                 {story.status !== "approved" && (
-                  <button onClick={() => onReview(story.id, "approved")} className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700">Approve &amp; Publish</button>
+                  <button
+                    onClick={() => run(story.id, "approve", () => onReview(story.id, "approved"))}
+                    disabled={busy?.id === story.id}
+                    className="inline-flex items-center gap-1.5 rounded bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+                  >
+                    {busy?.id === story.id && busy.action === "approve" && <Loader2 className="w-3 h-3 animate-spin" />}
+                    Approve &amp; Publish
+                  </button>
                 )}
                 {story.status !== "rejected" && (
-                  <button onClick={() => onReview(story.id, "rejected")} className="rounded-full border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 px-3 py-1.5 text-xs font-bold hover:bg-red-50 dark:hover:bg-red-950/30">
+                  <button
+                    onClick={() => story.status === "approved" ? run(story.id, "unpublish", () => onReview(story.id, "rejected")) : onReview(story.id, "rejected")}
+                    disabled={busy?.id === story.id}
+                    className="inline-flex items-center gap-1.5 rounded border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 px-3 py-1.5 text-xs font-bold hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-60"
+                  >
+                    {busy?.id === story.id && busy.action === "unpublish" && <Loader2 className="w-3 h-3 animate-spin" />}
                     {story.status === "approved" ? "Unpublish" : "Reject"}
                   </button>
                 )}
@@ -2299,6 +3515,28 @@ function Panel({ title, toolbar, children }: { title: string; toolbar?: React.Re
   )
 }
 
+// Wraps a chart with a small "Download" button that saves it as a .png image.
+// Wraps a chart with a small "Download" button that saves it as a real .png
+// image of the chart itself (colors, legend and all) - see
+// lib/chart-export.ts for why the whole container, not just the <svg>.
+function ChartFrame({ filename, children }: { filename: string; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  return (
+    <div>
+      <div className="flex justify-end mb-1">
+        <button
+          type="button"
+          onClick={() => downloadChartAsImage(ref.current, filename)}
+          className="inline-flex items-center gap-1 rounded border border-slate-200 dark:border-[#233350] px-2.5 py-1 text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+        >
+          <Download className="w-3 h-3" /> Download
+        </button>
+      </div>
+      <div ref={ref}>{children}</div>
+    </div>
+  )
+}
+
 function SearchSortBar({
   query,
   onQuery,
@@ -2322,13 +3560,13 @@ function SearchSortBar({
           value={query}
           onChange={event => onQuery(event.target.value)}
           placeholder={placeholder}
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+          className="w-full pl-10 pr-4 py-2.5 rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
         />
       </div>
       <select
         value={sort}
         onChange={event => onSort(event.target.value)}
-        className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] text-sm font-semibold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+        className="px-4 py-2.5 rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] text-sm font-semibold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
       >
         {sortOptions.map(option => (
           <option key={option.value} value={option.value}>{option.label}</option>
@@ -2340,8 +3578,9 @@ function SearchSortBar({
 
 function SuspendFields({ profile }: { profile: Profile }) {
   const [suspended, setSuspended] = useState(!!profile.suspended)
+  const reasonRef = useRef<HTMLTextAreaElement>(null)
   return (
-    <div className="space-y-2 rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/20 p-3">
+    <div className="space-y-2 rounded border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/20 p-3">
       <label className="flex items-center gap-2 text-sm font-bold text-amber-800 dark:text-amber-300">
         <input type="checkbox" name="suspended" defaultChecked={profile.suspended || false} onChange={(e) => setSuspended(e.target.checked)} />
         Suspend this account
@@ -2349,13 +3588,22 @@ function SuspendFields({ profile }: { profile: Profile }) {
       {suspended && (
         <div className="space-y-1">
           <Label htmlFor="edit-profile-suspended-reason">Reason (shown to the user)</Label>
-          <textarea
-            id="edit-profile-suspended-reason"
-            name="suspended_reason"
-            defaultValue={profile.suspended_reason || ""}
-            placeholder="E.g., violation of community guidelines"
-            className="w-full min-h-16 rounded-xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
-          />
+          <div className="relative">
+            <textarea
+              ref={reasonRef}
+              id="edit-profile-suspended-reason"
+              name="suspended_reason"
+              defaultValue={profile.suspended_reason || ""}
+              placeholder="E.g., violation of community guidelines"
+              className="w-full min-h-16 rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-3 py-2 pr-11 text-sm outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+            />
+            <MicButton
+              className="top-2 right-2"
+              onText={text => {
+                if (reasonRef.current) reasonRef.current.value = appendSpeech(reasonRef.current.value, text)
+              }}
+            />
+          </div>
         </div>
       )}
     </div>
@@ -2363,24 +3611,27 @@ function SuspendFields({ profile }: { profile: Profile }) {
 }
 
 function Empty({ text }: { text: string }) {
-  return <div className="rounded-2xl border border-dashed border-slate-300 dark:border-[#233350] p-8 text-center text-sm text-slate-500 dark:text-slate-400">{text}</div>
+  return <div className="rounded border border-dashed border-slate-300 dark:border-[#233350] p-8 text-center text-sm text-slate-500 dark:text-slate-400">{text}</div>
 }
 
-function StatCard({ icon: Icon, label, value, accent }: { icon: React.ComponentType<{ className?: string }>; label: string; value: number | string; accent: "blue" | "emerald" | "amber" | "purple" }) {
+function StatCard({ icon: Icon, label, value, accent, prefix = "", decimals = 0 }: { icon: React.ComponentType<{ className?: string }>; label: string; value: number | string; accent: "blue" | "emerald" | "amber" | "purple" | "pink"; prefix?: string; decimals?: number }) {
   const accentClasses = {
     blue: "bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400",
     emerald: "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400",
     amber: "bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400",
     purple: "bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400",
+    pink: "bg-pink-50 dark:bg-pink-950/50 text-pink-600 dark:text-pink-400",
   }[accent]
 
   return (
-    <div className="rounded-2xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] p-4 flex items-center gap-3 shadow-sm">
-      <div className={`rounded-xl p-2.5 ${accentClasses}`}>
+    <div className="rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] p-4 flex items-center gap-3 shadow-sm">
+      <div className={`rounded p-2.5 ${accentClasses}`}>
         <Icon className="w-5 h-5" />
       </div>
       <div>
-        <p className="text-2xl font-extrabold leading-none">{value}</p>
+        <p className="text-2xl font-extrabold leading-none">
+          {typeof value === "number" ? <CountUp value={value} prefix={prefix} decimals={decimals} /> : value}
+        </p>
         <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">{label}</p>
       </div>
     </div>
@@ -2389,5 +3640,5 @@ function StatCard({ icon: Icon, label, value, accent }: { icon: React.ComponentT
 
 function CountBadge({ value }: { value: number }) {
   if (value === 0) return null
-  return <span className="ml-0.5 inline-flex items-center justify-center rounded-full bg-blue-600 text-white text-[10px] font-bold min-w-[18px] h-[18px] px-1">{value}</span>
+  return <span className="ml-0.5 inline-flex items-center justify-center rounded bg-blue-600 text-white text-[10px] font-bold min-w-[18px] h-[18px] px-1">{value}</span>
 }

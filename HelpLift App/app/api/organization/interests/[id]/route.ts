@@ -26,7 +26,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       if (fulfillmentError) return NextResponse.json({ message: fulfillmentError.message }, { status: 400 })
 
       // A need moves from "open" to "in progress" once at least one giver is
-      // actively working on it — distinct from the fulfillment's own status.
+      // actively working on it - distinct from the fulfillment's own status.
       const needStatus = (interest as any).needs?.status || (interest as any).needs?.[0]?.status
       if (needStatus === "open") {
         await supabase.from("needs").update({ status: "in_progress" }).eq("id", interest.need_id).eq("status", "open")

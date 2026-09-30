@@ -1,9 +1,12 @@
 "use client"
 
-import { useState } from "react"
-import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from "recharts"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { useRef, useState } from "react"
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart, Pie, PieChart, XAxis, YAxis } from "recharts"
+import { Download } from "lucide-react"
+import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { RANGE_OPTIONS, compactNumber, type AnalyticsRange, type MonthPoint, type RankedPoint } from "@/lib/analytics"
+import { downloadChartAsImage } from "@/lib/chart-export"
+import { CountUp } from "@/components/count-up"
 
 // Chart colors are defined once, as roles, so light/dark swap in one place. The
 // series color is the validated blue (slot 1): #2a78d6 on light cards, #3987e5
@@ -60,12 +63,66 @@ export function RangeFilter({ value, onChange }: { value: AnalyticsRange; onChan
   )
 }
 
+// An explicit "From"/"To" override, alongside the quick presets above - for
+// picking a specific past window (e.g. a particular month or quarter)
+// rather than only "the last N months". Either field can be set on its own;
+// see resolveRange in lib/analytics.ts for exactly how the two combine.
+export function DateRangeFilter({
+  from,
+  to,
+  onFromChange,
+  onToChange,
+}: {
+  from: string
+  to: string
+  onFromChange: (value: string) => void
+  onToChange: (value: string) => void
+}) {
+  const inputClass = "rounded-xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-3 py-1.5 text-xs font-semibold"
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <label className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400">
+        From
+        <input type="date" value={from} onChange={e => onFromChange(e.target.value)} className={inputClass} />
+      </label>
+      <label className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400">
+        To
+        <input type="date" value={to} onChange={e => onToChange(e.target.value)} className={inputClass} />
+      </label>
+      {(from || to) && (
+        <button
+          type="button"
+          onClick={() => { onFromChange(""); onToChange("") }}
+          className="text-xs font-bold text-blue-600 hover:underline"
+        >
+          Clear dates
+        </button>
+      )}
+    </div>
+  )
+}
+
 // A single headline number. The number is the chart: no plot for one value.
-export function StatTile({ label, value, note }: { label: string; value: string; note?: string }) {
+export function StatTile({
+  label,
+  value,
+  note,
+  prefix = "",
+  decimals = 0,
+}: {
+  label: string
+  /** A number animates in with CountUp; a string (an already-formatted value, or a loading placeholder like "-") renders as-is. */
+  value: string | number
+  note?: string
+  prefix?: string
+  decimals?: number
+}) {
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] p-4">
       <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">{label}</p>
-      <p className="mt-1 text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">{value}</p>
+      <p className="mt-1 text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+        {typeof value === "number" ? <CountUp value={value} prefix={prefix} decimals={decimals} /> : value}
+      </p>
       {note && <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{note}</p>}
     </div>
   )
@@ -73,8 +130,10 @@ export function StatTile({ label, value, note }: { label: string; value: string;
 
 type Row = { label: string; value: string }
 
-// Card around each chart: title, one-line takeaway, the chart, and a table twin
-// so every value is readable without hovering.
+// Card around each chart: title, one-line takeaway, the chart, a table twin
+// so every value is readable without hovering, and a download button that
+// saves the chart itself as a .png image - only shown while the chart (not
+// the table) is on screen, since that's what gets captured.
 export function ChartCard({
   title,
   description,
@@ -93,6 +152,9 @@ export function ChartCard({
   children: React.ReactNode
 }) {
   const [showTable, setShowTable] = useState(false)
+  const chartRef = useRef<HTMLDivElement>(null)
+  const filename = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+
   return (
     <section className="rounded-3xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] p-5 space-y-3">
       <div className="flex items-start justify-between gap-3">
@@ -101,14 +163,25 @@ export function ChartCard({
           {description && <p className="text-xs text-slate-500 dark:text-slate-400">{description}</p>}
         </div>
         {!isEmpty && (
-          <button
-            type="button"
-            onClick={() => setShowTable(value => !value)}
-            aria-pressed={showTable}
-            className="shrink-0 rounded-full border border-slate-200 dark:border-[#233350] px-3 py-1 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
-          >
-            {showTable ? "View as chart" : "View as table"}
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            {!showTable && (
+              <button
+                type="button"
+                onClick={() => downloadChartAsImage(chartRef.current, filename)}
+                className="inline-flex items-center gap-1 rounded-full border border-slate-200 dark:border-[#233350] px-3 py-1 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+              >
+                <Download className="w-3 h-3" /> Download
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowTable(value => !value)}
+              aria-pressed={showTable}
+              className="rounded-full border border-slate-200 dark:border-[#233350] px-3 py-1 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+            >
+              {showTable ? "View as chart" : "View as table"}
+            </button>
+          </div>
         )}
       </div>
 
@@ -134,7 +207,7 @@ export function ChartCard({
           </table>
         </div>
       ) : (
-        children
+        <div ref={chartRef}>{children}</div>
       )}
     </section>
   )
@@ -170,6 +243,95 @@ export function MonthlyColumns({
         />
         <Bar dataKey="value" fill="var(--viz-series)" radius={[4, 4, 0, 0]} maxBarSize={24} />
       </BarChart>
+    </ChartContainer>
+  )
+}
+
+// Month-by-month filled area - the same monthly shape as MonthlyColumns, but
+// for a running total (money received, money paid out) where a continuous
+// line reads more naturally than discrete columns.
+export function MonthlyArea({
+  data,
+  seriesLabel,
+  format,
+}: {
+  data: MonthPoint[]
+  seriesLabel: string
+  format: (value: number) => string
+}) {
+  return (
+    <ChartContainer config={{ value: { label: seriesLabel, color: "var(--viz-series)" } }} className="h-[260px] w-full">
+      <AreaChart data={data} margin={{ left: 4, right: 8, top: 8, bottom: 0 }}>
+        <CartesianGrid vertical={false} stroke="var(--viz-grid)" />
+        <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: "var(--viz-axis)" }} tick={tick} tickMargin={8} minTickGap={16} />
+        <YAxis tickLine={false} axisLine={false} tick={tick} width={44} allowDecimals={false} tickFormatter={value => compactNumber(Number(value))} />
+        <ChartTooltip
+          cursor={{ stroke: "var(--viz-series)", strokeWidth: 1 }}
+          content={<ChartTooltipContent formatter={value => <span className="font-semibold">{format(Number(value))}</span>} />}
+        />
+        <Area type="monotone" dataKey="value" stroke="var(--viz-series)" fill="var(--viz-series)" fillOpacity={0.15} strokeWidth={2} />
+      </AreaChart>
+    </ChartContainer>
+  )
+}
+
+// Month-by-month line - for a count trend (offers of support, visits...),
+// visually distinct from the money-shaped area chart above even though
+// they're built from the same MonthPoint shape.
+export function MonthlyLine({
+  data,
+  seriesLabel,
+  format,
+}: {
+  data: MonthPoint[]
+  seriesLabel: string
+  format: (value: number) => string
+}) {
+  return (
+    <ChartContainer config={{ value: { label: seriesLabel, color: "var(--viz-series)" } }} className="h-[260px] w-full">
+      <LineChart data={data} margin={{ left: 4, right: 8, top: 8, bottom: 0 }}>
+        <CartesianGrid vertical={false} stroke="var(--viz-grid)" />
+        <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: "var(--viz-axis)" }} tick={tick} tickMargin={8} minTickGap={16} />
+        <YAxis tickLine={false} axisLine={false} tick={tick} width={44} allowDecimals={false} tickFormatter={value => compactNumber(Number(value))} />
+        <ChartTooltip
+          cursor={{ stroke: "var(--viz-series)", strokeWidth: 1 }}
+          content={<ChartTooltipContent formatter={value => <span className="font-semibold">{format(Number(value))}</span>} />}
+        />
+        <Line type="monotone" dataKey="value" stroke="var(--viz-series)" strokeWidth={2} dot={{ r: 3 }} />
+      </LineChart>
+    </ChartContainer>
+  )
+}
+
+// A handful of validated, mutually distinct hues (colorblind-safe pairwise
+// separation) in a fixed order - assigned by position, never by status
+// meaning, since the same StatusPie is reused for several different domains
+// (needs, deliveries, withdrawals) that don't share a status vocabulary.
+const STATUS_PIE_COLORS = ["#2a78d6", "#059669", "#d97706", "#e11d48", "#7c3aed", "#0891b2"]
+
+// A named-status breakdown as a donut. Identity is carried by the legend and
+// direct tooltip labels, never by color alone; zero-value slices (from
+// byStatusOrder's fixed status list) are dropped rather than drawn as a
+// sliver.
+export function StatusPie({ data, format }: { data: RankedPoint[]; format: (value: number) => string }) {
+  const colorByName = new Map(data.map((point, i) => [point.name, STATUS_PIE_COLORS[i % STATUS_PIE_COLORS.length]]))
+  const nonZero = data.filter(point => point.value > 0)
+  const config = Object.fromEntries(data.map(point => [point.name, { label: point.name, color: colorByName.get(point.name) }]))
+  return (
+    <ChartContainer config={config} className="h-[260px] w-full">
+      <PieChart>
+        <ChartTooltip
+          content={<ChartTooltipContent hideLabel formatter={(value, _name, item) => (
+            <span><span className="text-muted-foreground">{String((item as any)?.payload?.name ?? "")}: </span><span className="font-semibold">{format(Number(value))}</span></span>
+          )} />}
+        />
+        <Pie data={nonZero} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} strokeWidth={2} stroke="var(--background)">
+          {nonZero.map(entry => (
+            <Cell key={entry.name} fill={colorByName.get(entry.name)} />
+          ))}
+        </Pie>
+        <ChartLegend content={<ChartLegendContent nameKey="name" />} />
+      </PieChart>
     </ChartContainer>
   )
 }

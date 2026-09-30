@@ -2,7 +2,7 @@
 -- Description:
 --   1. Repairs the gift_offerings claim flow: an organization claiming an
 --      offering now moves it to a new 'pending_claim' status instead of
---      jumping straight to 'claimed' — an admin must approve (-> 'claimed')
+--      jumping straight to 'claimed' - an admin must approve (-> 'claimed')
 --      or reject (-> back to 'approved', re-listed) the claim. The previous
 --      "Approved organizations can claim offerings" WITH CHECK never actually
 --      constrained the target status or verified claimed_by_org_id matched
@@ -13,10 +13,10 @@
 --      bank-transfer + proof-of-payment pipeline as a need donation, instead
 --      of just being a text listing. donations.need_id/organization_id
 --      become nullable (a financial pledge isn't tied to a specific need or
---      org yet — an org is assigned only once it later claims the listing),
+--      org yet - an org is assigned only once it later claims the listing),
 --      and a new gift_offering_id links the two rows together.
 --   3. Re-issues the "Users can send messages to admins" policy exactly as
---      originally defined (20260914001600) — idempotent safety net in case
+--      originally defined (20260914001600) - idempotent safety net in case
 --      it was missed on the live database, given a reported failure with the
 --      same "row-level security" wording.
 
@@ -30,7 +30,7 @@ alter table public.gift_offerings add column if not exists claim_notes text;
 
 -- Once a claim moves off 'approved' (to pending_claim / claimed / rejected by
 -- an admin), the public "status = 'approved'" SELECT policy no longer covers
--- it — but the claiming organization still needs to see and track it.
+-- it - but the claiming organization still needs to see and track it.
 drop policy if exists "Organizations can view offerings they have claimed" on public.gift_offerings;
 create policy "Organizations can view offerings they have claimed"
 on public.gift_offerings for select to authenticated
@@ -96,7 +96,7 @@ with check (
 
 -- Rebuild the tamper guard with null-safe comparisons now that need_id and
 -- organization_id can legitimately be null (IS DISTINCT FROM instead of <>,
--- which is NULL — and therefore never true — when either side is null).
+-- which is NULL - and therefore never true - when either side is null).
 create or replace function public.prevent_donation_tamper()
 returns trigger
 language plpgsql

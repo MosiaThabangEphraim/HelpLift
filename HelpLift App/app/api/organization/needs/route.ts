@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { NEED_CATEGORIES } from "@/lib/categories"
+import { getActiveCategoryNames } from "@/lib/need-categories"
 import { getOrgContext, roleAtLeast, insufficientRoleMessage } from "@/lib/organization-access"
+import { forwardGeocodePlace } from "@/lib/geolocation"
 
 async function getOrganizationClient() {
   const supabase = await createClient()
@@ -9,7 +10,7 @@ async function getOrganizationClient() {
   if (!user) return { supabase, user: null, organization: null, status: 401, message: undefined as string | undefined }
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
   if (profile?.role !== "organization") return { supabase, user, organization: null, status: 403, message: undefined as string | undefined }
-  const ctx = await getOrgContext<{ id: string; verification_status: string }>(supabase, user.id, "id, verification_status")
+  const ctx = await getOrgContext<{ id: string; verification_status: string; city: string | null; province: string | null }>(supabase, user.id, "id, verification_status, city, province")
   if (ctx && !roleAtLeast(ctx.role, "manager")) return { supabase, user, organization: null, status: 403, message: insufficientRoleMessage(ctx.role, "manager") }
   return { supabase, user, organization: ctx?.organization ?? null, status: ctx ? 200 : 404, message: undefined as string | undefined }
 }
@@ -34,8 +35,9 @@ export async function POST(request: Request) {
     }
 
     if (!body.title || !body.description || !body.category) return NextResponse.json({ message: "Title, description, and category are required." }, { status: 400 })
-    if (!(NEED_CATEGORIES as readonly string[]).includes(body.category)) {
-      return NextResponse.json({ message: `Invalid category. Must be one of: ${NEED_CATEGORIES.join(", ")}.` }, { status: 400 })
+    const activeCategories = await getActiveCategoryNames(supabase)
+    if (!activeCategories.includes(body.category)) {
+      return NextResponse.json({ message: `Invalid category. Must be one of: ${activeCategories.join(", ")}.` }, { status: 400 })
     }
 
     const urgency = ["low", "medium", "high"].includes(body.urgency) ? body.urgency : "medium"
@@ -61,6 +63,18 @@ export async function POST(request: Request) {
       error = retry.error
     }
     if (error) return NextResponse.json({ message: error.message }, { status: 400 })
+
+    // Best-effort - "near me" matching degrades to "not near anyone" for
+    // this need if geocoding fails, never blocks the need being created.
+    if (need) {
+      try {
+        const geocodeQuery = need.location || [organization.city, organization.province].filter(Boolean).join(" ")
+        const coords = await forwardGeocodePlace(geocodeQuery)
+        if (coords) await supabase.from("needs").update({ latitude: coords.lat, longitude: coords.lng }).eq("id", need.id)
+      } catch (geocodeErr) {
+        console.warn("Need geocoding warning:", geocodeErr)
+      }
+    }
 
     if (need && attachmentFiles.length > 0) {
       for (const file of attachmentFiles) {

@@ -53,3 +53,28 @@ export async function lookupInvitation(admin: SupabaseClient, token: string): Pr
     status,
   }
 }
+
+export type AdminInviteLookup = {
+  id: string
+  email: string
+  status: InviteStatus
+}
+
+// Same shape as lookupInvitation, for the separate admin_invitations table
+// (20260922000100_admin_invitations.sql) - admins have no org/role to carry.
+export async function lookupAdminInvitation(admin: SupabaseClient, token: string): Promise<AdminInviteLookup | null> {
+  if (!/^[a-f0-9]{64}$/.test(token)) return null
+  const { data } = await admin
+    .from("admin_invitations")
+    .select("id, email, expires_at, accepted_at, revoked_at")
+    .eq("token_hash", hashInviteToken(token))
+    .maybeSingle()
+  if (!data) return null
+
+  let status: InviteStatus = "valid"
+  if (data.accepted_at) status = "accepted"
+  else if (data.revoked_at) status = "revoked"
+  else if (new Date(data.expires_at).getTime() < Date.now()) status = "expired"
+
+  return { id: data.id, email: data.email, status }
+}

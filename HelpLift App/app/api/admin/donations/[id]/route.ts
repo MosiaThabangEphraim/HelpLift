@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { sendDonationReceipt } from "@/lib/donation-receipt"
 
 export async function GET(
   request: Request,
@@ -15,7 +16,7 @@ export async function GET(
     const { id } = await context.params
     const { data: donation, error } = await supabase
       .from("donations")
-      .select("id, amount, payment_method, status, reference_code, bank_name, proof_storage_path, proof_uploaded_at, payer_notes, admin_notes, reviewed_at, receipt_sent_at, giver_id, organization_id, created_at, needs(title, organizations(name, profile_id)), givers(name, email, profile_id)")
+      .select("id, amount, payment_method, status, reference_code, bank_name, proof_storage_path, proof_uploaded_at, payer_notes, admin_notes, reviewed_at, receipt_sent_at, giver_id, organization_id, is_platform_donation, donor_profile_id, guest_name, guest_email, created_at, needs(title, organizations(name, profile_id)), givers(name, email, profile_id), donor:profiles!donor_profile_id(full_name, email)")
       .eq("id", id)
       .single()
     if (error || !donation) return NextResponse.json({ message: "Donation not found." }, { status: 404 })
@@ -82,12 +83,12 @@ export async function PATCH(
       .from("donations")
       .update(updatePayload)
       .eq("id", id)
-      .select("id, amount, reference_code, status, giver_id, organization_id, gift_offering_id, needs(title), givers(profile_id), organizations(profile_id)")
+      .select("id, amount, reference_code, status, giver_id, organization_id, gift_offering_id, is_platform_donation, donor_profile_id, needs(title), givers(profile_id), organizations(profile_id)")
       .single()
     if (error) return NextResponse.json({ message: error.message }, { status: 400 })
 
     // A financial Gift Library pledge's listing stays hidden ('pending') until
-    // its payment is confirmed — cascade the verdict onto it here so it either
+    // its payment is confirmed - cascade the verdict onto it here so it either
     // becomes claimable (successful) or is withdrawn (unsuccessful).
     if (donation.gift_offering_id) {
       try {
@@ -103,32 +104,43 @@ export async function PATCH(
 
     try {
       const needTitle = (donation as any).needs?.title || (donation as any).needs?.[0]?.title
-      const subject = needTitle ? `for "${needTitle}"` : "as a Gift Library pledge"
-      const giverProfileId = (donation as any).givers?.profile_id || (donation as any).givers?.[0]?.profile_id
+      const subject = donation.is_platform_donation
+        ? "in support of the platform"
+        : needTitle ? `for "${needTitle}"` : "as a Gift Library pledge"
+      const giverProfileId = (donation as any).givers?.profile_id || (donation as any).givers?.[0]?.profile_id || donation.donor_profile_id
       const orgProfileId = (donation as any).organizations?.profile_id || (donation as any).organizations?.[0]?.profile_id
       const verdict = status === "successful" ? "confirmed as successful" : "marked as unsuccessful"
-      const notifications = []
       if (giverProfileId) {
-        notifications.push({
+        await supabase.from("notifications").insert({
           recipient_id: giverProfileId,
           sender_id: user.id,
+          sender_name: "HelpLift Notifications",
           type: "donation_reviewed",
           title: `Donation ${verdict}`,
           message: `Your donation of R${Number(donation.amount).toFixed(2)} (ref ${donation.reference_code}) ${subject} was ${verdict}.${admin_notes ? ` Note: ${admin_notes}` : ""}`,
         })
       }
       if (orgProfileId && status === "successful") {
-        notifications.push({
+        await supabase.from("notifications").insert({
           recipient_id: orgProfileId,
           sender_id: user.id,
+          sender_name: "HelpLift Notifications",
           type: "donation_received",
           title: "Donation received",
           message: `A donation of R${Number(donation.amount).toFixed(2)} (ref ${donation.reference_code}) ${subject} was confirmed.`,
         })
       }
-      if (notifications.length) await supabase.from("notifications").insert(notifications)
     } catch (notifyErr) {
       console.warn("Donation review notification warning:", notifyErr)
+    }
+
+    // Confirmed EFT donations get their receipt emailed automatically - the
+    // admin can still preview/resend it any time from the donation dialog.
+    // Awaited (not fire-and-forget): on serverless hosting, work started after
+    // the response is sent isn't guaranteed to finish. sendDonationReceipt
+    // never throws, so this can't turn a successful review into an error.
+    if (status === "successful") {
+      await sendDonationReceipt(supabase, id)
     }
 
     return NextResponse.json({ donation })

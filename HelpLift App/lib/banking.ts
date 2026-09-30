@@ -1,38 +1,8 @@
-export type BankKey = "absa" | "fnb"
-
-export type BankAccount = {
-  key: BankKey
-  bankName: string
-  accountName: string
-  accountNumber: string
-  branchCode: string
-  accountType: string
-  swiftCode: string
-}
-
-// HelpLift's own receiving accounts for manual EFT donations. Donors transfer
-// into one of these; the reference code ties the deposit back to a specific
-// donation record for admin verification.
-export const BANK_ACCOUNTS: Record<BankKey, BankAccount> = {
-  absa: {
-    key: "absa",
-    bankName: "ABSA Bank",
-    accountName: "HelpLift",
-    accountNumber: "4079635021",
-    branchCode: "632005",
-    accountType: "Cheque Account",
-    swiftCode: "ABSAZAJJ",
-  },
-  fnb: {
-    key: "fnb",
-    bankName: "First National Bank (FNB)",
-    accountName: "HelpLift",
-    accountNumber: "62891234567",
-    branchCode: "250655",
-    accountType: "Business Cheque Account",
-    swiftCode: "FIRNZAJJ",
-  },
-}
+// HelpLift's own receiving accounts for manual EFT donations used to be a
+// hardcoded BANK_ACCOUNTS constant here - an admin can now manage them
+// instead (Platform Settings), so that data lives in the
+// platform_bank_accounts table. See lib/bank-accounts.ts for the server-side
+// type/helpers, and lib/use-bank-accounts.ts for the client-side fetch hook.
 
 export function formatCurrency(amount: number): string {
   return `R${amount.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`

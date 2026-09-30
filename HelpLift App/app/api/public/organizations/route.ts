@@ -15,7 +15,7 @@ export async function GET() {
 
     const { data: organizations, error } = await supabase
       .from("organizations")
-      .select("id, name, type, city, province, mission, logo_url, verification_status, created_at, profile_id")
+      .select("id, name, type, city, province, address, mission, logo_url, verification_status, created_at, profile_id")
       .eq("verification_status", "approved")
       .order("name", { ascending: true })
     if (error) return NextResponse.json({ success: false, message: error.message, organizations: [] }, { status: 500 })

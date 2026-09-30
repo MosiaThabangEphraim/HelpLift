@@ -1,4 +1,4 @@
-// Shared password strength rules — used by the registration form's live
+// Shared password strength rules - used by the registration form's live
 // checklist (components/password-requirements.tsx) and mirrored server-side
 // in api/register/route.ts so the two can never drift out of sync.
 export const PASSWORD_REQUIREMENTS = [

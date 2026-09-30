@@ -1,12 +1,12 @@
 -- Migration: 20260917000100_payfast_itn_trigger.sql
 -- Description: Let the PayFast ITN webhook (api/public/payfast/notify) confirm
--- donations. That endpoint has no end-user session — it runs on the service
+-- donations. That endpoint has no end-user session - it runs on the service
 -- role key, so auth.uid() is null there. prevent_donation_tamper() previously
 -- only allowed status/review-field changes when public.is_admin() was true,
 -- which requires a logged-in admin's auth.uid(); a null auth.uid() fell into
 -- the giver branch and got rejected. Service-role access already bypasses RLS
 -- entirely, so treating "no auth.uid()" the same as admin here doesn't widen
--- what an end user can do — it only unblocks trusted server-side code.
+-- what an end user can do - it only unblocks trusted server-side code.
 --
 -- This rebuilds the function from its current definition as of
 -- 20260914002600_admin_can_correct_donation_amount.sql (gift_offering_id

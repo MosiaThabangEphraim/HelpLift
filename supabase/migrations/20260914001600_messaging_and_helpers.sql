@@ -3,13 +3,13 @@
 -- and fixes a pre-existing RLS gap where organizations could never actually see the
 -- name/email of a giver who expressed interest in one of their needs.
 
--- 1. Track who sent a notification (nullable — system-generated notifications, e.g.
+-- 1. Track who sent a notification (nullable - system-generated notifications, e.g.
 -- organization verification updates, have no human sender).
 alter table public.notifications add column if not exists sender_id uuid references public.profiles(id) on delete set null;
 
 -- 2. Bug fix: api/organization/interests's `givers(name, email)` embed has always
 -- returned null because no policy ever granted organizations SELECT access to a
--- giver's row — only the giver themselves (or an admin) could read it. The
+-- giver's row - only the giver themselves (or an admin) could read it. The
 -- "Giver interests" section has been silently showing "Giver" / blank email ever
 -- since. This also gives organizations the visibility they need to target a
 -- message at a specific interested giver (below).
@@ -28,7 +28,7 @@ using (
 );
 
 -- 3. A non-admin (giver/organization) has no way to discover an admin's profile id
--- to address a message to — profiles RLS only lets them see their own row. This
+-- to address a message to - profiles RLS only lets them see their own row. This
 -- security-definer helper returns one admin id, bypassing that restriction; it
 -- exposes nothing beyond "an admin account exists with this id".
 create or replace function public.get_any_admin_id()
@@ -79,7 +79,7 @@ with check (
   )
 );
 
--- ("Admins can create notifications" — i.e. admin messaging any user/org —
+-- ("Admins can create notifications" - i.e. admin messaging any user/org -
 -- already exists from 20260914000900_notifications.sql and needs no change.)
 
 -- 6. Admins could previously only mark their OWN notifications as read (the

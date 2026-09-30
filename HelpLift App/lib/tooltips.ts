@@ -54,6 +54,14 @@ export const TOOLTIP_LABELS: Record<string, string> = {
   "switch to light mode": "Switch to the light theme",
   "switch to dark mode": "Switch to the dark theme",
   "save changes": "Save your changes",
+  "admin:update": "Save this person's new role in their organization and notify them",
+
+  // --- Wallet & withdrawals
+  "org:request withdrawal": "Request a payout of your available balance, transferred by EFT once an administrator approves it",
+  "org:cancel request": "Cancel this withdrawal request before it's reviewed",
+  "admin:decline": "Decline this withdrawal request. The organization is told, with a reason if you add one",
+  "admin:attach proof & mark paid": "Upload the proof of payment for the EFT you sent - this marks the withdrawal Transfer Complete and notifies the organization",
+
   "export": "Download this list as a spreadsheet (CSV)",
   "reset to all time": "Clear the date filter and show everything",
   "reset all filters": "Clear the search and all filters",
@@ -140,7 +148,7 @@ export const TOOLTIP_LABELS: Record<string, string> = {
   "awaiting payment": "The giver hasn't uploaded proof of payment yet",
   "published": "Approved and visible to the public",
   "rejected": "An administrator rejected this",
-  "owner": "Full access, including the team, organization profile and banking details",
+  "owner": "Full access, including the team, organization profile, banking details and requesting withdrawals",
   "manager": "Can manage needs, interests, fulfillments, stories and messages",
   "viewer": "Read-only access",
   "owner · account holder": "The original account holder. Can't be demoted or removed",

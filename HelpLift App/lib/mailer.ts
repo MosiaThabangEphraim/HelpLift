@@ -1,9 +1,9 @@
-// Shared email sender — used by the contact form (api/contact) and the
+// Shared email sender - used by the contact form (api/contact) and the
 // notification-email webhook (api/webhooks/notification-created).
 //
 // This calls Brevo's transactional email HTTP API directly (over HTTPS/443)
 // rather than SMTP. We switched from SMTP after discovering the dev network
-// blocks outbound SMTP ports (587 and 465 both timed out with ETIMEDOUT) —
+// blocks outbound SMTP ports (587 and 465 both timed out with ETIMEDOUT) -
 // a common restriction on ISPs/campus networks and some hosting platforms.
 // The HTTP API sends over plain HTTPS, which isn't subject to that.
 //

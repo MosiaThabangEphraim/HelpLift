@@ -7,7 +7,7 @@
 --      monetary) fulfillment can attach multiple notes/photos/documents,
 --      not just the single proof_storage_path/proof_notes fulfillments
 --      already had. Inserts go through a SECURITY DEFINER function rather
---      than a plain RLS policy — the messaging feature hit a reproducible,
+--      than a plain RLS policy - the messaging feature hit a reproducible,
 --      unexplained RLS rejection on an otherwise-correct INSERT policy, so
 --      new write paths use the same insert-via-function pattern that's
 --      proven reliable instead of risking a repeat of that saga.
@@ -73,7 +73,7 @@ grant execute on function public.add_fulfillment_proof(uuid, text, text) to auth
 
 -- Extend send_notification's organization -> giver authorization to also
 -- cover the gift-claim relationship (an org notifying the giver whose
--- listing it just claimed) — not covered by the existing
+-- listing it just claimed) - not covered by the existing
 -- interest/donation/fulfillment checks, and this exact "notify giver about
 -- a claim" insert was previously a raw .insert() with no policy backing it
 -- at all, so it was very likely silently failing.

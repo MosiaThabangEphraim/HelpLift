@@ -1,18 +1,18 @@
 -- Migration: 20260918000200_harden_suspension_enforcement.sql
 -- Description: Suspension was previously enforced only at the page/middleware
--- level (proxy.ts redirects a suspended user to /suspended, everywhere) —
+-- level (proxy.ts redirects a suspended user to /suspended, everywhere) -
 -- solid for normal app usage, but a direct API call bypasses it entirely.
 -- This adds a database-level backstop for actual writes.
 --
 -- Approach: a single BEFORE INSERT/UPDATE trigger per relevant table, not a
 -- rewrite of existing RLS policies. Triggers here only ever ADD a rejection
--- on top of whatever RLS already allowed — they can't be reconstructed
+-- on top of whatever RLS already allowed - they can't be reconstructed
 -- incorrectly the way re-deriving an existing policy's exact boolean logic
 -- could (see the payfast_itn_trigger migration's own note on that mistake),
 -- since they don't need to know or reproduce that logic at all.
 --
 -- auth.uid() is null for service-role callers (webhooks, the PayFast ITN
--- handler, etc.) — is_suspended() treats that as "not suspended", so trusted
+-- handler, etc.) - is_suspended() treats that as "not suspended", so trusted
 -- backend flows are unaffected, same reasoning as prevent_donation_tamper's
 -- "or auth.uid() is null" carve-out.
 
@@ -87,7 +87,7 @@ for each row execute function public.block_suspended_write();
 -- prevent_profile_privilege_escalation trigger: block_suspended_write only
 -- ever looks at the ACTING user's own suspension status (auth.uid()), never
 -- the row being touched, so an admin editing a suspended user's row is
--- unaffected (admins aren't suspended) — this only stops a suspended user
+-- unaffected (admins aren't suspended) - this only stops a suspended user
 -- from changing their own records, exactly the intent.
 drop trigger if exists profiles_block_suspended_write on public.profiles;
 create trigger profiles_block_suspended_write
@@ -104,7 +104,7 @@ create trigger givers_block_suspended_write
 before insert or update on public.givers
 for each row execute function public.block_suspended_write();
 
--- send_notification() is the one write suspension must NOT fully block —
+-- send_notification() is the one write suspension must NOT fully block -
 -- a suspended user's only remaining ability is messaging an admin. Same
 -- signature as 20260917000200_message_attachments.sql, just adding the
 -- suspension carve-out; no drop needed since the signature is unchanged.
@@ -148,7 +148,7 @@ begin
     v_allowed := true;
   end if;
 
-  -- A giver may message any organization — organizations are public
+  -- A giver may message any organization - organizations are public
   -- entities (listed on the needs board and their own profile page).
   if not v_allowed and v_sender_role = 'giver' and v_recipient_role = 'organization' then
     v_allowed := true;

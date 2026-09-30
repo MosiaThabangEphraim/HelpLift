@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // Supabase/PostgREST embeds a to-one relation (e.g. donations selecting
-// needs(title) via need_id) inconsistently depending on the query shape —
+// needs(title) via need_id) inconsistently depending on the query shape -
 // sometimes a single object, sometimes a one-element array. Code that
 // assumed "always array" (`?.[0]`) silently got `undefined` wherever it
 // actually came back as an object, breaking both search filters and

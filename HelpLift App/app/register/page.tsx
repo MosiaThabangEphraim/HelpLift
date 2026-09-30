@@ -4,12 +4,18 @@ import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Sparkles, Building, Briefcase, FileText, AlertCircle, Loader2 } from "lucide-react"
+import { ArrowRight, Building2, HandHeart, HeartHandshake, FileText, AlertCircle, Loader2 } from "lucide-react"
 import { PasswordRequirements } from "@/components/password-requirements"
 import { isPasswordValid, isValidEmail } from "@/lib/password"
-import { NEED_CATEGORIES } from "@/lib/categories"
+import { useNeedCategories } from "@/lib/use-need-categories"
 import { GoogleSignInButton } from "@/components/google-sign-in-button"
+import { LinkedInSignInButton } from "@/components/linkedin-sign-in-button"
+import { MicrosoftSignInButton } from "@/components/microsoft-sign-in-button"
+import { TermsAgreementCheckbox } from "@/components/terms-agreement-checkbox"
 import { BackButton } from "@/components/back-button"
+import { MicButton } from "@/components/mic-button"
+import { GrammarCheckButton } from "@/components/grammar-check-button"
+import { appendSpeech } from "@/lib/speech-to-text"
 
 function FieldLabel({ children, required = true }: { children: React.ReactNode; required?: boolean }) {
   return (
@@ -50,6 +56,7 @@ export default function RegisterPage() {
   const [name, setName] = useState("")
   const [phone, setPhone] = useState("")
   const [categories, setCategories] = useState("")
+  const needCategories = useNeedCategories()
   const [locations, setLocations] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -58,6 +65,7 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState("")
   const [successMsg, setSuccessMsg] = useState("")
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
 
   const emailValid = email === "" || isValidEmail(email)
   const passwordValid = isPasswordValid(password)
@@ -65,11 +73,12 @@ export default function RegisterPage() {
 
   const canSubmit = useMemo(() => {
     if (!role) return false
+    if (!agreedToTerms) return false
     if (!email || !isValidEmail(email)) return false
     if (!passwordValid) return false
     if (!confirmPassword || password !== confirmPassword) return false
     return true
-  }, [role, email, passwordValid, confirmPassword, password])
+  }, [role, agreedToTerms, email, passwordValid, confirmPassword, password])
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -145,36 +154,45 @@ export default function RegisterPage() {
       </div>
 
       <div className="text-center mb-12">
-        <div className="bg-gradient-to-tr from-blue-600 to-indigo-500 p-3 rounded-2xl shadow-lg inline-block mb-6">
-          <Sparkles className="w-8 h-8 text-white" />
+        <div className="bg-gradient-to-tr from-blue-600 to-indigo-500 p-3 rounded shadow-lg inline-block mb-6">
+          <HeartHandshake className="w-8 h-8 text-white" />
         </div>
         <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">Join HelpLift</h1>
       </div>
 
-      <div className="w-full max-w-xl grid grid-cols-2 gap-4 mb-10">
+      <div className="w-full max-w-xl grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
         <button
-          onClick={() => setRole("organization")}
-          className={`p-6 rounded-3xl border-2 transition-all flex flex-col items-center gap-3 ${role === 'organization' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'}`}
+          type="button"
+          onClick={() => setRole("giver")}
+          className={`p-6 rounded border-2 transition-all flex flex-col items-center gap-3 text-center ${role === "giver" ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30" : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-blue-500"}`}
         >
-          <Building className="w-8 h-8" />
-          <span className="font-bold text-sm">Organization</span>
+          <HandHeart className="w-8 h-8 text-blue-600" />
+          <span className="font-bold">I want to give</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400">Register as a giver: individual, business or group.</span>
         </button>
         <button
-          onClick={() => setRole("giver")}
-          className={`p-6 rounded-3xl border-2 transition-all flex flex-col items-center gap-3 ${role === 'giver' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'}`}
+          type="button"
+          onClick={() => setRole("organization")}
+          className={`p-6 rounded border-2 transition-all flex flex-col items-center gap-3 text-center ${role === "organization" ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30" : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-blue-500"}`}
         >
-          <Briefcase className="w-8 h-8" />
-          <span className="font-bold text-sm">Giver</span>
+          <Building2 className="w-8 h-8 text-blue-600" />
+          <span className="font-bold">I'm an organization</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400">Register a school, charity or community group that needs support.</span>
         </button>
       </div>
 
       {role && (
         <div className="w-full max-w-xl mb-8 space-y-4">
-          <GoogleSignInButton label="Sign up with Google" intent={role === "organization" ? "org" : "giver"} onError={setErrorMsg} />
+          <div className="p-4 rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+            <TermsAgreementCheckbox checked={agreedToTerms} onCheckedChange={setAgreedToTerms} />
+          </div>
+          <GoogleSignInButton label="Sign up with Google" intent={role === "organization" ? "org" : "giver"} onError={setErrorMsg} disabled={!agreedToTerms} />
+          <LinkedInSignInButton label="Sign up with LinkedIn" intent={role === "organization" ? "org" : "giver"} onError={setErrorMsg} disabled={!agreedToTerms} />
+          <MicrosoftSignInButton label="Sign up with Microsoft" intent={role === "organization" ? "org" : "giver"} onError={setErrorMsg} disabled={!agreedToTerms} />
           <p className="text-center text-xs text-slate-400 dark:text-slate-500">
             {role === "organization"
-              ? "Google verifies your email. You'll then add your organization's details and documents, and choose a password."
-              : "Google verifies your email. You'll then add your details and choose a password."}
+              ? "Google/LinkedIn/Microsoft verify your email. You'll then add your organization's details and documents, and choose a password."
+              : "Google/LinkedIn/Microsoft verify your email. You'll then add your details and choose a password."}
           </p>
           <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-wider text-slate-400">
             <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
@@ -186,8 +204,8 @@ export default function RegisterPage() {
 
       {role && (
         <form onSubmit={handleRegister} className="w-full max-w-xl space-y-8 animate-in fade-in slide-in-from-bottom-4 pb-20">
-          {errorMsg && <div className="p-4 rounded-2xl bg-red-50 border border-red-100 flex items-center gap-3 text-red-700 text-sm font-semibold"><AlertCircle className="h-5 w-5 shrink-0" />{errorMsg}</div>}
-          {successMsg && <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm font-semibold">{successMsg}</div>}
+          {errorMsg && <div className="p-4 rounded bg-red-50 border border-red-100 flex items-center gap-3 text-red-700 text-sm font-semibold"><AlertCircle className="h-5 w-5 shrink-0" />{errorMsg}</div>}
+          {successMsg && <div className="p-4 rounded bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm font-semibold">{successMsg}</div>}
 
           <p className="text-xs text-slate-400 dark:text-slate-500">
             Fields marked <span className="text-red-500 font-bold">*</span> are required.
@@ -247,8 +265,14 @@ export default function RegisterPage() {
                 )}
               </div>
               <div>
-                <FieldLabel required={false}>Mission Statement</FieldLabel>
-                <textarea value={mission} onChange={(e) => setMission(e.target.value)} className={`${inputClass} h-24`} placeholder="What does your organization do, and who does it serve?" />
+                <div className="flex items-center justify-between gap-2">
+                  <FieldLabel required={false}>Mission Statement</FieldLabel>
+                  <GrammarCheckButton text={mission} onTextChange={setMission} />
+                </div>
+                <div className="relative">
+                  <textarea value={mission} onChange={(e) => setMission(e.target.value)} className={`${inputClass} h-24 pr-11`} placeholder="What does your organization do, and who does it serve?" />
+                  <MicButton className="top-2 right-2" onText={text => setMission(m => appendSpeech(m, text))} />
+                </div>
               </div>
 
               <div className="pt-2">
@@ -297,7 +321,7 @@ export default function RegisterPage() {
                     <select
                       value={doc.type}
                       onChange={(e) => setDocuments(docs => docs.map((d, i) => i === index ? { ...d, type: e.target.value } : d))}
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none focus:border-blue-500"
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded text-xs font-semibold text-slate-700 dark:text-slate-300 outline-none focus:border-blue-500"
                     >
                       <option value="registration_certificate">NPO / NGO Registration Certificate</option>
                       <option value="tax_exemption">SARS Section 18A / Tax Exemption</option>
@@ -307,7 +331,7 @@ export default function RegisterPage() {
                     </select>
 
                     <div className="flex items-center gap-2">
-                      <label className="flex-1 flex items-center justify-between gap-2 px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-blue-500 transition-colors">
+                      <label className="flex-1 flex items-center justify-between gap-2 px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-dashed border-slate-300 rounded cursor-pointer hover:border-blue-500 transition-colors">
                         <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 truncate">
                           {doc.file ? doc.file.name : "Select document (.pdf, .png, .jpg)"}
                         </span>
@@ -347,9 +371,9 @@ export default function RegisterPage() {
           ) : (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Giver Information</h2>
-              <div className="flex gap-4 p-1 bg-slate-100 dark:bg-slate-800 rounded-full">
+              <div className="flex gap-4 p-1 bg-slate-100 dark:bg-slate-800 rounded">
                 {["individual", "business", "group"].map((type) => (
-                  <button key={type} type="button" onClick={() => setAccountType(type as any)} className={`flex-1 py-3 rounded-full capitalize text-sm font-bold transition-all ${accountType === type ? 'bg-white dark:bg-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>
+                  <button key={type} type="button" onClick={() => setAccountType(type as any)} className={`flex-1 py-3 rounded capitalize text-sm font-bold transition-all ${accountType === type ? 'bg-white dark:bg-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>
                     {type}
                   </button>
                 ))}
@@ -380,7 +404,7 @@ export default function RegisterPage() {
               <div>
                 <FieldLabel required={false}>Preferred Support Categories</FieldLabel>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {NEED_CATEGORIES.map(category => {
+                  {needCategories.map(category => {
                     const selected = categories.split(",").map(c => c.trim()).filter(Boolean)
                     return (
                       <label key={category} className="flex items-center gap-2 text-sm">
@@ -431,7 +455,7 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <Button type="submit" disabled={isLoading || !canSubmit} className="w-full py-6 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-full shadow-lg transition-all disabled:opacity-50">
+          <Button type="submit" disabled={isLoading || !canSubmit} className="w-full py-6 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded shadow-lg transition-all disabled:opacity-50">
             {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <ArrowRight className="mr-2 h-5 w-5" />}
             {isLoading ? "Creating account..." : "Complete Registration"}
           </Button>

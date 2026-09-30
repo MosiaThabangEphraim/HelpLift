@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 
 // organization_documents.uploaded_by is `not null ... on delete cascade`, so
 // deleting a team member's account would silently delete every document they
-// uploaded for the organization — and the files sit under a folder named after
+// uploaded for the organization - and the files sit under a folder named after
 // the uploader's user id, which teammates can only read while that user is
 // still on the team. Before a member's account is deleted, hand their
 // documents (rows and storage files) to another owner.

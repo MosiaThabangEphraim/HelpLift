@@ -3,11 +3,11 @@
 -- RLS error. is_admin_profile(recipient_id) has been proven to return true
 -- for the exact recipient/sender/session involved (via RPC, same request),
 -- which should be sufficient for "Users can send messages to admins" to pass
--- — yet the insert still fails. This function is SECURITY INVOKER (runs with
+-- - yet the insert still fails. This function is SECURITY INVOKER (runs with
 -- the CALLER's own privileges/RLS, unlike every other helper so far, which
 -- were SECURITY DEFINER), so calling it reproduces exactly what the app's
 -- direct insert does, but wrapped in an exception handler that surfaces the
--- full SQLSTATE/message/detail/hint/context Postgres actually raised — detail
+-- full SQLSTATE/message/detail/hint/context Postgres actually raised - detail
 -- PostgREST normally swallows down to the generic "violates row-level
 -- security policy" line. It always rolls back its own test insert, so it
 -- never leaves data behind.

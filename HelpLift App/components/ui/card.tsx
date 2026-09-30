@@ -7,7 +7,13 @@ function Card({ className, ...props }: React.ComponentProps<'div'>) {
     <div
       data-slot="card"
       className={cn(
-        'bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm',
+        // Flat/tight redesign default (rolled out site-wide from an
+        // organization-dashboard trial): no box, no fill of its own - just a
+        // thin rule above the title, sitting flush on whatever background
+        // it's placed on. bg-card previously drew a shade distinct from the
+        // page background even with the border removed, reading as a
+        // visible edge on its own.
+        'bg-transparent text-card-foreground flex flex-col gap-6 rounded-none border-0 border-t border-border pt-4 shadow-none',
         className,
       )}
       {...props}
@@ -32,7 +38,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="card-title"
-      className={cn('leading-none font-semibold', className)}
+      className={cn('leading-none font-semibold text-base', className)}
       {...props}
     />
   )
@@ -42,7 +48,7 @@ function CardDescription({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="card-description"
-      className={cn('text-muted-foreground text-sm', className)}
+      className={cn('text-muted-foreground text-xs', className)}
       {...props}
     />
   )

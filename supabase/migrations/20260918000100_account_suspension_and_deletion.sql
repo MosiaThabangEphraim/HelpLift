@@ -6,7 +6,7 @@
 -- Account deletion itself needs no schema change: profiles.id references
 -- auth.users(id) on delete cascade, and organizations.profile_id /
 -- givers.profile_id reference profiles(id) on delete cascade, which cascades
--- further into needs, donations, gift_offerings, notifications, etc. — all
+-- further into needs, donations, gift_offerings, notifications, etc. - all
 -- already FK'd with on delete cascade. Deleting the auth.users row (via
 -- supabase.auth.admin.deleteUser(), which api/admin/users/[id] and the new
 -- self-service endpoint both use) wipes everything in one call.
@@ -16,7 +16,7 @@ alter table public.profiles add column if not exists suspended_at timestamptz;
 alter table public.profiles add column if not exists suspended_reason text;
 
 -- "Users can update their own profile" (20260914000100) is a blanket
--- using/with-check on id = auth.uid() with no column-level restriction —
+-- using/with-check on id = auth.uid() with no column-level restriction -
 -- meaning, before this, a user could already self-promote their own role
 -- via a direct client call (RLS has no concept of "this column is
 -- read-only for non-admins"). Adding `suspended` under that same policy

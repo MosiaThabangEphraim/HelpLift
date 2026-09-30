@@ -43,8 +43,8 @@ function VerifyEmailContent() {
     <div className="relative min-h-screen w-full flex flex-col items-center bg-background overflow-x-hidden">
 
       {/* --- BACKGROUND DECORATIONS --- */}
-      <div className="absolute top-[-10%] left-[-5%] w-[50%] h-[40%] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-5%] w-[40%] h-[50%] bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute top-[-10%] left-[-5%] w-[50%] h-[40%] bg-primary/10 rounded blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-5%] w-[40%] h-[50%] bg-primary/5 rounded blur-[100px] pointer-events-none" />
 
       {/* --- MAIN CONTENT --- */}
       <main className="flex-1 w-full max-w-[600px] px-6 pb-10 pt-24 flex flex-col items-center z-20">
@@ -53,7 +53,7 @@ function VerifyEmailContent() {
           <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* WELCOME/INFO SECTION */}
             <div className="text-center space-y-4 mb-12">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-semibold mx-auto">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded bg-primary/10 border border-primary/20 text-primary text-sm font-semibold mx-auto">
                 <HeartHandshake className="w-4 h-4" />
                 <span>HelpLift Account Verification</span>
               </div>
@@ -108,7 +108,7 @@ function VerifyEmailContent() {
 
                   <Button
                     type="submit"
-                    className="w-full h-14 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-lg rounded-2xl transition-all shadow-xl shadow-primary/20 active:scale-[0.98]"
+                    className="w-full h-14 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-lg rounded transition-all shadow-xl shadow-primary/20 active:scale-[0.98]"
                   >
                     Complete Verification
                   </Button>
@@ -116,7 +116,7 @@ function VerifyEmailContent() {
               )}
 
               {status === "error" && (
-                <div className="mt-8 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-center space-y-3 animate-in fade-in">
+                <div className="mt-8 p-4 bg-red-500/10 border border-red-500/20 rounded text-center space-y-3 animate-in fade-in">
                   <div className="flex items-center justify-center gap-2 text-red-600 font-bold">
                     <XCircle className="w-5 h-5" />
                     <span>Verification Failed</span>
@@ -125,7 +125,7 @@ function VerifyEmailContent() {
                   <Button
                     variant="outline"
                     onClick={() => setStatus("idle")}
-                    className="rounded-full px-6 border-border hover:bg-muted text-xs font-bold"
+                    className="rounded px-6 border-border hover:bg-muted text-xs font-bold"
                   >
                     Try Again
                   </Button>

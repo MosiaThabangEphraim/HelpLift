@@ -17,7 +17,7 @@ export async function GET() {
     // fanned_from is null: skip the copies made for an organization's teammates.
     const { data: sentRows, error } = await supabase
       .from("notifications")
-      .select("id, thread_id, recipient_id, message, created_at")
+      .select("id, thread_id, recipient_id, message, created_at, delivered_at, read_at")
       .eq("sender_id", user.id)
       .in("type", CONVERSATION_TYPES)
       .is("fanned_from", null)
@@ -80,6 +80,8 @@ export async function GET() {
         recipient_role: names.get(row.recipient_id)?.role || null,
         message: row.message,
         created_at: row.created_at,
+        delivered_at: row.delivered_at,
+        read_at: row.read_at,
         replied: !!lastReceived && new Date(lastReceived).getTime() > new Date(row.created_at).getTime(),
       }
     })

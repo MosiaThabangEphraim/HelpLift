@@ -11,7 +11,7 @@ export async function GET() {
 
     const { data: donations, error } = await supabase
       .from("donations")
-      .select("id, amount, payment_method, status, reference_code, bank_name, proof_storage_path, proof_uploaded_at, payer_notes, admin_notes, reviewed_at, receipt_sent_at, created_at, needs(title, organizations(name)), gift_offerings(title), givers(name, email)")
+      .select("id, amount, payment_method, status, reference_code, bank_name, proof_storage_path, proof_uploaded_at, payer_notes, admin_notes, reviewed_at, receipt_sent_at, created_at, is_platform_donation, guest_name, guest_email, needs(title, organizations(name)), gift_offerings(title), givers(name, email), donor:profiles!donor_profile_id(full_name, email)")
       .order("created_at", { ascending: false })
     if (error) return NextResponse.json({ message: error.message }, { status: 400 })
 

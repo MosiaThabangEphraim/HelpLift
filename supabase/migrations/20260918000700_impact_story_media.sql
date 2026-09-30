@@ -5,7 +5,7 @@
 -- following the same child-table + SECURITY DEFINER insert function pattern
 -- as fulfillment_proofs / donation_proofs / notification_attachments (a
 -- plain RLS INSERT policy on this shape of row has previously hit a
--- reproducible, unexplained rejection in this project — see the
+-- reproducible, unexplained rejection in this project - see the
 -- send_notification comment in 20260914002700).
 --
 -- impact_stories.image_url / video_url are left in place and still get set

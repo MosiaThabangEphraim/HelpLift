@@ -37,6 +37,12 @@ async function isUnverifiedOrganization(
   return !!org && org.verification_status !== "approved"
 }
 
+// Platform Settings > Maintenance mode blocks the whole site for everyone
+// except a signed-in admin — /admin-login and /maintenance itself always stay
+// reachable (so an admin can sign in and turn it back off, and so the block
+// page itself doesn't redirect to itself).
+const MAINTENANCE_BYPASS = ["/admin-login", "/maintenance"]
+
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })
   const supabase = createServerClient(
@@ -56,6 +62,21 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
   const pathname = request.nextUrl.pathname
+
+  if (!MAINTENANCE_BYPASS.includes(pathname)) {
+    let isAdmin = false
+    if (user) {
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+      isAdmin = profile?.role === "admin"
+    }
+    if (!isAdmin) {
+      const { data: setting } = await supabase.from("platform_settings").select("value").eq("key", "maintenance_mode").maybeSingle()
+      if ((setting?.value as any)?.enabled) {
+        return NextResponse.redirect(new URL("/maintenance", request.url))
+      }
+    }
+  }
+
   const matchedRoute = protectedRoutes.find((route) => pathname.startsWith(route.prefix))
 
   if (matchedRoute && !user) {
@@ -128,5 +149,18 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/givers-dashboard/:path*", "/organisation-dashboard/:path*", "/admin-dashboard/:path*", "/profile/:path*", "/suspended", "/pending-verification", "/login", "/register"],
+  matcher: [
+    "/",
+    "/needs/:path*",
+    "/gift-library",
+    "/organizations/:path*",
+    "/givers-dashboard/:path*",
+    "/organisation-dashboard/:path*",
+    "/admin-dashboard/:path*",
+    "/profile/:path*",
+    "/suspended",
+    "/pending-verification",
+    "/login",
+    "/register/:path*",
+  ],
 }

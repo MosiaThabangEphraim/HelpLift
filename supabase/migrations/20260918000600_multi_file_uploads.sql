@@ -1,10 +1,10 @@
 -- Migration: 20260918000600_multi_file_uploads.sql
--- Description: Extends the two remaining single-file upload flows — donation
--- proof-of-payment and message attachments — to support multiple files per
+-- Description: Extends the two remaining single-file upload flows - donation
+-- proof-of-payment and message attachments - to support multiple files per
 -- donation / per message, mirroring the existing fulfillment_proofs pattern
 -- (20260914002700): a child table plus a SECURITY DEFINER insert function,
 -- rather than a plain RLS INSERT policy (a prior attempt at a plain INSERT
--- policy on this kind of row hit a reproducible, unexplained RLS rejection —
+-- policy on this kind of row hit a reproducible, unexplained RLS rejection -
 -- see the comment on send_notification in that same migration).
 --
 -- The original singular columns (donations.proof_storage_path /

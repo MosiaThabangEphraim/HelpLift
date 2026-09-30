@@ -17,13 +17,46 @@ function serviceClient() {
 
 // Self-service permanent account deletion, for givers and organizations
 // from their own Settings. Requires re-entering the current password as
-// proof of intent — Supabase has no standalone "verify this password"
+// proof of intent - Supabase has no standalone "verify this password"
 // endpoint, so this signs in with it; a failed sign-in means it was wrong.
 //
 // Deleting the auth.users row cascades down through profiles ->
 // organizations/givers -> everything referencing them (needs, donations,
 // gift_offerings, notifications, etc. are all FK'd with on delete cascade)
-// — this one call is a full, permanent wipe of the account's data.
+// - this one call is a full, permanent wipe of the account's data.
+// Self-service toggle for whether this account gets emails for its in-app
+// notifications (see profiles.email_notifications_enabled, checked in
+// app/api/webhooks/notification-created/route.ts before it sends anything).
+// Lives here rather than in the giver/organization profile routes since the
+// column is on profiles, not givers/organizations, and the behavior is
+// identical for every role - one endpoint for whoever's signed in, same as
+// account deletion below. Never touches email verification or password
+// reset - those are Supabase Auth's own emails, sent through its own
+// mailer, not this table or the notification webhook.
+export async function PATCH(request: Request) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ message: "Authentication required." }, { status: 401 })
+
+    const body = await request.json()
+    if (typeof body.email_notifications_enabled !== "boolean") {
+      return NextResponse.json({ message: "No updatable fields provided." }, { status: 400 })
+    }
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({ email_notifications_enabled: body.email_notifications_enabled })
+      .eq("id", user.id)
+    if (error) return NextResponse.json({ message: error.message }, { status: 400 })
+
+    return NextResponse.json({ email_notifications_enabled: body.email_notifications_enabled })
+  } catch (error) {
+    console.error("Account settings update error:", error)
+    return NextResponse.json({ message: "Settings update is unavailable." }, { status: 503 })
+  }
+}
+
 export async function DELETE(request: Request) {
   try {
     const supabase = await createClient()
@@ -74,7 +107,7 @@ export async function DELETE(request: Request) {
     try {
       await supabase.auth.signOut()
     } catch {
-      // Session may already be invalid now that the user row is gone —
+      // Session may already be invalid now that the user row is gone -
       // the client clears its own state and redirects regardless.
     }
 

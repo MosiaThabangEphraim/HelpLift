@@ -1,7 +1,7 @@
 -- Migration: 20260914002400_debug_auth_context.sql
 -- Description: Narrower diagnostic. is_admin_profile(recipient) has proven
 -- true via a standalone RPC call, and also fails identically inside a
--- SECURITY INVOKER function reproducing the real insert — so the next thing
+-- SECURITY INVOKER function reproducing the real insert - so the next thing
 -- to rule out is whether auth.uid() and is_admin_profile() resolve
 -- differently when evaluated in the SAME statement/transaction as the
 -- insert itself, versus a separate round trip. This computes everything

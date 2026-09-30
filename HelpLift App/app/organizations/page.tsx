@@ -17,6 +17,9 @@ import {
 import { MessageComposeDialog } from "@/components/message-compose-dialog"
 import { useCanMessage } from "@/hooks/use-can-message"
 import { BackButton } from "@/components/back-button"
+import { getCurrentPosition, reverseGeocodePlaceNames } from "@/lib/geolocation"
+import { LocateFixed } from "lucide-react"
+import { ViewToggle, type ListView } from "@/components/view-toggle"
 
 type DirectoryOrganization = {
   id: string
@@ -24,6 +27,7 @@ type DirectoryOrganization = {
   type: string
   city: string | null
   province: string | null
+  address: string | null
   mission: string | null
   logo_url: string | null
   verification_status: string
@@ -37,7 +41,7 @@ type DirectoryOrganization = {
 type SortKey = "name" | "needs" | "newest"
 
 const selectClass =
-  "w-full px-4 py-3 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded-2xl text-sm font-semibold outline-none focus:border-blue-500 transition-colors text-slate-700 dark:text-slate-300"
+  "w-full px-4 py-3 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded text-sm font-semibold outline-none focus:border-blue-500 transition-colors text-slate-700 dark:text-slate-300"
 
 export default function OrganizationsDirectoryPage() {
   const [organizations, setOrganizations] = useState<DirectoryOrganization[]>([])
@@ -49,6 +53,13 @@ export default function OrganizationsDirectoryPage() {
   const [provinceFilter, setProvinceFilter] = useState("all")
   const [onlyWithNeeds, setOnlyWithNeeds] = useState(false)
   const [sortBy, setSortBy] = useState<SortKey>("name")
+  // "Near me" - see lib/geolocation.ts. Same live-position + one free
+  // reverse-geocode, then text-match approach used on the needs pages.
+  const [nearMeEnabled, setNearMeEnabled] = useState(false)
+  const [nearMePlaces, setNearMePlaces] = useState<string[]>([])
+  const [isLocating, setIsLocating] = useState(false)
+  const [nearMeError, setNearMeError] = useState("")
+  const [view, setView] = useState<ListView>("grid")
 
   // Who is looking. Messaging needs an account, and an organization viewer is
   // read-only, so they can't send messages.
@@ -75,12 +86,37 @@ export default function OrganizationsDirectoryPage() {
   const types = useMemo(() => Array.from(new Set(organizations.map(o => o.type).filter(Boolean))).sort(), [organizations])
   const provinces = useMemo(() => Array.from(new Set(organizations.map(o => o.province).filter(Boolean) as string[])).sort(), [organizations])
 
+  const toggleNearMe = async (checked: boolean) => {
+    if (!checked) {
+      setNearMeEnabled(false)
+      return
+    }
+    setIsLocating(true)
+    setNearMeError("")
+    try {
+      const position = await getCurrentPosition()
+      const places = await reverseGeocodePlaceNames(position.coords.latitude, position.coords.longitude)
+      if (places.length === 0) throw new Error("Could not determine your area from your location.")
+      setNearMePlaces(places)
+      setNearMeEnabled(true)
+    } catch (err: any) {
+      setNearMeError(err.message || "Could not use your location.")
+      setNearMeEnabled(false)
+    } finally {
+      setIsLocating(false)
+    }
+  }
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
     const filtered = organizations.filter(org => {
       if (typeFilter !== "all" && org.type !== typeFilter) return false
       if (provinceFilter !== "all" && org.province !== provinceFilter) return false
       if (onlyWithNeeds && org.open_needs === 0) return false
+      if (nearMeEnabled) {
+        const orgPlace = [org.address, org.city, org.province].filter(Boolean).join(" ").toLowerCase()
+        if (!nearMePlaces.some(p => orgPlace.includes(p.trim().toLowerCase()))) return false
+      }
       if (!q) return true
       return [org.name, org.mission, org.city, org.province, org.type].some(field => field?.toLowerCase().includes(q))
     })
@@ -89,15 +125,16 @@ export default function OrganizationsDirectoryPage() {
     else if (sortBy === "newest") sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     else sorted.sort((a, b) => a.name.localeCompare(b.name))
     return sorted
-  }, [organizations, query, typeFilter, provinceFilter, onlyWithNeeds, sortBy])
+  }, [organizations, query, typeFilter, provinceFilter, onlyWithNeeds, sortBy, nearMeEnabled, nearMePlaces])
 
-  const hasFilters = query !== "" || typeFilter !== "all" || provinceFilter !== "all" || onlyWithNeeds || sortBy !== "name"
+  const hasFilters = query !== "" || typeFilter !== "all" || provinceFilter !== "all" || onlyWithNeeds || sortBy !== "name" || nearMeEnabled
   const resetFilters = () => {
     setQuery("")
     setTypeFilter("all")
     setProvinceFilter("all")
     setOnlyWithNeeds(false)
     setSortBy("name")
+    setNearMeEnabled(false)
   }
 
   const handleMessage = (org: DirectoryOrganization) => {
@@ -111,12 +148,12 @@ export default function OrganizationsDirectoryPage() {
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100 pt-28 pb-20 px-4 md:px-8 transition-colors">
-      <div className="max-w-7xl mx-auto space-y-10">
-        <div className="-mb-4">
+      <div className="max-w-[2400px] mx-auto space-y-10">
+        <div>
           <BackButton fallbackHref="/" />
         </div>
         <header className="space-y-4 text-center max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900 text-blue-600 dark:text-blue-400 text-xs font-bold uppercase tracking-wider">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900 text-blue-600 dark:text-blue-400 text-xs font-bold uppercase tracking-wider">
             <Building2 className="w-4 h-4" />
             <span>Organizations</span>
           </div>
@@ -127,7 +164,7 @@ export default function OrganizationsDirectoryPage() {
         </header>
 
         {/* --- SEARCH & FILTERS --- */}
-        <div className="rounded-3xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E]/80 p-6 shadow-sm space-y-4">
+        <div className="rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E]/80 p-6 shadow-sm space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
             <div className="md:col-span-5 relative">
               <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
@@ -137,7 +174,7 @@ export default function OrganizationsDirectoryPage() {
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 aria-label="Search organizations"
-                className="w-full pl-12 pr-4 py-3 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded-2xl text-sm outline-none focus:border-blue-500 transition-colors"
+                className="w-full pl-12 pr-4 py-3 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded text-sm outline-none focus:border-blue-500 transition-colors"
               />
             </div>
             <div className="md:col-span-2">
@@ -161,23 +198,42 @@ export default function OrganizationsDirectoryPage() {
             </div>
           </div>
           <div className="flex items-center justify-between gap-3 flex-wrap text-sm">
-            <label className="inline-flex items-center gap-2 font-semibold cursor-pointer">
-              <input type="checkbox" checked={onlyWithNeeds} onChange={e => setOnlyWithNeeds(e.target.checked)} className="w-4 h-4 accent-blue-600" />
-              <span className="inline-flex items-center gap-1.5"><Filter className="w-3.5 h-3.5 text-slate-400" /> Only organizations with open needs</span>
-            </label>
+            <div className="flex items-center gap-4 flex-wrap">
+              <label data-tip="Hide organizations with nothing currently open to support" className="inline-flex items-center gap-2 font-semibold cursor-pointer">
+                <input type="checkbox" checked={onlyWithNeeds} onChange={e => setOnlyWithNeeds(e.target.checked)} className="w-4 h-4 accent-blue-600" />
+                <span className="inline-flex items-center gap-1.5"><Filter className="w-3.5 h-3.5 text-slate-400" /> Only organizations with open needs</span>
+              </label>
+              <label
+                data-tip="Uses your device's live location, just once, to find organizations near you - it isn't saved"
+                className="inline-flex items-center gap-2 font-semibold cursor-pointer"
+              >
+                <input type="checkbox" checked={nearMeEnabled} onChange={e => toggleNearMe(e.target.checked)} className="w-4 h-4 accent-blue-600" />
+                <span className="inline-flex items-center gap-1.5">
+                  {isLocating ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" /> : <LocateFixed className="w-3.5 h-3.5 text-slate-400" />}
+                  Organizations near me
+                </span>
+              </label>
+              {nearMeError && <span className="text-xs font-semibold text-red-600 dark:text-red-400">{nearMeError}</span>}
+            </div>
             <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
               {!isLoading && <span>{visible.length} of {organizations.length} organization{organizations.length === 1 ? "" : "s"}</span>}
               {hasFilters && (
                 <button type="button" onClick={resetFilters} className="font-bold text-blue-600 hover:underline">Reset filters</button>
               )}
+              <ViewToggle view={view} onChange={setView} />
             </div>
           </div>
+          {nearMeEnabled && nearMePlaces.length > 0 && (
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400">
+              <LocateFixed className="w-3.5 h-3.5" /> Showing organizations near {nearMePlaces.slice(0, 2).join(", ")}
+            </p>
+          )}
         </div>
 
         {needSignIn && (
-          <div className="max-w-3xl mx-auto rounded-2xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-4 text-sm font-semibold text-amber-800 dark:text-amber-300 flex items-center justify-between gap-3 flex-wrap">
+          <div className="max-w-3xl mx-auto rounded border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-4 text-sm font-semibold text-amber-800 dark:text-amber-300 flex items-center justify-between gap-3 flex-wrap">
             <span>Sign in to send a message to {needSignIn}.</span>
-            <Link href="/login" className="rounded-full bg-amber-600 hover:bg-amber-700 text-white px-4 py-1.5 text-xs font-bold">Sign in</Link>
+            <Link href="/login" className="rounded bg-amber-600 hover:bg-amber-700 text-white px-4 py-1.5 text-xs font-bold">Sign in</Link>
           </div>
         )}
 
@@ -193,27 +249,27 @@ export default function OrganizationsDirectoryPage() {
             <p className="text-sm font-semibold text-red-600">{loadError}</p>
           </div>
         ) : visible.length === 0 ? (
-          <div className="text-center py-20 rounded-3xl border border-dashed border-slate-300 dark:border-[#233350] p-8 space-y-3 bg-white dark:bg-[#121B2E]/40">
+          <div className="text-center py-20 rounded border border-dashed border-slate-300 dark:border-[#233350] p-8 space-y-3 bg-white dark:bg-[#121B2E]/40">
             <Building2 className="w-12 h-12 text-slate-400 mx-auto" />
             <h3 className="text-xl font-bold">{organizations.length === 0 ? "No organizations yet" : "No organizations match your search"}</h3>
             {hasFilters && (
-              <button onClick={resetFilters} className="px-5 py-2.5 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-sm hover:opacity-90">
+              <button onClick={resetFilters} className="px-5 py-2.5 rounded bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-sm hover:opacity-90">
                 Reset filters
               </button>
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className={`grid gap-6 ${view === "grid" ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"}`}>
             {visible.map(org => {
               const place = [org.city, org.province].filter(Boolean).join(", ")
               return (
-                <article key={org.id} className="rounded-3xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] p-6 flex flex-col justify-between gap-5 shadow-sm hover:shadow-md transition-shadow">
+                <article key={org.id} className="rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] p-6 flex flex-col justify-between gap-5 shadow-sm hover:shadow-md transition-shadow">
                   <div className="space-y-3">
                     <div className="flex items-start gap-3">
                       {org.logo_url ? (
-                        <img src={org.logo_url} alt="" className="h-12 w-12 rounded-2xl object-cover border border-slate-200 dark:border-[#233350] shrink-0" />
+                        <img src={org.logo_url} alt="" className="h-12 w-12 rounded object-cover border border-slate-200 dark:border-[#233350] shrink-0" />
                       ) : (
-                        <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white font-bold shrink-0">
+                        <div className="h-12 w-12 rounded bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white font-bold shrink-0">
                           {org.name.charAt(0).toUpperCase()}
                         </div>
                       )}
@@ -224,11 +280,11 @@ export default function OrganizationsDirectoryPage() {
                     </div>
 
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300" data-tip="Checked and approved by a HelpLift administrator">
+                      <span className="inline-flex items-center gap-1 rounded bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300" data-tip="Checked and approved by a HelpLift administrator">
                         <CheckCircle2 className="w-3 h-3" /> Verified
                       </span>
                       <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                        className={`inline-flex items-center gap-1 rounded px-2.5 py-1 text-[11px] font-bold ${
                           org.open_needs > 0
                             ? "bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300"
                             : "bg-slate-100 dark:bg-[#1A2740] text-slate-500 dark:text-slate-400"
@@ -251,17 +307,17 @@ export default function OrganizationsDirectoryPage() {
                   <div className="flex items-center gap-2">
                     <Link
                       href={`/organizations/${org.id}`}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2.5 text-sm font-bold hover:opacity-90 transition-opacity"
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 rounded bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2.5 text-sm font-bold hover:opacity-90 transition-opacity"
                     >
                       View details <ArrowRight className="w-4 h-4" />
                     </Link>
                     {org.is_own ? (
-                      <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-[#1A2740] px-3 py-2 text-xs font-bold text-slate-500">Your organization</span>
+                      <span className="inline-flex items-center rounded bg-slate-100 dark:bg-[#1A2740] px-3 py-2 text-xs font-bold text-slate-500">Your organization</span>
                     ) : isViewer ? (
                       <span
                         aria-disabled="true"
                         data-tip="Viewers have read-only access and can't send messages. Ask an owner or manager."
-                        className="inline-flex cursor-not-allowed items-center justify-center gap-1.5 rounded-full border border-slate-200 dark:border-[#233350] px-4 py-2.5 text-sm font-bold text-slate-400 dark:text-slate-500 opacity-70"
+                        className="inline-flex cursor-not-allowed items-center justify-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] px-4 py-2.5 text-sm font-bold text-slate-400 dark:text-slate-500 opacity-70"
                       >
                         <MessageSquare className="w-4 h-4" /> Message
                       </span>
@@ -269,7 +325,7 @@ export default function OrganizationsDirectoryPage() {
                       <button
                         type="button"
                         onClick={() => handleMessage(org)}
-                        className="inline-flex items-center justify-center gap-1.5 rounded-full border border-slate-200 dark:border-[#233350] px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1A2740] transition-colors"
+                        className="inline-flex items-center justify-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1A2740] transition-colors"
                         data-tip={signedIn ? `Send a message to ${org.name}` : "Sign in to message this organization"}
                       >
                         <MessageSquare className="w-4 h-4" /> Message

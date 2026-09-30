@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react"
 import { Loader2, Star } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartCard, RankedBars, StatTile, VizRoot } from "@/components/analytics/chart-parts"
+import { FeedbackDetailDialog } from "@/components/feedback-detail-dialog"
+import { activateOnKey } from "@/lib/keyboard"
 
 type Feedback = {
   id: string
@@ -35,6 +37,7 @@ export function AdminFeedback() {
   const [ratingFilter, setRatingFilter] = useState<"all" | "1" | "2" | "3" | "4" | "5">("all")
   const [roleFilter, setRoleFilter] = useState<"all" | "giver" | "organization">("all")
   const [withCommentOnly, setWithCommentOnly] = useState(false)
+  const [selected, setSelected] = useState<Feedback | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -128,7 +131,14 @@ export function AdminFeedback() {
           ) : (
             <div className="space-y-3">
               {visible.map(item => (
-                <article key={item.id} className="rounded-2xl border border-slate-200 dark:border-[#233350] p-4 space-y-2">
+                <article
+                  key={item.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelected(item)}
+                  onKeyDown={activateOnKey}
+                  className="cursor-pointer rounded-2xl border border-slate-200 dark:border-[#233350] p-4 space-y-2 hover:border-blue-300 dark:hover:border-blue-800 hover:shadow-sm transition-all"
+                >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-3">
                       <Stars value={item.rating} />
@@ -138,17 +148,18 @@ export function AdminFeedback() {
                     <span className="text-[11px] text-slate-400">{new Date(item.created_at).toLocaleString()}</span>
                   </div>
                   {item.message ? (
-                    <p className="whitespace-pre-line text-sm text-slate-700 dark:text-slate-300">{item.message}</p>
+                    <p className="line-clamp-2 whitespace-pre-line text-sm text-slate-700 dark:text-slate-300">{item.message}</p>
                   ) : (
                     <p className="text-sm italic text-slate-400">No comment.</p>
                   )}
-                  {item.sender_email && <p className="text-xs text-slate-400">{item.sender_email}</p>}
                 </article>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
+
+      <FeedbackDetailDialog open={!!selected} onOpenChange={open => !open && setSelected(null)} feedback={selected} />
     </VizRoot>
   )
 }

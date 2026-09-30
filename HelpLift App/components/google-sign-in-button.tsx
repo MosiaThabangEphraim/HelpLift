@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { setOauthIntent, type OauthIntent } from "@/lib/oauth-intent"
 
 // "Continue with Google". Google sign-in is handled by Supabase Auth (the Google
 // provider is enabled, with the client ID and secret, in the Supabase
@@ -11,20 +12,20 @@ export function GoogleSignInButton({
   label = "Continue with Google",
   intent,
   onError,
+  disabled = false,
 }: {
   label?: string
   /** Where the person started: "org" / "giver" = they already picked a type on the Register page, "admin" = the admin portal. */
-  intent?: "org" | "giver" | "admin"
+  intent?: OauthIntent
   onError?: (message: string) => void
+  /** e.g. registration's "agree to the terms" checkbox not checked yet. */
+  disabled?: boolean
 }) {
   const [isLoading, setIsLoading] = useState(false)
 
   const start = async () => {
     setIsLoading(true)
-    // Read (and cleared) by /auth/callback once Google sends the person back.
-    document.cookie = intent
-      ? `google_intent=${intent}; path=/; max-age=600; SameSite=Lax`
-      : "google_intent=; path=/; max-age=0; SameSite=Lax"
+    setOauthIntent(intent)
     const supabase = createClient()
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -45,7 +46,7 @@ export function GoogleSignInButton({
     <button
       type="button"
       onClick={start}
-      disabled={isLoading}
+      disabled={isLoading || disabled}
       className="flex w-full items-center justify-center gap-3 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-6 py-3.5 text-sm font-bold text-slate-800 dark:text-slate-100 shadow-sm transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-60"
     >
       {isLoading ? (

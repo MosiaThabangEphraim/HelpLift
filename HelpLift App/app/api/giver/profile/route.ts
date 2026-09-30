@@ -7,7 +7,7 @@ const ALLOWED_ACCOUNT_TYPES = ["individual", "business", "group"] as const
 // `profiles.phone` and `givers.name`/`givers.phone` in sync since both tables
 // store the same identity fields (see 20260914000100_help_lift_auth_schema.sql).
 //
-// `email` is accepted here only as a SYNC field, never to initiate a change —
+// `email` is accepted here only as a SYNC field, never to initiate a change -
 // the actual login email change happens client-side via
 // supabase.auth.updateUser({ email }) + verifyOtp (see ChangeEmailFlow in
 // components/account-security.tsx), which is the only path that can update
@@ -28,6 +28,7 @@ export async function PATCH(request: Request) {
     const preferredCategories = typeof body.preferred_categories === "string" ? body.preferred_categories : undefined
     const preferredLocations = typeof body.preferred_locations === "string" ? body.preferred_locations : undefined
     const email = typeof body.email === "string" ? body.email.trim() : undefined
+    const spotlightOptOut = typeof body.spotlight_opt_out === "boolean" ? body.spotlight_opt_out : undefined
 
     if (fullName !== undefined && !fullName) {
       return NextResponse.json({ message: "Name cannot be empty." }, { status: 400 })
@@ -44,7 +45,7 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ message: "This email does not match your current login email. Complete the email change first." }, { status: 400 })
       }
     }
-    if (fullName === undefined && phone === undefined && accountType === undefined && preferredCategories === undefined && preferredLocations === undefined && email === undefined) {
+    if (fullName === undefined && phone === undefined && accountType === undefined && preferredCategories === undefined && preferredLocations === undefined && email === undefined && spotlightOptOut === undefined) {
       return NextResponse.json({ message: "No updatable fields provided." }, { status: 400 })
     }
 
@@ -75,12 +76,13 @@ export async function PATCH(request: Request) {
         .map((item: string) => item.trim())
         .filter(Boolean)
     }
+    if (spotlightOptOut !== undefined) giverUpdate.spotlight_opt_out = spotlightOptOut
 
     const { data: giver, error: giverError } = await supabase
       .from("givers")
       .update(giverUpdate)
       .eq("profile_id", user.id)
-      .select("id, name, email, phone, account_type, preferred_categories, preferred_locations")
+      .select("id, name, email, phone, account_type, preferred_categories, preferred_locations, spotlight_opt_out")
       .single()
 
     if (giverError) return NextResponse.json({ message: giverError.message }, { status: 400 })

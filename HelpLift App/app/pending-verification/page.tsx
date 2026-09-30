@@ -33,7 +33,7 @@ const STATUS_COPY: Record<string, { icon: typeof Clock; title: string; body: str
 
 // Mirrors /suspended: the only page a not-yet-approved organization can reach
 // (proxy.ts redirects every other org route here). Unlike suspension, they
-// can still submit documents and get moved forward — just not touch the rest
+// can still submit documents and get moved forward - just not touch the rest
 // of the platform while pending.
 export default function PendingVerificationPage() {
   const router = useRouter()
@@ -144,25 +144,25 @@ export default function PendingVerificationPage() {
     <main className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 px-4 py-16 md:py-24">
       <div className="mx-auto w-full max-w-2xl space-y-8">
         <section className="text-center space-y-3">
-          <div className={`inline-flex rounded-2xl ${copy.tone} p-4 text-white mx-auto`}>
+          <div className={`inline-flex rounded ${copy.tone} p-4 text-white mx-auto`}>
             <StatusIcon className="h-8 w-8" />
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{copy.title}</h1>
           <p className="text-slate-500 dark:text-slate-400 max-w-md mx-auto">{copy.body}</p>
           {status !== "rejected" && (
             <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 max-w-md mx-auto">
-              Keep an eye on your email — we'll notify you there as soon as your organization is approved, or if an administrator needs anything else from you.
+              Keep an eye on your email - we'll notify you there as soon as your organization is approved, or if an administrator needs anything else from you.
             </p>
           )}
           {notes && (
-            <p className="text-sm text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-900 rounded-xl p-3 mt-2 text-left max-w-md mx-auto">
+            <p className="text-sm text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-900 rounded p-3 mt-2 text-left max-w-md mx-auto">
               <span className="font-bold">Note from admin: </span>{notes}
             </p>
           )}
         </section>
 
         {(error || message) && (
-          <div className={`flex items-center gap-2 rounded-2xl border p-4 text-sm font-semibold ${
+          <div className={`flex items-center gap-2 rounded border p-4 text-sm font-semibold ${
             error ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"
           }`}>
             {error ? <XCircle className="h-5 w-5 shrink-0" /> : <CheckCircle2 className="h-5 w-5 shrink-0" />}
@@ -170,7 +170,7 @@ export default function PendingVerificationPage() {
           </div>
         )}
 
-        <section className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 space-y-4">
+        <section className="rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 space-y-4">
           <div>
             <h2 className="font-bold text-slate-900 dark:text-slate-100">Submit a document</h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">Upload registration or tax evidence for admin review. Maximum 10 MB.</p>
@@ -185,7 +185,7 @@ export default function PendingVerificationPage() {
                 id="pending-doc-type"
                 value={selectedDocType}
                 onChange={(e) => setSelectedDocType(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                className="mt-1 w-full rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
               >
                 <option value="registration_certificate">NPO / NGO Registration Certificate</option>
                 <option value="tax_exemption">SARS Section 18A / Tax Exemption</option>
@@ -194,7 +194,7 @@ export default function PendingVerificationPage() {
                 <option value="supporting_document">Other Verification Document</option>
               </select>
             </div>
-            <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-slate-300 dark:border-[#2C3E63] p-5 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:border-blue-500">
+            <label className="flex cursor-pointer items-center gap-3 rounded border border-dashed border-slate-300 dark:border-[#2C3E63] p-5 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:border-blue-500">
               <UploadCloud className="h-5 w-5 text-blue-600" />
               <span className="truncate">
                 {selectedFiles.length === 0
@@ -205,7 +205,7 @@ export default function PendingVerificationPage() {
               </span>
               <input type="file" multiple accept=".pdf,.png,.jpg,.jpeg" onChange={event => setSelectedFiles(Array.from(event.target.files || []))} className="sr-only" />
             </label>
-            <button disabled={isUploading || selectedFiles.length === 0} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-900 px-5 py-3 font-bold text-white disabled:opacity-50">
+            <button disabled={isUploading || selectedFiles.length === 0} className="inline-flex w-full items-center justify-center gap-2 rounded bg-slate-900 px-5 py-3 font-bold text-white disabled:opacity-50">
               {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
               {selectedFiles.length > 1 ? `Upload ${selectedFiles.length} documents` : "Upload document"}
             </button>
@@ -215,7 +215,7 @@ export default function PendingVerificationPage() {
           {documents.length > 0 && (
             <div className="space-y-2 pt-2">
               {documents.map(document => (
-                <div key={document.id} className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 dark:border-[#233350] p-3">
+                <div key={document.id} className="flex items-center justify-between gap-4 rounded border border-slate-200 dark:border-[#233350] p-3">
                   <span className="flex items-center gap-2.5 text-sm font-semibold truncate">
                     <FileText className="h-4 w-4 text-blue-600 shrink-0" />
                     <span className="truncate">{document.file_name}</span>
@@ -230,7 +230,7 @@ export default function PendingVerificationPage() {
             <button
               onClick={handleResubmit}
               disabled={isResubmitting}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-amber-600 hover:bg-amber-700 text-white px-5 py-3 text-sm font-bold disabled:opacity-50"
+              className="inline-flex w-full items-center justify-center gap-2 rounded bg-amber-600 hover:bg-amber-700 text-white px-5 py-3 text-sm font-bold disabled:opacity-50"
             >
               {isResubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
               Resubmit for Review
@@ -240,8 +240,8 @@ export default function PendingVerificationPage() {
 
         <section className="text-center space-y-4">
           {sentToAdmin ? (
-            <p className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-700">
-              Message sent — an administrator will get back to you.
+            <p className="rounded border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-700">
+              Message sent - an administrator will get back to you.
             </p>
           ) : memberRole !== "viewer" ? (
             <Button onClick={() => setIsMessagingAdmin(true)} variant="outline" className="w-full max-w-md mx-auto">

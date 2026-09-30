@@ -1,7 +1,7 @@
 -- Migration: 20260914002900_org_scope_completion_part2.sql (part 2 of 2)
 -- Description: Run AFTER 20260914002800_org_scope_completion.sql has been
 -- run and committed on its own (it adds the 'more_info_requested' and
--- 'in_progress' enum values this file uses — Postgres requires that to be a
+-- 'in_progress' enum values this file uses - Postgres requires that to be a
 -- separate, already-committed transaction).
 --
 -- Closes out gaps identified against the written project scope for
@@ -11,7 +11,7 @@
 --   2. Profile Management: a logo/branding asset field + public bucket.
 --   3. Posting Needs: attachments (images/documents) on a need, via a
 --      need_attachments table (same multi-file pattern as fulfillment_proofs
---      — insert via SECURITY DEFINER function, not a bare RLS policy).
+--      - insert via SECURITY DEFINER function, not a bare RLS policy).
 --   4. Managing Needs: an 'in_progress' need status (distinct from a
 --      fulfillment's own status) and a DELETE policy so an organization can
 --      remove a need it owns (the app layer blocks deleting one that
@@ -25,7 +25,7 @@ alter table public.organizations add column if not exists verification_notes tex
 -- The organization's own "Users can update their own organization" UPDATE
 -- policy has no column-level restriction (RLS can't express that directly),
 -- so nothing at the database layer actually stopped an organization from
--- setting its own verification_status via a direct client call — only the
+-- setting its own verification_status via a direct client call - only the
 -- app-level route allowlist did. This closes that gap, while also allowing
 -- the one legitimate self-service transition: resubmitting for review after
 -- an admin requests more information.
@@ -193,7 +193,7 @@ alter table public.impact_stories add column if not exists video_url text;
 
 -- --- 6. 'in_progress' needs stay fully live, not half-hidden ----------------
 -- Everywhere a need had to be status = 'open' to be visible/actionable to the
--- public or to givers, it must now also allow 'in_progress' — otherwise a
+-- public or to givers, it must now also allow 'in_progress' - otherwise a
 -- need effectively disappears (and stops accepting further interest/
 -- donations) the moment the first giver is accepted, which defeats needs
 -- that call for multiple contributors.

@@ -1,8 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
+import { ShareButtons } from "@/components/share-buttons"
 import {
   Building2,
   CheckCircle2,
@@ -25,6 +26,7 @@ import { StoryMediaGallery } from "@/components/story-media-gallery"
 import { MessageComposeDialog } from "@/components/message-compose-dialog"
 import { useCanMessage } from "@/hooks/use-can-message"
 import { BackButton } from "@/components/back-button"
+import { ReadAloudButton } from "@/components/read-aloud-button"
 
 type OrganizationProfile = {
   id: string
@@ -73,7 +75,11 @@ type Story = {
 export default function OrganizationPublicProfilePage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const id = params?.id as string
+  // A shared story link (?story=<id> - see ShareButtons below) scrolls to and
+  // briefly highlights that one story once the page has actually loaded it.
+  const sharedStoryId = searchParams.get("story")
 
   const [org, setOrg] = useState<OrganizationProfile | null>(null)
   const [needs, setNeeds] = useState<Need[]>([])
@@ -98,6 +104,13 @@ export default function OrganizationPublicProfilePage() {
     loadProfile()
   }, [id])
 
+  useEffect(() => {
+    if (!sharedStoryId || stories.length === 0) return
+    const el = document.getElementById(`story-${sharedStoryId}`)
+    if (!el) return
+    el.scrollIntoView({ behavior: "smooth", block: "center" })
+  }, [sharedStoryId, stories])
+
   const loadProfile = async () => {
     setIsLoading(true)
     setError("")
@@ -121,7 +134,7 @@ export default function OrganizationPublicProfilePage() {
     const level = (urgency || "medium").toLowerCase()
     if (level === "high") {
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400">
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-bold bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400">
           <Flame className="w-3 h-3 fill-red-500" />
           High
         </span>
@@ -129,14 +142,14 @@ export default function OrganizationPublicProfilePage() {
     }
     if (level === "medium") {
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400">
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-bold bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400">
           <AlertTriangle className="w-3 h-3" />
           Medium
         </span>
       )
     }
     return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400">
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-bold bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400">
         <PackageCheck className="w-3 h-3" />
         Standard
       </span>
@@ -154,13 +167,13 @@ export default function OrganizationPublicProfilePage() {
   if (error || !org) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#FAFAFA] dark:bg-slate-950 px-4 text-center">
-        <div className="p-6 max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl space-y-4">
+        <div className="p-6 max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded space-y-4">
           <Building2 className="w-12 h-12 text-slate-400 mx-auto" />
           <h2 className="text-xl font-bold">Organization Profile Unavailable</h2>
           <p className="text-sm text-slate-500 dark:text-slate-400">{error || "We could not find the organization profile you were looking for."}</p>
           <Link
             href="/needs"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-blue-600 text-white text-sm font-bold hover:bg-blue-700"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded bg-blue-600 text-white text-sm font-bold hover:bg-blue-700"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Browse Community Needs</span>
@@ -172,18 +185,18 @@ export default function OrganizationPublicProfilePage() {
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 text-slate-900 dark:text-slate-100 pt-28 pb-24 px-4 md:px-8">
-      <div className="max-w-6xl mx-auto space-y-10">
+      <div className="max-w-[2400px] mx-auto space-y-10">
 
         <BackButton fallbackHref="/organizations" />
 
         {/* Organization Header Card */}
-        <header className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 shadow-sm space-y-6">
+        <header className="rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 shadow-sm space-y-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="flex items-start md:items-center gap-5">
               {org.logo_url ? (
-                <img src={org.logo_url} alt={`${org.name} logo`} className="w-16 h-16 rounded-2xl object-cover shadow-lg shadow-blue-600/20 shrink-0 border border-slate-200 dark:border-slate-800" />
+                <img src={org.logo_url} alt={`${org.name} logo`} className="w-16 h-16 rounded object-cover shadow-lg shadow-blue-600/20 shrink-0 border border-slate-200 dark:border-slate-800" />
               ) : (
-                <div className="w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-600/20 shrink-0">
+                <div className="w-16 h-16 rounded bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-600/20 shrink-0">
                   <Building2 className="w-8 h-8" />
                 </div>
               )}
@@ -193,7 +206,7 @@ export default function OrganizationPublicProfilePage() {
                     {org.name}
                   </h1>
                   {org.verification_status === "approved" && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       Verified Organization
                     </span>
@@ -208,7 +221,7 @@ export default function OrganizationPublicProfilePage() {
                   <span
                     aria-disabled="true"
                     data-tip="Viewers have read-only access and can't send messages. Ask an owner or manager."
-                    className="mt-3 inline-flex cursor-not-allowed items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-700 px-4 py-2 text-sm font-bold text-slate-400 opacity-70"
+                    className="mt-3 inline-flex cursor-not-allowed items-center gap-1.5 rounded border border-slate-200 dark:border-slate-700 px-4 py-2 text-sm font-bold text-slate-400 opacity-70"
                   >
                     <MessageSquare className="w-4 h-4" /> Message
                   </span>
@@ -217,7 +230,7 @@ export default function OrganizationPublicProfilePage() {
                     <button
                       type="button"
                       onClick={handleMessage}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm font-bold transition-colors"
+                      className="inline-flex items-center gap-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm font-bold transition-colors"
                       data-tip={signedIn ? `Send a message to ${org.name}` : "Sign in to message this organization"}
                     >
                       <MessageSquare className="w-4 h-4" /> Message
@@ -235,25 +248,25 @@ export default function OrganizationPublicProfilePage() {
 
             <div className="flex flex-wrap gap-3 text-xs font-semibold text-slate-500 dark:text-slate-400">
               {(org.city || org.province) && (
-                <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                <div className="flex items-center gap-1.5 px-3.5 py-2 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                   <MapPin className="w-4 h-4 text-slate-400" />
                   <span>{[org.city, org.province].filter(Boolean).join(", ")}</span>
                 </div>
               )}
               {org.contact_email && (
-                <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                <div className="flex items-center gap-1.5 px-3.5 py-2 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                   <Mail className="w-4 h-4 text-slate-400" />
                   <span>{org.contact_email}</span>
                 </div>
               )}
               {org.phone && (
-                <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                <div className="flex items-center gap-1.5 px-3.5 py-2 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                   <Phone className="w-4 h-4 text-slate-400" />
                   <span>{org.phone}</span>
                 </div>
               )}
               {org.address && (
-                <div className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                <div className="flex items-center gap-1.5 px-3.5 py-2 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                   <Building2 className="w-4 h-4 text-slate-400" />
                   <span>{org.address}</span>
                 </div>
@@ -263,10 +276,13 @@ export default function OrganizationPublicProfilePage() {
 
           {/* Mission Statement */}
           {org.mission && (
-            <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800/80 space-y-2">
-              <span className="text-xs font-black uppercase tracking-wider text-blue-600 dark:text-blue-400 flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5" /> Mission & Vision
-              </span>
+            <div className="p-6 rounded bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800/80 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-black uppercase tracking-wider text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5" /> Mission & Vision
+                </span>
+                <ReadAloudButton text={org.mission} label="Listen to mission" />
+              </div>
               <p className="text-sm md:text-base text-slate-700 dark:text-slate-300 leading-relaxed italic">
                 "{org.mission}"
               </p>
@@ -295,7 +311,7 @@ export default function OrganizationPublicProfilePage() {
           </div>
 
           {needs.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-slate-300 dark:border-slate-800 p-8 text-center bg-white dark:bg-slate-900/40 text-slate-500 dark:text-slate-400 text-sm">
+            <div className="rounded border border-dashed border-slate-300 dark:border-slate-800 p-8 text-center bg-white dark:bg-slate-900/40 text-slate-500 dark:text-slate-400 text-sm">
               This organization has no open requests at this time.
             </div>
           ) : (
@@ -303,11 +319,11 @@ export default function OrganizationPublicProfilePage() {
               {needs.map((need) => (
                 <div
                   key={need.id}
-                  className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 flex flex-col justify-between shadow-sm space-y-4"
+                  className="rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 flex flex-col justify-between shadow-sm space-y-4"
                 >
                   <div className="space-y-3">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold">
+                      <span className="px-3 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold">
                         {need.category}
                       </span>
                       {renderUrgencyBadge(need.urgency)}
@@ -327,7 +343,7 @@ export default function OrganizationPublicProfilePage() {
 
                   <Link
                     href={`/needs?search=${encodeURIComponent(need.title)}`}
-                    className="inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 transition-colors shadow-sm"
+                    className="inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 transition-colors shadow-sm"
                   >
                     <Send className="w-3.5 h-3.5" />
                     <span>Support this Need</span>
@@ -350,7 +366,7 @@ export default function OrganizationPublicProfilePage() {
           </div>
 
           {stories.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-slate-300 dark:border-slate-800 p-8 text-center bg-white dark:bg-slate-900/40 text-slate-500 dark:text-slate-400 text-sm">
+            <div className="rounded border border-dashed border-slate-300 dark:border-slate-800 p-8 text-center bg-white dark:bg-slate-900/40 text-slate-500 dark:text-slate-400 text-sm">
               No impact stories posted yet by this organization.
             </div>
           ) : (
@@ -366,7 +382,12 @@ export default function OrganizationPublicProfilePage() {
                 return (
                 <article
                   key={story.id}
-                  className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-sm flex flex-col"
+                  id={`story-${story.id}`}
+                  className={`rounded border bg-white dark:bg-slate-900 overflow-hidden shadow-sm flex flex-col transition-colors ${
+                    sharedStoryId === story.id
+                      ? "border-blue-400 dark:border-blue-600 ring-2 ring-blue-200 dark:ring-blue-900"
+                      : "border-slate-200 dark:border-slate-800"
+                  }`}
                 >
                   {media.length > 0 && (
                     <div className="p-2 pb-0">
@@ -382,6 +403,11 @@ export default function OrganizationPublicProfilePage() {
                         {story.content}
                       </p>
                     </div>
+
+                    <ShareButtons
+                      url={typeof window !== "undefined" ? `${window.location.origin}/organizations/${id}?story=${story.id}` : ""}
+                      title={story.title}
+                    />
 
                     <div className="flex items-center justify-between text-xs text-slate-400 pt-3 border-t border-slate-100 dark:border-slate-800">
                       <span>{story.author_role || "Operations Team"}</span>

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
 /**
- * Password reset email contains a clickable link — BUT only if Supabase's
+ * Password reset email contains a clickable link - BUT only if Supabase's
  * email template is configured correctly. See:
  *   /supabase/email-templates/README.md
  * The template must wrap {{ .ConfirmationURL }} in <a href="..."> tags

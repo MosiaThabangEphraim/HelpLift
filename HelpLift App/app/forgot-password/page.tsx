@@ -44,8 +44,8 @@ export default function ForgotPasswordPage() {
     <div className="relative min-h-screen w-full flex flex-col items-center bg-background overflow-x-hidden">
       
       {/* --- BACKGROUND DECORATIONS --- */}
-      <div className="absolute top-[-10%] left-[-5%] w-[50%] h-[40%] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-5%] w-[40%] h-[50%] bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute top-[-10%] left-[-5%] w-[50%] h-[40%] bg-primary/10 rounded blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-5%] w-[40%] h-[50%] bg-primary/5 rounded blur-[100px] pointer-events-none" />
 
       {/* --- MAIN CONTENT --- */}
       <main className="flex-1 w-full max-w-[600px] px-6 pb-10 pt-24 flex flex-col items-center z-20">
@@ -65,7 +65,7 @@ export default function ForgotPasswordPage() {
           <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* WELCOME/INFO SECTION */}
             <div className="text-center space-y-4 mb-12">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-semibold mx-auto">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded bg-primary/10 border border-primary/20 text-primary text-sm font-semibold mx-auto">
                 <HeartHandshake className="w-4 h-4" />
                 <span>HelpLift Account Recovery</span>
               </div>
@@ -82,7 +82,7 @@ export default function ForgotPasswordPage() {
             {/* FORM SECTION */}
             <div className="w-full px-4 md:px-8">
               <form onSubmit={handleSubmit} className="space-y-8">
-                {errorMsg && <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{errorMsg}</p>}
+                {errorMsg && <p className="rounded border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">{errorMsg}</p>}
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-foreground/80 ml-1">Account Email Address</label>
                   <div className="relative group">
@@ -103,7 +103,7 @@ export default function ForgotPasswordPage() {
                 <Button 
                   type="submit" 
                   disabled={isLoading}
-                  className="w-full h-14 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-lg rounded-2xl transition-all shadow-xl shadow-primary/20 active:scale-[0.98]"
+                  className="w-full h-14 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-lg rounded transition-all shadow-xl shadow-primary/20 active:scale-[0.98]"
                 >
                   {isLoading ? (
                     <div className="flex items-center gap-3">
@@ -144,14 +144,14 @@ export default function ForgotPasswordPage() {
             <div className="pt-4 space-y-4">
               <Button
                 onClick={() => router.push(`/reset-password?email=${encodeURIComponent(email)}`)}
-                className="w-full h-14 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-lg rounded-2xl transition-all shadow-xl shadow-primary/20 active:scale-[0.98]"
+                className="w-full h-14 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-lg rounded transition-all shadow-xl shadow-primary/20 active:scale-[0.98]"
               >
                 Enter Verification Code
               </Button>
               <Button
                 variant="outline"
                 onClick={() => setIsSubmitted(false)}
-                className="rounded-full px-8 border-border hover:bg-muted font-bold"
+                className="rounded px-8 border-border hover:bg-muted font-bold"
               >
                 Try a different email
               </Button>

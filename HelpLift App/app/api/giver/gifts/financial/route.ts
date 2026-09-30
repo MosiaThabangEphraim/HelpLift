@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { BANK_ACCOUNTS, type BankKey } from "@/lib/banking"
+import { getActiveBankAccounts } from "@/lib/bank-accounts"
 import { buildPaymentFields } from "@/lib/payfast"
+import { createOrder } from "@/lib/paypal"
 
 // A "Financial Assistance" Gift Library pledge is money, so instead of just
 // creating a text listing that sits idle until an admin eyeballs it, it goes
@@ -24,11 +25,14 @@ export async function POST(request: Request) {
 
     const numericAmount = Number(amount)
     if (!numericAmount || numericAmount <= 0) return NextResponse.json({ message: "Enter a pledge amount greater than zero." }, { status: 400 })
-    if (!["eft", "payfast"].includes(payment_method)) {
+    if (!["eft", "payfast", "paypal"].includes(payment_method)) {
       return NextResponse.json({ message: "Invalid payment method." }, { status: 400 })
     }
-    if (payment_method === "eft" && (!bank_name || !Object.keys(BANK_ACCOUNTS).includes(bank_name))) {
-      return NextResponse.json({ message: "Select a bank to transfer into." }, { status: 400 })
+    let bankAccount = null
+    if (payment_method === "eft") {
+      const activeAccounts = await getActiveBankAccounts(supabase)
+      bankAccount = activeAccounts.find(a => a.key === bank_name) || null
+      if (!bankAccount) return NextResponse.json({ message: "Select a bank to transfer into." }, { status: 400 })
     }
 
     const { data: gift, error: giftError } = await supabase
@@ -52,7 +56,7 @@ export async function POST(request: Request) {
         gift_offering_id: gift.id,
         amount: numericAmount,
         payment_method,
-        bank_name: payment_method === "eft" ? (bank_name as BankKey) : null,
+        bank_name: payment_method === "eft" ? bank_name : null,
       })
       .select()
       .single()
@@ -68,8 +72,8 @@ export async function POST(request: Request) {
       let payfast
       try {
         payfast = buildPaymentFields({
-          returnUrl: `${siteUrl}/givers-dashboard?tab=donations&payfast=success`,
-          cancelUrl: `${siteUrl}/givers-dashboard?tab=donations&payfast=cancelled`,
+          returnUrl: `${siteUrl}/givers-dashboard?tab=donations&payfast=success&donation=${donation.id}`,
+          cancelUrl: `${siteUrl}/givers-dashboard?tab=donations&payfast=cancelled&donation=${donation.id}`,
           notifyUrl: `${siteUrl}/api/public/payfast/notify`,
           nameFirst: nameFirst || undefined,
           nameLast: rest.join(" ") || undefined,
@@ -85,7 +89,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ gift, donation, payfast }, { status: 201 })
     }
 
-    return NextResponse.json({ gift, donation, bank: BANK_ACCOUNTS[bank_name as BankKey] }, { status: 201 })
+    if (payment_method === "paypal") {
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || new URL(request.url).origin
+      let paypal
+      try {
+        paypal = await createOrder({
+          amount: numericAmount,
+          referenceId: donation.id,
+          description: purpose?.trim() || "General financial support for a verified organization, via HelpLift",
+          returnUrl: `${siteUrl}/api/public/paypal/return?donation=${donation.id}`,
+          cancelUrl: `${siteUrl}/givers-dashboard?tab=donations&paypal=cancelled&donation=${donation.id}`,
+        })
+      } catch (configError: any) {
+        return NextResponse.json({ message: configError.message || "PayPal is not configured." }, { status: 503 })
+      }
+      return NextResponse.json({ gift, donation, paypal }, { status: 201 })
+    }
+
+    return NextResponse.json({ gift, donation, bank: bankAccount }, { status: 201 })
   } catch (error) {
     console.error("Financial pledge creation error:", error)
     return NextResponse.json({ message: "Unable to start this pledge." }, { status: 503 })

@@ -15,7 +15,7 @@ const fieldClass = "w-full rounded-xl border border-slate-200 dark:border-slate-
  * Supabase send a confirmation code to the new address using the "Change
  * Email Address" template) then verify (verifyOtp with type "email_change").
  * If "Secure email change" is enabled in Supabase, a code may also be sent to
- * the OLD address — Supabase's own error message will say so if this single
+ * the OLD address - Supabase's own error message will say so if this single
  * code isn't sufficient; this UI doesn't need to special-case that.
  */
 export function ChangeEmailFlow({ currentEmail, onBack, onUpdated }: { currentEmail: string; onBack: () => void; onUpdated: (newEmail: string) => void }) {
@@ -207,7 +207,7 @@ export function ChangePasswordFlow({ onBack, onUpdated }: { onBack: () => void; 
  * acknowledgement checkbox before the button even enables. The actual
  * verification that this is really the account owner happens server-side
  * in DELETE /api/account, which re-authenticates with the password before
- * calling auth.admin.deleteUser() — this form can't be tricked into
+ * calling auth.admin.deleteUser() - this form can't be tricked into
  * deleting an account without the correct password.
  */
 export function DeleteAccountFlow({ onBack }: { onBack: () => void }) {
@@ -248,7 +248,7 @@ export function DeleteAccountFlow({ onBack }: { onBack: () => void }) {
       </button>
       <div className="flex items-start gap-2 rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 p-3 text-sm font-semibold text-red-700 dark:text-red-300">
         <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-        <span>This permanently deletes your account and all associated data — needs, donations, messages, everything. This cannot be undone.</span>
+        <span>This permanently deletes your account and all associated data - needs, donations, messages, everything. This cannot be undone.</span>
       </div>
       {error && <div className="rounded-xl bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">{error}</div>}
       <form onSubmit={handleSubmit} className="space-y-3">

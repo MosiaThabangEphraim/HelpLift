@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { MessageComposeDialog } from "@/components/message-compose-dialog"
+import { ReadAloudButton } from "@/components/read-aloud-button"
+import { MessageStatus } from "@/components/message-status"
 
 export type MessageDetail = {
   id: string
@@ -38,6 +40,8 @@ type ThreadMessage = {
   message: string
   created_at: string
   mine: boolean
+  delivered_at?: string | null
+  read_at?: string | null
   attachments: ThreadAttachment[]
 }
 
@@ -127,7 +131,7 @@ export function MessageDetailDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>{message?.title}</DialogTitle>
           </DialogHeader>
@@ -138,25 +142,29 @@ export function MessageDetailDialog({
                   <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
                     Conversation · {thread!.messages.length} message{thread!.messages.length === 1 ? "" : "s"}
                   </p>
-                  <div className="max-h-[45vh] space-y-3 overflow-y-auto pr-1">
+                  <div className="max-h-[80vh] space-y-3.5 overflow-y-auto rounded-2xl bg-slate-50 dark:bg-[#0B1220] p-3">
                     {thread!.messages.map(item => (
-                      <div key={item.id} className={`flex ${item.mine ? "justify-end" : "justify-start"}`}>
+                      <div key={item.id} className={`flex flex-col gap-1 ${item.mine ? "items-end" : "items-start"}`}>
+                        <p className="px-1 text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                          {item.mine && item.sender_id === thread!.me ? "You" : item.sender_name || "Unknown sender"}
+                          {item.mine && item.sender_id !== thread!.me ? " (your team)" : ""}
+                          {item.sender_role && !item.mine ? <span className="capitalize font-medium"> · {item.sender_role}</span> : null}
+                        </p>
                         <div
-                          className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm ${
+                          className={`max-w-[85%] rounded-[20px] px-4 py-2.5 text-sm shadow-sm ${
                             item.mine
                               ? "bg-blue-600 text-white rounded-br-md"
-                              : "bg-slate-100 dark:bg-[#1A2740] text-slate-800 dark:text-slate-100 rounded-bl-md"
+                              : "bg-white dark:bg-[#1A2740] text-slate-800 dark:text-slate-100 rounded-bl-md border border-slate-200/70 dark:border-transparent"
                           } ${item.id === message.id ? "ring-2 ring-blue-300 dark:ring-blue-500/60" : ""}`}
                         >
-                          <p className={`mb-0.5 text-[11px] font-bold ${item.mine ? "text-blue-100" : "text-slate-500 dark:text-slate-400"}`}>
-                            {item.mine && item.sender_id === thread!.me ? "You" : item.sender_name || "Unknown sender"}
-                            {item.mine && item.sender_id !== thread!.me ? " (your team)" : ""}
-                            {item.sender_role && !item.mine ? <span className="capitalize font-medium"> · {item.sender_role}</span> : null}
-                          </p>
-                          <p className="whitespace-pre-line">{item.message}</p>
+                          <p className="whitespace-pre-line leading-relaxed">{item.message}</p>
                           <AttachmentLinks attachments={item.attachments} className={`mt-1.5 ${item.mine ? "text-white" : "text-blue-600 dark:text-blue-400"}`} />
-                          <p className={`mt-1 text-[10px] ${item.mine ? "text-blue-100" : "text-slate-400"}`}>{new Date(item.created_at).toLocaleString()}</p>
                         </div>
+                        <p className="flex items-center gap-1 px-1 text-[10px] text-slate-400">
+                          <ReadAloudButton text={item.message} label="Listen" iconOnly />
+                          {new Date(item.created_at).toLocaleString()}
+                          {item.mine && <>· <MessageStatus deliveredAt={item.delivered_at} readAt={item.read_at} /></>}
+                        </p>
                       </div>
                     ))}
                     <div ref={endRef} />
@@ -185,6 +193,7 @@ export function MessageDetailDialog({
                   )}
 
                   <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-line">{message.message}</p>
+                  <ReadAloudButton text={message.message} label="Listen to this message" iconOnly />
                   {message.attachments && message.attachments.length > 0 ? (
                     <AttachmentLinks attachments={message.attachments} className="text-blue-600" />
                   ) : message.attachmentUrl ? (

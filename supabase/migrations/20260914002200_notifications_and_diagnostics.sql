@@ -1,14 +1,14 @@
 -- Migration: 20260914002200_notifications_and_diagnostics.sql
 -- Description:
 --   1. A one-time diagnostic function so a live policy definition can actually
---      be inspected (via the service-role key) instead of guessing further —
+--      be inspected (via the service-role key) instead of guessing further -
 --      "Message Admin" has been reported broken twice despite the policy
 --      looking correct on paper and its RPC dependencies checking out.
---   2. Belt-and-braces explicit execute grant on is_admin_profile — every
+--   2. Belt-and-braces explicit execute grant on is_admin_profile - every
 --      other helper function it's used alongside either has one or is proven
 --      working without one, so this is unlikely to be the fix, but it's free.
 --   3. Lets a giver notify the organization on their side of a fulfillment
---      (marking in progress / delivered) — the reverse direction (org ->
+--      (marking in progress / delivered) - the reverse direction (org ->
 --      giver) was already covered by the existing interested-givers policy,
 --      but nothing let a giver message an org back.
 --   4. General giver -> organization messaging, not just fulfillment-linked

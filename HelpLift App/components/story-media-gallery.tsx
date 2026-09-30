@@ -7,12 +7,12 @@ import { toEmbeddableVideoUrl, isDirectVideoFile } from "@/lib/video-embed"
 
 export type GalleryMedia = { id: string; media_type: string; url: string }
 
-// A horizontally scrollable, swipeable gallery for a story's photos/videos —
+// A horizontally scrollable, swipeable gallery for a story's photos/videos -
 // scroll-snap does the swipe/drag-to-scroll natively (touch + trackpad +
 // mouse-wheel-shift), no carousel library needed. Dots track scroll position
 // via onScroll and also let the viewer jump straight to an item. Clicking a
 // photo opens it full-size in a lightbox, rendered via a portal to
-// document.body — this gallery is sometimes used inside a Radix Dialog,
+// document.body - this gallery is sometimes used inside a Radix Dialog,
 // whose content wrapper has a CSS transform, and a transform establishes a
 // new containing block for `position: fixed` descendants, so a plain fixed
 // overlay nested in there would be clipped to the dialog instead of covering
@@ -23,7 +23,7 @@ export type GalleryMedia = { id: string; media_type: string; url: string }
 // treat every click/Escape in here as "outside the dialog" and close the
 // whole story too. The `data-story-lightbox` marker below lets the parent
 // Dialog's onPointerDownOutside (see app/page.tsx) recognize clicks that
-// land in here and ignore them — stopping propagation on the portal node
+// land in here and ignore them - stopping propagation on the portal node
 // itself doesn't work here, since it's a DOM sibling of the app's React
 // root (not a descendant), so it never reaches Radix's listener via bubbling
 // in the first place; Radix's own escape hatch is the reliable fix.
@@ -36,7 +36,7 @@ export function StoryMediaGallery({
   media: GalleryMedia[]
   title: string
   heightClassName?: string
-  /** Fires whenever the full-size lightbox opens/closes — if this gallery
+  /** Fires whenever the full-size lightbox opens/closes - if this gallery
    * lives inside a Dialog, pass this through so the Dialog can ignore its
    * own Escape-key-closes-me handling while the lightbox (portaled outside
    * the Dialog's DOM) is the thing that should close first. */

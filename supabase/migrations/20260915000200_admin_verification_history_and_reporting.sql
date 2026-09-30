@@ -1,6 +1,6 @@
 -- Closes two gaps in the Main Admin spec:
 --   1. Organization Approval: there was no audit trail of verification
---      decisions (approve/reject/request-info/resubmit) — only the current
+--      decisions (approve/reject/request-info/resubmit) - only the current
 --      status + last note survived on the organizations row itself.
 --   2. Monitoring and Reporting: needs an index on needs.status so the new
 --      "fulfilled needs" / date-range reporting queries stay fast as the
