@@ -11,21 +11,18 @@ The app is a single Next.js project split across three logical layers - but laye
 ```
 1. FRONTEND             Next.js (React) pages, dashboards, forms, dialogs
                          what the user sees and interacts with
-                             │
-              ┌──────────────┴──────────────┐
-              │                              │
-              ▼                              ▼
-2. BACKEND LOGIC              (bypassed for plain reads/writes
-   Next.js Route Handlers      RLS alone can safely guard)
+                             
+          
+2. BACKEND LOGIC              
+   Next.js Route Handlers      
    (app/api/**/route.ts)
    business rules: "can this
    user donate?", "create
    this need", "process this
    payment", "send this
    notification"
-              │                              │
-              └──────────────┬──────────────┘
-                              ▼
+
+
 3. SUPABASE (BaaS)       PostgreSQL · Auth · Storage · Row Level Security
                          the actual backend infrastructure
 ```
