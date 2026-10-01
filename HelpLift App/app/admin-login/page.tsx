@@ -33,6 +33,17 @@ export default function AdminLoginPage() {
     }
   }, [])
 
+  const completeLogin = (user: { id: string; email: string; fullName: string; role: string }) => {
+    if (user.role !== "admin") {
+      setErrorMsg("This portal is for administrators only.")
+      return
+    }
+    localStorage.setItem("userId", user.id)
+    localStorage.setItem("userRole", user.role)
+    localStorage.setItem("userName", user.fullName)
+    router.push("/admin-dashboard")
+  }
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
@@ -68,15 +79,7 @@ export default function AdminLoginPage() {
         throw new Error(data.message || "Admin login failed")
       }
 
-      if (data.user.role !== "admin") {
-        throw new Error("This portal is for administrators only.")
-      }
-
-      localStorage.setItem("userId", data.user.id)
-      localStorage.setItem("userRole", data.user.role)
-      localStorage.setItem("userName", data.user.fullName)
-
-      router.push("/admin-dashboard")
+      completeLogin(data.user)
     } catch (err: any) {
       setErrorMsg(err instanceof Error ? err.message : "Admin login failed")
       setIsLoading(false)

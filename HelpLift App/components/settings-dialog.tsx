@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { AtSign, Bell, KeyRound, Mail, SlidersHorizontal, Star, Trash2, Type, UserRound } from "lucide-react"
+import { AtSign, Bell, KeyRound, Mail, ShieldCheck, SlidersHorizontal, Star, Trash2, Type, UserRound } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -73,6 +73,8 @@ export function SettingsDialog({
   onToggleSpotlightOptOut,
   emailNotificationsEnabled,
   onToggleEmailNotifications,
+  twoFactorEnabled,
+  onToggleTwoFactor,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -92,6 +94,9 @@ export function SettingsDialog({
   /** Whether this account gets emails for in-app notifications (see profiles.email_notifications_enabled). Pass this and onToggleEmailNotifications together to show the row; omit both to hide it (e.g. while its migration hasn't run yet). Doesn't affect account emails like email verification or password reset - those go through Supabase Auth's own mailer, never this toggle. */
   emailNotificationsEnabled?: boolean
   onToggleEmailNotifications?: (next: boolean) => void | Promise<void>
+  /** Whether a correct password alone isn't enough to sign in - a code is also emailed, and must be entered, to finish (see profiles.two_factor_enabled, checked in api/login). Pass this and onToggleTwoFactor together to show the row; omit both to hide it (e.g. while its migration hasn't run yet). */
+  twoFactorEnabled?: boolean
+  onToggleTwoFactor?: (next: boolean) => void | Promise<void>
 }) {
   const [soundOn, setSoundOn] = useState(true)
   const [soundChoice, setSoundChoice] = useState<NotificationSoundId>("chime")
@@ -162,6 +167,25 @@ export function SettingsDialog({
           )}
 
           <PasskeySettings open={open} />
+
+          {onToggleTwoFactor && (
+            <SettingRow
+              icon={<ShieldCheck className="h-5 w-5" />}
+              title="Two-factor sign-in"
+              description={
+                twoFactorEnabled
+                  ? "On - after your password, we also email a code you must enter to finish signing in. Doesn't apply to Google/LinkedIn/Microsoft sign-in."
+                  : "Off - your password alone signs you in. Turn on for an extra emailed code at every sign-in."
+              }
+            >
+              <Switch
+                checked={!!twoFactorEnabled}
+                onCheckedChange={onToggleTwoFactor}
+                aria-label="Two-factor sign-in"
+                data-tip={twoFactorEnabled ? "Turn off to sign in with just your password" : "Turn on to require an emailed code at every sign-in"}
+              />
+            </SettingRow>
+          )}
 
           <SettingRow icon={<Bell className="h-5 w-5" />} title="Notification sounds" description={soundOn ? "A sound plays when a new notification arrives." : "Muted. No sound for new notifications."}>
             <Switch checked={soundOn} onCheckedChange={changeSound} aria-label="Notification sounds" />

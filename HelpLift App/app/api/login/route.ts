@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { lockAccountAndSendCode, MAX_LOGIN_ATTEMPTS } from "@/lib/login-lockout"
+import { sendTwoFactorCode } from "@/lib/two-factor"
 
 export async function POST(req: Request) {
   try {
@@ -55,7 +56,7 @@ export async function POST(req: Request) {
       await admin.from("profiles").update({ failed_login_attempts: 0, locked_until: null }).eq("id", lockProfile.id)
     }
 
-    const { data: profile, error: profileError } = await supabase.from("profiles").select("id, full_name, email, role").eq("id", authData.user.id).single()
+    const { data: profile, error: profileError } = await supabase.from("profiles").select("id, full_name, email, role, two_factor_enabled").eq("id", authData.user.id).single()
     if (profileError || !profile) return NextResponse.json({ success: false, message: "Your account profile is incomplete. Please contact support." }, { status: 500 })
     if (profile.role === "admin" && !adminPortal) {
       await supabase.auth.signOut()
@@ -64,6 +65,25 @@ export async function POST(req: Request) {
     if (adminPortal && profile.role !== "admin") {
       await supabase.auth.signOut()
       return NextResponse.json({ success: false, message: "This account does not have administrator access." }, { status: 403 })
+    }
+
+    // Admin accounts are exempt - no option to turn it on, two_factor_enabled
+    // is simply never consulted for this role.
+    if (profile.two_factor_enabled && profile.role !== "admin") {
+      // Password just checked out, but the second factor hasn't - no usable
+      // session should exist until it does, so the one Supabase just
+      // created is torn down immediately. api/login/verify-2fa is the only
+      // way back in from here, and it needs the attempt token below (not
+      // just the emailed code) to do it.
+      await supabase.auth.signOut()
+      const attemptToken = await sendTwoFactorCode(profile.id, profile.email, profile.full_name)
+      return NextResponse.json({
+        success: false,
+        twoFactorRequired: true,
+        attemptToken,
+        email: profile.email,
+        message: "Enter the verification code we emailed you to finish signing in.",
+      }, { status: 401 })
     }
 
     return NextResponse.json({

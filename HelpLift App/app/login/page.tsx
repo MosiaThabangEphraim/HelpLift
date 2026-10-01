@@ -14,6 +14,7 @@ import { MicrosoftSignInButton } from "@/components/microsoft-sign-in-button"
 import { createClient } from "@/lib/supabase/client"
 import { isPasskeySupported, passkeyErrorMessage } from "@/lib/passkeys"
 import { AccountUnlockDialog } from "@/components/account-unlock-dialog"
+import { TwoFactorDialog, type TwoFactorUser } from "@/components/two-factor-dialog"
 
 // Messages for the ?error= values /auth/callback redirects back with.
 const CALLBACK_ERRORS: Record<string, string> = {
@@ -42,6 +43,7 @@ function LoginContent() {
   const [errorMsg, setErrorMsg] = useState("")
   const [showUnlockDialog, setShowUnlockDialog] = useState(false)
   const [showUnlockedBanner, setShowUnlockedBanner] = useState(false)
+  const [twoFactorAttempt, setTwoFactorAttempt] = useState<{ email: string; attemptToken: string } | null>(null)
   const [showVerifiedBanner, setShowVerifiedBanner] = useState(false)
   const [adminBanner, setAdminBanner] = useState<{ message: string; updatedAt: string; attachments: { name: string; url: string }[] } | null>(null)
   const [passkeySupported, setPasskeySupported] = useState(false)
@@ -152,6 +154,25 @@ function LoginContent() {
     }
   }
 
+  // Shared by the normal password-only path and the post-2FA path - either
+  // way, by the time this runs, a real session already exists and all that's
+  // left is remembering who's signed in and routing to their dashboard.
+  const completeLogin = (user: TwoFactorUser) => {
+    localStorage.setItem("userId", user.id)
+    localStorage.setItem("userRole", user.role)
+    localStorage.setItem("userName", user.fullName)
+
+    if (user.role === "giver") {
+      router.push("/givers-dashboard")
+    } else if (user.role === "organization") {
+      router.push("/organisation-dashboard")
+    } else if (user.role === "admin") {
+      router.push("/admin-dashboard")
+    } else {
+      router.push("/dashboard")
+    }
+  }
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
@@ -188,24 +209,16 @@ function LoginContent() {
           setIsLoading(false)
           return
         }
+        if (data.twoFactorRequired) {
+          setTwoFactorAttempt({ email: data.email, attemptToken: data.attemptToken })
+          setIsLoading(false)
+          return
+        }
         throw new Error(data.message || "Login failed")
       }
 
-      // 4. Set Session Data
-      localStorage.setItem("userId", data.user.id)
-      localStorage.setItem("userRole", data.user.role)
-      localStorage.setItem("userName", data.user.fullName)
-
-      // 5. Redirect based on role
-      if (data.user.role === "giver") {
-        router.push("/givers-dashboard")
-      } else if (data.user.role === "organization") {
-        router.push("/organisation-dashboard")
-      } else if (data.user.role === "admin") {
-        router.push("/admin-dashboard")
-      } else {
-        router.push("/dashboard")
-      }
+      // 4. Set session data and redirect
+      completeLogin(data.user)
     } catch (err: any) {
       setErrorMsg(err.message)
       setIsLoading(false)
@@ -322,6 +335,14 @@ function LoginContent() {
           setShowUnlockedBanner(true)
           setPassword("")
         }}
+      />
+
+      <TwoFactorDialog
+        open={!!twoFactorAttempt}
+        email={twoFactorAttempt?.email || ""}
+        attemptToken={twoFactorAttempt?.attemptToken || ""}
+        onOpenChange={open => !open && setTwoFactorAttempt(null)}
+        onVerified={user => { setTwoFactorAttempt(null); completeLogin(user) }}
       />
 
       {adminBanner && (

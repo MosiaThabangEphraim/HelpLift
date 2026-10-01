@@ -24,15 +24,15 @@ function serviceClient() {
 // organizations/givers -> everything referencing them (needs, donations,
 // gift_offerings, notifications, etc. are all FK'd with on delete cascade)
 // - this one call is a full, permanent wipe of the account's data.
-// Self-service toggle for whether this account gets emails for its in-app
-// notifications (see profiles.email_notifications_enabled, checked in
-// app/api/webhooks/notification-created/route.ts before it sends anything).
-// Lives here rather than in the giver/organization profile routes since the
-// column is on profiles, not givers/organizations, and the behavior is
-// identical for every role - one endpoint for whoever's signed in, same as
-// account deletion below. Never touches email verification or password
-// reset - those are Supabase Auth's own emails, sent through its own
-// mailer, not this table or the notification webhook.
+// Self-service toggles for this account's own security/notification
+// preferences - email_notifications_enabled (see
+// app/api/webhooks/notification-created/route.ts) and two_factor_enabled
+// (see api/login and api/login/verify-2fa). Lives here rather than in the
+// giver/organization profile routes since both columns are on profiles,
+// not givers/organizations, and the behavior is identical for every role -
+// one endpoint for whoever's signed in, same as account deletion below.
+// Never touches email verification or password reset - those are Supabase
+// Auth's own emails, sent through its own mailer, not this table.
 export async function PATCH(request: Request) {
   try {
     const supabase = await createClient()
@@ -40,17 +40,17 @@ export async function PATCH(request: Request) {
     if (!user) return NextResponse.json({ message: "Authentication required." }, { status: 401 })
 
     const body = await request.json()
-    if (typeof body.email_notifications_enabled !== "boolean") {
+    const update: Record<string, boolean> = {}
+    if (typeof body.email_notifications_enabled === "boolean") update.email_notifications_enabled = body.email_notifications_enabled
+    if (typeof body.two_factor_enabled === "boolean") update.two_factor_enabled = body.two_factor_enabled
+    if (Object.keys(update).length === 0) {
       return NextResponse.json({ message: "No updatable fields provided." }, { status: 400 })
     }
 
-    const { error } = await supabase
-      .from("profiles")
-      .update({ email_notifications_enabled: body.email_notifications_enabled })
-      .eq("id", user.id)
+    const { error } = await supabase.from("profiles").update(update).eq("id", user.id)
     if (error) return NextResponse.json({ message: error.message }, { status: 400 })
 
-    return NextResponse.json({ email_notifications_enabled: body.email_notifications_enabled })
+    return NextResponse.json(update)
   } catch (error) {
     console.error("Account settings update error:", error)
     return NextResponse.json({ message: "Settings update is unavailable." }, { status: 503 })

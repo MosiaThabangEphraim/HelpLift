@@ -231,6 +231,9 @@ export default function OrganizationDashboardPage() {
   // organizations, since it applies to every role the same way
   // (settings-dialog.tsx).
   const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(true)
+  // Whether a correct password alone signs this account in, or an emailed
+  // code is also required (profiles.two_factor_enabled, checked in api/login).
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(true)
   // Role within the organization (owner/manager/viewer). Only used to tailor the
   // UI; the API routes and database policies are what actually enforce it.
   const [memberRole, setMemberRole] = useState<OrgRole>("owner")
@@ -406,11 +409,12 @@ export default function OrganizationDashboardPage() {
     }
     setLoginEmail(user.email || "")
 
-    // role and email_notifications_enabled fetched together - one round trip
-    // instead of two. Falls back to a role-only query only in the unlikely
-    // case this environment's profiles table predates that column's migration.
-    let currentProfile: { role: string; email_notifications_enabled?: boolean } | null =
-      (await supabase.from("profiles").select("role, email_notifications_enabled").eq("id", user.id).single()).data
+    // role, email_notifications_enabled and two_factor_enabled fetched
+    // together - one round trip instead of three. Falls back to a role-only
+    // query only in the unlikely case this environment's profiles table
+    // predates those columns' migrations.
+    let currentProfile: { role: string; email_notifications_enabled?: boolean; two_factor_enabled?: boolean } | null =
+      (await supabase.from("profiles").select("role, email_notifications_enabled, two_factor_enabled").eq("id", user.id).single()).data
     if (!currentProfile) {
       currentProfile = (await supabase.from("profiles").select("role").eq("id", user.id).single()).data
     }
@@ -420,6 +424,7 @@ export default function OrganizationDashboardPage() {
       return router.replace("/login")
     }
     setEmailNotificationsEnabled(currentProfile?.email_notifications_enabled ?? true)
+    setTwoFactorEnabled(currentProfile?.two_factor_enabled ?? true)
 
     const orgCtx = await getOrgContext<Organization>(
       supabase,
@@ -1080,6 +1085,19 @@ export default function OrganizationDashboardPage() {
       body: JSON.stringify({ email_notifications_enabled: next }),
     })
     if (!res.ok) setEmailNotificationsEnabled(!next)
+  }
+
+  // Whether an emailed code is also required at sign-in (see
+  // profiles.two_factor_enabled, checked in api/login) - applied
+  // optimistically, same pattern as toggleEmailNotifications above.
+  const toggleTwoFactor = async (next: boolean) => {
+    setTwoFactorEnabled(next)
+    const res = await fetch("/api/account", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ two_factor_enabled: next }),
+    })
+    if (!res.ok) setTwoFactorEnabled(!next)
   }
 
   const saveOrganizationProfile = async (event: FormEvent<HTMLFormElement>) => {
@@ -3129,6 +3147,8 @@ export default function OrganizationDashboardPage() {
         onDeleteAccount={() => { setIsSettingsOpen(false); setOrgDialogMode("delete"); setIsEditingOrg(true) }}
         emailNotificationsEnabled={emailNotificationsEnabled}
         onToggleEmailNotifications={toggleEmailNotifications}
+        twoFactorEnabled={twoFactorEnabled}
+        onToggleTwoFactor={toggleTwoFactor}
       />
 
       <Dialog open={isEditingOrg} onOpenChange={open => !open && closeOrgDialog()}>
