@@ -67,11 +67,10 @@ Requests and responses are JSON (or `multipart/form-data` for file uploads, e.g.
 ```
 HelpLift/
 ├── HelpLift App/          # the Next.js application - see below
-├── supabase/
-│   ├── migrations/        # ~90 timestamped SQL migrations - the source of truth for schema & RLS
-│   ├── email-templates/   # Supabase Auth email template overrides
-│   └── role_based_access_all_in_one.sql
-└── .trae/                 # legacy AI-IDE planning docs (reference only)
+└── supabase/
+    ├── migrations/        # ~90 timestamped SQL migrations - the source of truth for schema & RLS
+    ├── email-templates/   # Supabase Auth email template overrides
+    └── role_based_access_all_in_one.sql
 ```
 
 Inside `HelpLift App/`:
