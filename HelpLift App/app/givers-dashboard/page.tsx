@@ -1,5 +1,5 @@
 "use client"
-
+import { HelpLiftAssistant } from "@/components/helplift-assistant"
 import { FormEvent, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -85,6 +85,7 @@ import { useNotificationAlerts } from "@/hooks/use-notification-alerts"
 import { GiverAnalytics } from "@/components/analytics/giver-analytics"
 import { UserAvatar } from "@/components/user-avatar"
 import { MessageViewToggle, SentMessages } from "@/components/sent-messages"
+import { optimizeAndValidateFile } from "@/lib/media-optimizer";
 
 type Giver = { id: string; name: string; email: string; phone: string | null; account_type: string; preferred_categories: string[] | null; preferred_locations: string[] | null; avatar_url?: string | null; spotlight_opt_out?: boolean }
 type Need = {
@@ -627,8 +628,17 @@ export default function GiverDashboardPage() {
     setIsUpdatingAvatar(true)
     setAvatarNote(null)
     try {
+      // 1. Optimize and compress the avatar image
+      const optimizedFile = await optimizeAndValidateFile(file, {
+      isAvatar: true,
+      maxSizeMB: 0.3,
+      maxWidthOrHeight: 512,
+      })
+
+      // 2. Append the optimized file
       const formData = new FormData()
-      formData.append("avatar", file)
+      formData.append("avatar", optimizedFile)
+
       const res = await fetch("/api/giver/avatar", { method: "POST", body: formData })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.message || "Could not upload the picture.")
@@ -2159,6 +2169,8 @@ export default function GiverDashboardPage() {
         } as GiftDetailSummary : null}
         role="giver"
       />
+      //FLOATING AI ASSISTANT
+      <HelpLiftAssistant role="giver" />
     </main>
   )
 }

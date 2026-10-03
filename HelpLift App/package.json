@@ -43,6 +43,7 @@
     "@types/qrcode": "^1.5.6",
     "@vercel/analytics": "latest",
     "autoprefixer": "^10.4.20",
+    "browser-image-compression": "^2.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",

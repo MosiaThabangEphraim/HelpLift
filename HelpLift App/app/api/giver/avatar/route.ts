@@ -6,6 +6,29 @@ const MAX_BYTES = 2 * 1024 * 1024
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp"]
 const ALLOWED_EXTENSIONS = /\.(png|jpe?g|webp)$/i
 
+// Helper to inspect actual file binary header (magic bytes)
+async function hasValidImageSignature(file: File): Promise<boolean> {
+  const buffer = await file.slice(0, 12).arrayBuffer()
+  const bytes = new Uint8Array(buffer)
+
+  // JPEG: FF D8 FF
+  const isJpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
+  // PNG: 89 50 4E 47
+  const isPng = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47
+  // WEBP: RIFF....WEBP (52 49 46 46 .... 57 45 42 50)
+  const isWebp =
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+
+  return isJpeg || isPng || isWebp
+}
+
 // The storage path inside the bucket, from a picture's public URL.
 function storagePathFromUrl(url: string | null): string | null {
   if (!url) return null
@@ -36,7 +59,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Use a PNG, JPG or WebP image." }, { status: 400 })
     }
     if (file.size > MAX_BYTES) return NextResponse.json({ message: "The picture must be smaller than 2 MB." }, { status: 400 })
-
+     
+    // Security Hardening: Verify magic bytes to reject disguised/spoofed executables
+    const isValidSignature = await hasValidImageSignature(file)
+    if (!isValidSignature) {
+      return NextResponse.json({ message: "Corrupted or invalid image file signature." }, { status: 400 })
+    } 
+      
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_")
     const storagePath = `${user.id}/avatar-${Date.now()}-${safeName}`
     const { error: uploadError } = await supabase.storage.from(BUCKET).upload(storagePath, file, { contentType: file.type, upsert: false })
