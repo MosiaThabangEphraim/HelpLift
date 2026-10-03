@@ -214,31 +214,40 @@ export default function LandingPage() {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!chatInput.trim()) return
+    const trimmedInput = chatInput.trim()
+    if (!trimmedInput || isTyping) return
 
-    const userMessage = chatInput.trim()
-    setMessages((prev) => [...prev, { role: "user", text: userMessage }])
+    // 1. Immediately append the user's message to the UI
+    const userMessage = { role: "user", text: trimmedInput }
+    const updatedMessages = [...messages, userMessage]
+    setMessages(updatedMessages)
     setChatInput("")
     setIsTyping(true)
 
-    // Simulate intelligent AI response based on context or keywords
-    setTimeout(() => {
-      let botResponse = "Thanks for asking! HelpLift connects verified organizations with passionate givers. You can sign up to browse needs or post items to our Gift Library."
-      
-      const lower = userMessage.toLowerCase()
-      if (lower.includes("verify") || lower.includes("organization") || lower.includes("vet")) {
-        botResponse = "Organizations undergo strict vetting where our admins review registration documents, tax status, and community footprints to ensure total trust."
-      } else if (lower.includes("gift library") || lower.includes("surplus") || lower.includes("items")) {
-        botResponse = "The Gift Library allows you to proactively list surplus goods, inventory, or professional services so verified organizations can claim them directly."
-      } else if (lower.includes("cost") || lower.includes("fee") || lower.includes("free")) {
-        botResponse = "Yes! HelpLift is completely free for verified organizations to post needs and for givers to contribute."
-      } else if (lower.includes("signup") || lower.includes("register") || lower.includes("join")) {
-        botResponse = "You can easily join by clicking the 'Join the Platform' button at the top of the page or going directly to our registration page."
-      }
+    try {
+      // 2. Send the conversation to your /api/assistant route
+      const res = await fetch("/api/assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: updatedMessages }),
+      })
 
-      setMessages((prev) => [...prev, { role: "assistant", text: botResponse }])
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message || "Failed to reach assistant.")
+
+      // 3. Append the real AI assistant response
+      setMessages((prev) => [...prev, { role: "assistant", text: data.reply }])
+    } catch (err: any) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: err.message || "I'm having trouble connecting right now. Please try again in a moment.",
+        },
+      ])
+    } finally {
       setIsTyping(false)
-    }, 1000)
+    }
   }
 
   const currentStory = stories[activeStoryIndex] || null

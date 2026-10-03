@@ -1,5 +1,6 @@
 "use client"
 
+import { HelpLiftAssistant } from "@/components/helplift-assistant"
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -3674,6 +3675,7 @@ export default function OrganizationDashboardPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <HelpLiftAssistant role="organization" />
     </main>
   )
 }
