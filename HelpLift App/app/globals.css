@@ -427,3 +427,29 @@ body::-webkit-scrollbar {
   animation: shimmer 1.5s infinite;
 }
 
+/* Homepage needs map (components/needs-map.tsx) */
+.leaflet-container {
+  font-family: inherit;
+}
+.dark .helplift-map-tiles {
+  filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9);
+}
+.helplift-map-popup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.helplift-map-popup button {
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  color: #2563eb;
+  padding: 4px 2px;
+  cursor: pointer;
+}
+.helplift-map-popup button:hover {
+  text-decoration: underline;
+}
+

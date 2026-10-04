@@ -45,6 +45,9 @@ export async function POST(req: Request) {
     if (!["giver", "organization"].includes(role)) {
       return NextResponse.json({ success: false, message: "Choose a valid account type." }, { status: 400 })
     }
+    if (role === "giver" && body.ageConfirmed !== "true" && body.ageConfirmed !== true) {
+      return NextResponse.json({ success: false, message: "You must be 18 or older to register as a giver." }, { status: 400 })
+    }
     if (!isValidEmail(email)) {
       return NextResponse.json({ success: false, message: "Enter a valid email address." }, { status: 400 })
     }
@@ -75,6 +78,8 @@ export async function POST(req: Request) {
           account_type: body.accountType,
           categories: body.categories,
           locations: body.locations,
+          // When the giver confirmed being 18+ (kept in auth metadata - no schema change needed).
+          age_confirmed_at: role === "giver" ? new Date().toISOString() : undefined,
         },
         emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin}/login?verified=1`,
       },

@@ -59,9 +59,11 @@ export async function POST(request: Request) {
       if (!fullName) return NextResponse.json({ message: "Your name is required." }, { status: 400 })
       if (!phone) return NextResponse.json({ message: "Your phone number is required." }, { status: 400 })
       if (!ACCOUNT_TYPES.includes(accountType)) return NextResponse.json({ message: "Choose an account type." }, { status: 400 })
+      if (body.age_confirmed !== true) return NextResponse.json({ message: "You must be 18 or older to register as a giver." }, { status: 400 })
 
-      // Password first: if it fails, nothing else has changed.
-      const { error: passwordError } = await supabase.auth.updateUser({ password })
+      // Password first: if it fails, nothing else has changed. The 18+ confirmation
+      // is recorded in auth metadata alongside it (no schema change needed).
+      const { error: passwordError } = await supabase.auth.updateUser({ password, data: { age_confirmed_at: new Date().toISOString() } })
       if (passwordError) return NextResponse.json({ message: passwordError.message }, { status: 400 })
 
       const picture = (user.user_metadata?.avatar_url || user.user_metadata?.picture) as string | undefined

@@ -1,5 +1,4 @@
 "use client"
-import { HelpLiftAssistant } from "@/components/helplift-assistant"
 import { FormEvent, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -35,6 +34,7 @@ import {
   Star,
   LocateFixed,
   MapPin,
+  Home,
 } from "lucide-react"
 import { getCurrentPosition, haversineKm, NEAR_ME_RADIUS_KM, reverseGeocodePlaceNames } from "@/lib/geolocation"
 import { ViewToggle, type ListView } from "@/components/view-toggle"
@@ -834,6 +834,14 @@ export default function GiverDashboardPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              href="/"
+              aria-label="Home"
+              data-tip="Go to the HelpLift homepage"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            >
+              <Home className="w-4 h-4" />
+            </Link>
             <ThemeToggle className="h-9 w-9" />
             <FeedbackButton />
             <button
@@ -2169,8 +2177,6 @@ export default function GiverDashboardPage() {
         } as GiftDetailSummary : null}
         role="giver"
       />
-      //FLOATING AI ASSISTANT
-      <HelpLiftAssistant role="giver" />
     </main>
   )
 }

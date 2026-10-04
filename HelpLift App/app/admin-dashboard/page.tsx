@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, FormEvent } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { showFeedback } from "@/lib/inline-feedback"
 import {
   Building2,
@@ -37,7 +38,8 @@ import {
   Bell,
   Star,
   Heart,
-  Globe
+  Globe,
+  Home,
 } from "lucide-react"
 import {
   Area,
@@ -1043,6 +1045,14 @@ export default function AdminDashboardPage() {
               </DropdownMenuContent>
             </DropdownMenu>
 
+            <Link
+              href="/"
+              aria-label="Home"
+              data-tip="Go to the HelpLift homepage"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            >
+              <Home className="w-4 h-4" />
+            </Link>
             <ThemeToggle className="h-9 w-9" />
             <button onClick={logout} className="inline-flex items-center gap-2 rounded bg-slate-900 dark:bg-slate-100 px-4 py-2 text-sm font-semibold text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white">
               <LogOut className="h-4 w-4" /> Sign out

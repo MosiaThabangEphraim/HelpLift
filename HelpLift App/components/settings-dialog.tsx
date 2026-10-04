@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { AtSign, Bell, KeyRound, Mail, ShieldCheck, SlidersHorizontal, Star, Trash2, Type, UserRound } from "lucide-react"
+import { AtSign, Bell, Bot, KeyRound, Mail, ShieldCheck, SlidersHorizontal, Star, Trash2, Type, UserRound } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,7 @@ import {
   type NotificationSoundId,
 } from "@/lib/notification-sound"
 import { getFontSizeLevel, setFontSizeLevel, type FontSizeLevel } from "@/lib/font-size"
+import { isAssistantEnabled, setAssistantEnabled } from "@/lib/assistant-preference"
 
 const FONT_SIZE_OPTIONS: { value: FontSizeLevel; label: string; size: string }[] = [
   { value: "normal", label: "Normal text", size: "13px" },
@@ -101,18 +102,25 @@ export function SettingsDialog({
   const [soundOn, setSoundOn] = useState(true)
   const [soundChoice, setSoundChoice] = useState<NotificationSoundId>("chime")
   const [fontSize, setFontSize] = useState<FontSizeLevel>("normal")
+  const [assistantOn, setAssistantOn] = useState(true)
 
   useEffect(() => {
     if (open) {
       setSoundOn(isNotificationSoundEnabled())
       setSoundChoice(getNotificationSoundChoice())
       setFontSize(getFontSizeLevel())
+      setAssistantOn(isAssistantEnabled())
     }
   }, [open])
 
   const changeFontSize = (level: FontSizeLevel) => {
     setFontSize(level)
     setFontSizeLevel(level)
+  }
+
+  const changeAssistant = (next: boolean) => {
+    setAssistantOn(next)
+    setAssistantEnabled(next)
   }
 
   const changeSound = (next: boolean) => {
@@ -233,6 +241,19 @@ export function SettingsDialog({
               />
             </SettingRow>
           )}
+
+          <SettingRow
+            icon={<Bot className="h-5 w-5" />}
+            title="AI Assistant"
+            description={assistantOn ? "The chat assistant button shows on every page, on this device." : "Hidden on this device. Turn on to bring the chat assistant back."}
+          >
+            <Switch
+              checked={assistantOn}
+              onCheckedChange={changeAssistant}
+              aria-label="AI Assistant"
+              data-tip={assistantOn ? "Hide the AI Assistant on every page" : "Show the AI Assistant again"}
+            />
+          </SettingRow>
 
           <SettingRow icon={<Type className="h-5 w-5" />} title="Font size" description="Makes text larger across the whole site, on this device.">
             <div className="flex items-center gap-1 rounded-full border border-slate-200 dark:border-[#233350] p-1">

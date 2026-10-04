@@ -12,6 +12,7 @@ import { RouteHistoryTracker } from "@/components/route-history-tracker"
 import { OfflineProvider } from "@/components/offline-provider"
 import { FontSizeProvider } from "@/components/font-size-provider"
 import { SiteVisitTracker } from "@/components/site-visit-tracker"
+import { HelpLiftAssistant } from "@/components/helplift-assistant"
 import "./globals.css"
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" })
@@ -87,6 +88,7 @@ export default function RootLayout({
           <OfflineProvider />
           <FontSizeProvider />
           <SiteVisitTracker />
+          <HelpLiftAssistant />
         </ThemeProvider>
         <Analytics />
       </body>

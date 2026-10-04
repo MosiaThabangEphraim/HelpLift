@@ -12,6 +12,7 @@ import { GoogleSignInButton } from "@/components/google-sign-in-button"
 import { LinkedInSignInButton } from "@/components/linkedin-sign-in-button"
 import { MicrosoftSignInButton } from "@/components/microsoft-sign-in-button"
 import { TermsAgreementCheckbox } from "@/components/terms-agreement-checkbox"
+import { AgeConfirmationCheckbox } from "@/components/age-confirmation-checkbox"
 import { BackButton } from "@/components/back-button"
 import { MicButton } from "@/components/mic-button"
 import { GrammarCheckButton } from "@/components/grammar-check-button"
@@ -66,6 +67,9 @@ export default function RegisterPage() {
   const [errorMsg, setErrorMsg] = useState("")
   const [successMsg, setSuccessMsg] = useState("")
   const [agreedToTerms, setAgreedToTerms] = useState(false)
+  const [confirmedAdult, setConfirmedAdult] = useState(false)
+  // Terms for everyone; givers must also confirm they are 18 or older.
+  const agreementsMet = agreedToTerms && (role !== "giver" || confirmedAdult)
 
   const emailValid = email === "" || isValidEmail(email)
   const passwordValid = isPasswordValid(password)
@@ -73,12 +77,12 @@ export default function RegisterPage() {
 
   const canSubmit = useMemo(() => {
     if (!role) return false
-    if (!agreedToTerms) return false
+    if (!agreementsMet) return false
     if (!email || !isValidEmail(email)) return false
     if (!passwordValid) return false
     if (!confirmPassword || password !== confirmPassword) return false
     return true
-  }, [role, agreedToTerms, email, passwordValid, confirmPassword, password])
+  }, [role, agreementsMet, email, passwordValid, confirmPassword, password])
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -124,6 +128,7 @@ export default function RegisterPage() {
         formData.append("documentTypes", JSON.stringify(attachedDocs.map(d => d.type)))
       } else {
         formData.append("accountType", accountType)
+        formData.append("ageConfirmed", String(confirmedAdult))
         formData.append("categories", categories)
         formData.append("locations", locations)
       }
@@ -183,12 +188,13 @@ export default function RegisterPage() {
 
       {role && (
         <div className="w-full max-w-xl mb-8 space-y-4">
-          <div className="p-4 rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+          <div className="p-4 rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-3">
             <TermsAgreementCheckbox checked={agreedToTerms} onCheckedChange={setAgreedToTerms} />
+            {role === "giver" && <AgeConfirmationCheckbox checked={confirmedAdult} onCheckedChange={setConfirmedAdult} />}
           </div>
-          <GoogleSignInButton label="Sign up with Google" intent={role === "organization" ? "org" : "giver"} onError={setErrorMsg} disabled={!agreedToTerms} />
-          <LinkedInSignInButton label="Sign up with LinkedIn" intent={role === "organization" ? "org" : "giver"} onError={setErrorMsg} disabled={!agreedToTerms} />
-          <MicrosoftSignInButton label="Sign up with Microsoft" intent={role === "organization" ? "org" : "giver"} onError={setErrorMsg} disabled={!agreedToTerms} />
+          <GoogleSignInButton label="Sign up with Google" intent={role === "organization" ? "org" : "giver"} onError={setErrorMsg} disabled={!agreementsMet} />
+          <LinkedInSignInButton label="Sign up with LinkedIn" intent={role === "organization" ? "org" : "giver"} onError={setErrorMsg} disabled={!agreementsMet} />
+          <MicrosoftSignInButton label="Sign up with Microsoft" intent={role === "organization" ? "org" : "giver"} onError={setErrorMsg} disabled={!agreementsMet} />
           <p className="text-center text-xs text-slate-400 dark:text-slate-500">
             {role === "organization"
               ? "Google/LinkedIn/Microsoft verify your email. You'll then add your organization's details and documents, and choose a password."

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { 
@@ -20,9 +20,6 @@ import {
   Quote,
   Search,
   MessageSquare,
-  X,
-  Bot,
-  User,
   Flame,
   ExternalLink,
   Loader2,
@@ -43,6 +40,8 @@ import { ShareButtons } from "@/components/share-buttons"
 import { OutcomeBanner } from "@/components/outcome-banner"
 import { ReadAloudButton } from "@/components/read-aloud-button"
 import { CountUp } from "@/components/count-up"
+import { NeedsMap } from "@/components/needs-map"
+import { LiveActivityFeed } from "@/components/live-activity-feed"
 
 // -------------------- Data (HelpLift Ecosystem) --------------------
 const faqs = [
@@ -61,6 +60,7 @@ export default function LandingPage() {
 
   // Dynamic Data - populated from the database only; no hardcoded demo content.
   const [featuredNeeds, setFeaturedNeeds] = useState<any[]>([])
+  const [mapNeeds, setMapNeeds] = useState<any[]>([])
   const [isLoadingNeeds, setIsLoadingNeeds] = useState(true)
   const [platformStats, setPlatformStats] = useState<{ organizations: number; givers: number; openNeeds: number; fulfilledNeeds: number; stories: number; donationCount: number; totalDonated: number } | null>(null)
   const [stories, setStories] = useState<any[]>([])
@@ -120,15 +120,6 @@ export default function LandingPage() {
   const [isSendingContact, setIsSendingContact] = useState(false)
   const [contactFeedback, setContactFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null)
 
-  // --- AI Chatbot States ---
-  const [isChatOpen, setIsChatOpen] = useState(false)
-  const [chatInput, setChatInput] = useState("")
-  const [messages, setMessages] = useState([
-    { role: "assistant", text: "Hi there! I'm your HelpLift Assistant. How can I help you navigate our giving platform today?" }
-  ])
-  const [isTyping, setIsTyping] = useState(false)
-  const chatMessagesEndRef = useRef<HTMLDivElement>(null)
-
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20)
     window.addEventListener("scroll", handleScroll)
@@ -147,6 +138,7 @@ export default function LandingPage() {
       .then(data => {
         if (data.success && Array.isArray(data.needs)) {
           setFeaturedNeeds(data.needs.slice(0, 3))
+          setMapNeeds(data.needs)
         }
       })
       .catch(() => {})
@@ -185,11 +177,6 @@ export default function LandingPage() {
     return () => clearInterval(interval)
   }, [stories.length])
 
-  // Auto-scroll chat to bottom
-  useEffect(() => {
-    chatMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages, isTyping])
-
   const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSendingContact(true)
@@ -209,44 +196,6 @@ export default function LandingPage() {
       setContactFeedback({ type: "error", text: err.message || "Unable to send your message." })
     } finally {
       setIsSendingContact(false)
-    }
-  }
-
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const trimmedInput = chatInput.trim()
-    if (!trimmedInput || isTyping) return
-
-    // 1. Immediately append the user's message to the UI
-    const userMessage = { role: "user", text: trimmedInput }
-    const updatedMessages = [...messages, userMessage]
-    setMessages(updatedMessages)
-    setChatInput("")
-    setIsTyping(true)
-
-    try {
-      // 2. Send the conversation to your /api/assistant route
-      const res = await fetch("/api/assistant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: updatedMessages }),
-      })
-
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.message || "Failed to reach assistant.")
-
-      // 3. Append the real AI assistant response
-      setMessages((prev) => [...prev, { role: "assistant", text: data.reply }])
-    } catch (err: any) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          text: err.message || "I'm having trouble connecting right now. Please try again in a moment.",
-        },
-      ])
-    } finally {
-      setIsTyping(false)
     }
   }
 
@@ -505,6 +454,33 @@ export default function LandingPage() {
                 )
               })
             )}
+          </div>
+        </section>
+
+        {/* --- NEEDS MAP & LIVE ACTIVITY --- */}
+        <section id="needs-map" aria-labelledby="needs-map-heading" className="max-w-6xl mx-auto px-4 py-12">
+          <div className="mb-8 max-w-2xl">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-600 text-xs font-bold uppercase tracking-wider mb-3">
+              <MapPin className="w-3.5 h-3.5" />
+              <span>Happening now</span>
+            </div>
+            <h2 id="needs-map-heading" className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
+              Needs across South Africa
+            </h2>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
+              Every pin is a verified request. Click one to see it in full on the needs board.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              {isLoadingNeeds ? (
+                <div className="h-[380px] md:h-[440px] rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 animate-pulse" />
+              ) : (
+                <NeedsMap needs={mapNeeds} />
+              )}
+            </div>
+            <LiveActivityFeed />
           </div>
         </section>
 
@@ -914,99 +890,6 @@ export default function LandingPage() {
           </div>
         </footer>
       </main>
-
-      {/* --- FLOATING AI CHATBOT WIDGET --- */}
-      <div className="fixed bottom-6 right-6 z-[150]">
-        {!isChatOpen ? (
-          <button
-            onClick={() => setIsChatOpen(true)}
-            className="relative group flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded shadow-[0_10px_30px_rgb(37,99,235,0.4)] hover:scale-105 active:scale-95 transition-all duration-300"
-            aria-label="Open AI Assistant"
-          >
-            <span className="absolute -top-1 -right-1 flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded bg-blue-400 opacity-75"></span>
-              <span className="relative inline-flex rounded h-3 w-3 bg-blue-500"></span>
-            </span>
-            <Bot className="w-6 h-6" />
-          </button>
-        ) : (
-          <div className="w-[360px] md:w-[400px] h-[520px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-300">
-            {/* Chat Header */}
-            <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center shadow-inner">
-                  <Sparkles className="w-5 h-5 text-white animate-pulse" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-sm leading-tight">HelpLift Assistant</h4>
-                  <p className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Online & Ready</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setIsChatOpen(false)}
-                className="text-slate-400 hover:text-white p-1 rounded transition-colors"
-                aria-label="Close Chat"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Chat Messages Body */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50 dark:bg-slate-950/50">
-              {messages.map((msg, index) => (
-                <div 
-                  key={index} 
-                  className={`flex items-start gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
-                >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                    msg.role === 'user' ? 'bg-slate-900 text-white' : 'bg-blue-600 text-white'
-                  }`}>
-                    {msg.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
-                  </div>
-                  <div className={`max-w-[75%] px-4 py-3 rounded text-sm leading-relaxed ${
-                    msg.role === 'user' 
-                      ? 'bg-slate-900 text-white rounded-tr-none'
-                      : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 shadow-sm rounded-tl-none'
-                  }`}>
-                    {msg.text}
-                  </div>
-                </div>
-              ))}
-
-              {isTyping && (
-                <div className="flex items-start gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
-                    <Bot className="w-4 h-4" />
-                  </div>
-                  <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-4 py-3 rounded rounded-tl-none shadow-sm flex items-center gap-1.5">
-                    <div className="w-2 h-2 bg-blue-500 rounded animate-bounce [animation-delay:-0.3s]"></div>
-                    <div className="w-2 h-2 bg-blue-500 rounded animate-bounce [animation-delay:-0.15s]"></div>
-                    <div className="w-2 h-2 bg-blue-500 rounded animate-bounce"></div>
-                  </div>
-                </div>
-              )}
-              <div ref={chatMessagesEndRef} />
-            </div>
-
-            {/* Chat Input Footer */}
-            <form onSubmit={handleSendMessage} className="p-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2">
-              <input
-                type="text"
-                placeholder="Ask anything about HelpLift..."
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                className="flex-1 px-4 py-3 bg-slate-100 dark:bg-slate-800 border-0 rounded focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm text-slate-800 dark:text-slate-200"
-              />
-              <button
-                type="submit"
-                className="w-11 h-11 bg-blue-600 hover:bg-blue-700 text-white rounded flex items-center justify-center shadow-md transition-all shrink-0"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            </form>
-          </div>
-        )}
-      </div>
 
     </div>
   )

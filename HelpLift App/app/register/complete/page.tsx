@@ -12,6 +12,7 @@ import { MicButton } from "@/components/mic-button"
 import { GrammarCheckButton } from "@/components/grammar-check-button"
 import { appendSpeech } from "@/lib/speech-to-text"
 import { TermsAgreementCheckbox } from "@/components/terms-agreement-checkbox"
+import { AgeConfirmationCheckbox } from "@/components/age-confirmation-checkbox"
 
 const inputClass = "w-full bg-transparent border-0 border-b-2 border-slate-200 dark:border-slate-800 focus:border-blue-600 pb-2 outline-none text-slate-900 dark:text-slate-100 transition-all"
 
@@ -74,6 +75,7 @@ export default function CompleteRegistrationPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [passwordTouched, setPasswordTouched] = useState(false)
   const [agreedToTerms, setAgreedToTerms] = useState(false)
+  const [confirmedAdult, setConfirmedAdult] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -98,7 +100,7 @@ export default function CompleteRegistrationPage() {
     agreedToTerms &&
     (role === "organization"
       ? passwordOk && !!orgName.trim() && !!regNum.trim() && !!address.trim() && !!province.trim() && !!city.trim() && !!contact.trim()
-      : passwordOk && !!name.trim() && !!phone.trim())
+      : passwordOk && confirmedAdult && !!name.trim() && !!phone.trim())
 
   const toggleCategory = (category: string) =>
     setCategories(current => (current.includes(category) ? current.filter(c => c !== category) : [...current, category]))
@@ -125,7 +127,7 @@ export default function CompleteRegistrationPage() {
         res = await fetch("/api/register/complete", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ full_name: name, phone, account_type: accountType, categories: categories.join(","), locations, password }),
+          body: JSON.stringify({ full_name: name, phone, account_type: accountType, categories: categories.join(","), locations, password, age_confirmed: confirmedAdult }),
         })
       }
       const data = await res.json().catch(() => ({}))
@@ -446,8 +448,9 @@ export default function CompleteRegistrationPage() {
           </div>
         </div>
 
-        <div className="p-4 rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+        <div className="p-4 rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-3">
           <TermsAgreementCheckbox checked={agreedToTerms} onCheckedChange={setAgreedToTerms} />
+          {role === "giver" && <AgeConfirmationCheckbox checked={confirmedAdult} onCheckedChange={setConfirmedAdult} />}
         </div>
 
         <Button
