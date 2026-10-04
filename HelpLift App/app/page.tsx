@@ -68,6 +68,20 @@ export default function LandingPage() {
   const [openStory, setOpenStory] = useState<any | null>(null)
   const [isStoryLightboxOpen, setIsStoryLightboxOpen] = useState(false)
 
+  // Signed-in visitors get "My Dashboard" instead of "Sign In" - same check as
+  // the shared PublicNavbar, which this page replaces with its own nav.
+  const [dashboardPath, setDashboardPath] = useState<string | null>(null)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle()
+      const paths: Record<string, string> = { giver: "/givers-dashboard", organization: "/organisation-dashboard", admin: "/admin-dashboard" }
+      if (profile?.role && paths[profile.role]) setDashboardPath(paths[profile.role])
+    }).catch(() => {})
+  }, [])
+
   // --- "Support The Platform" ---
   const [showSupportPlatform, setShowSupportPlatform] = useState(false)
   const [showGuestSupportPlatform, setShowGuestSupportPlatform] = useState(false)
@@ -252,10 +266,17 @@ export default function LandingPage() {
           <div className="flex items-center gap-2">
             <ThemeToggle className="h-9 w-9" />
             <button
-              onClick={() => router.push("/login")}
-              className="hidden md:inline-flex items-center justify-center px-6 py-2.5 text-sm font-bold text-white transition-all duration-300 bg-slate-900 dark:bg-blue-600 border border-transparent rounded hover:bg-slate-800 dark:hover:bg-blue-700 hover:shadow-lg hover:shadow-slate-200 dark:hover:shadow-none hover:-translate-y-0.5"
+              onClick={() => router.push(dashboardPath || "/login")}
+              data-tip={dashboardPath ? "You're signed in - go to your dashboard" : undefined}
+              className="hidden md:inline-flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-bold text-white transition-all duration-300 bg-slate-900 dark:bg-blue-600 border border-transparent rounded hover:bg-slate-800 dark:hover:bg-blue-700 hover:shadow-lg hover:shadow-slate-200 dark:hover:shadow-none hover:-translate-y-0.5"
             >
-              Sign In
+              {dashboardPath ? (
+                <>
+                  <LayoutDashboard className="w-4 h-4" /> My Dashboard
+                </>
+              ) : (
+                "Sign In"
+              )}
             </button>
           </div>
         </div>
