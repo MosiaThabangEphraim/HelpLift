@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, FormEvent } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { RefreshButton } from "@/components/refresh-button"
 import { showFeedback } from "@/lib/inline-feedback"
 import {
   Building2,
@@ -1045,6 +1046,7 @@ export default function AdminDashboardPage() {
               </DropdownMenuContent>
             </DropdownMenu>
 
+            <RefreshButton onRefresh={loadData} />
             <Link
               href="/"
               aria-label="Home"

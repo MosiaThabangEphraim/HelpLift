@@ -244,14 +244,14 @@ export function SettingsDialog({
 
           <SettingRow
             icon={<Bot className="h-5 w-5" />}
-            title="AI Assistant"
-            description={assistantOn ? "The chat assistant button shows on every page, on this device." : "Hidden on this device. Turn on to bring the chat assistant back."}
+            title="Lifty (AI assistant)"
+            description={assistantOn ? "Lifty's chat button shows on every page, on this device." : "Hidden on this device. Turn on to bring Lifty back."}
           >
             <Switch
               checked={assistantOn}
               onCheckedChange={changeAssistant}
-              aria-label="AI Assistant"
-              data-tip={assistantOn ? "Hide the AI Assistant on every page" : "Show the AI Assistant again"}
+              aria-label="Lifty (AI assistant)"
+              data-tip={assistantOn ? "Hide Lifty on every page" : "Show Lifty again"}
             />
           </SettingRow>
 

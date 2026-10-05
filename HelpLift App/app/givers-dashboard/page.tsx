@@ -84,6 +84,10 @@ import { PasskeyPrompt } from "@/components/passkey-prompt"
 import { useNotificationAlerts } from "@/hooks/use-notification-alerts"
 import { GiverAnalytics } from "@/components/analytics/giver-analytics"
 import { UserAvatar } from "@/components/user-avatar"
+import { OrgLogo } from "@/components/org-logo"
+import { SnapToPledge } from "@/components/snap-to-pledge"
+import { DashboardTour } from "@/components/dashboard-tour"
+import { RefreshButton } from "@/components/refresh-button"
 import { MessageViewToggle, SentMessages } from "@/components/sent-messages"
 import { optimizeAndValidateFile } from "@/lib/media-optimizer";
 
@@ -101,7 +105,7 @@ type Need = {
   due_date: string | null
   urgency?: "low" | "medium" | "high" | string
   status?: string
-  organizations: { id?: string; name: string; verification_status: string; profile_id?: string; city?: string | null; province?: string | null }[] | { id?: string; name: string; verification_status: string; profile_id?: string; city?: string | null; province?: string | null } | null
+  organizations: { id?: string; name: string; verification_status: string; profile_id?: string; city?: string | null; province?: string | null; logo_url?: string | null }[] | { id?: string; name: string; verification_status: string; profile_id?: string; city?: string | null; province?: string | null; logo_url?: string | null } | null
 }
 type Interest = { id: string; status: string; message: string | null; created_at: string; needs: { title: string; organizations: { name: string; profile_id: string | null }[] | { name: string; profile_id: string | null } | null }[] | { title: string; organizations: { name: string; profile_id: string | null }[] | { name: string; profile_id: string | null } | null } | null; photos?: { id: string; file_name: string | null; url: string | null }[] }
 type FulfillmentOrg = { name: string; profile_id?: string; phone?: string | null; contact_email?: string | null }
@@ -340,7 +344,7 @@ export default function GiverDashboardPage() {
     const [{ data: openNeeds }, { data: submittedInterests }, { data: giverFulfillments }] = await Promise.all([
       supabase
         .from("needs")
-        .select("id, title, description, category, location, latitude, longitude, quantity, target_amount, due_date, urgency, status, organizations(id, name, verification_status, profile_id, city, province)")
+        .select("id, title, description, category, location, latitude, longitude, quantity, target_amount, due_date, urgency, status, organizations(id, name, verification_status, profile_id, city, province, logo_url)")
         .in("status", ["open", "in_progress"])
         .order("created_at", { ascending: false }),
       supabase
@@ -834,6 +838,7 @@ export default function GiverDashboardPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            <RefreshButton onRefresh={loadData} />
             <Link
               href="/"
               aria-label="Home"
@@ -862,6 +867,7 @@ export default function GiverDashboardPage() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
+                  data-tour="notifications"
                   aria-label="Notifications"
                   data-tip={unreadCount > 0 ? `Notifications: ${unreadCount} unread. Click to see them.` : "Notifications. You're all caught up."}
                   className="relative inline-flex h-9 w-9 items-center justify-center rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740] transition-colors">
@@ -915,6 +921,7 @@ export default function GiverDashboardPage() {
             </button>
 
             <button
+              data-tour="badges"
               onClick={() => setShowBadges(true)}
               data-tip="Your badges and progress toward the next one"
               className="inline-flex items-center gap-1.5 rounded border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40 px-4 py-2 text-sm font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-950/70"
@@ -923,6 +930,7 @@ export default function GiverDashboardPage() {
             </button>
 
             <button
+              data-tour="settings"
               onClick={() => setIsSettingsOpen(true)}
               className="inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
             >
@@ -956,13 +964,13 @@ export default function GiverDashboardPage() {
         {/* --- TABS --- */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-6">
           <TabsList className="w-full flex-nowrap justify-start overflow-x-auto">
-            <TabsTrigger value="needs" className="shrink-0 gap-1.5"><ClipboardList className="w-4 h-4" />Browse Needs</TabsTrigger>
-            <TabsTrigger value="interests" className="shrink-0 gap-1.5"><Users className="w-4 h-4" />My Interests</TabsTrigger>
-            <TabsTrigger value="gifts" className="shrink-0 gap-1.5"><Gift className="w-4 h-4" />Gift Library</TabsTrigger>
-            <TabsTrigger value="fulfillments" className="shrink-0 gap-1.5"><PackageCheck className="w-4 h-4" />Fulfillments<CountBadge value={stats.activeFulfillments} /></TabsTrigger>
-            <TabsTrigger value="donations" className="shrink-0 gap-1.5"><Banknote className="w-4 h-4" />My Donations<CountBadge value={pendingDonations} /></TabsTrigger>
-            <TabsTrigger value="messages" className="shrink-0 gap-1.5"><Mail className="w-4 h-4" />Messages<CountBadge value={unreadMessages} /></TabsTrigger>
-            <TabsTrigger value="analytics" className="shrink-0 gap-1.5"><BarChart3 className="w-4 h-4" />Analytics</TabsTrigger>
+            <TabsTrigger value="needs" data-tour="tab-needs" className="shrink-0 gap-1.5"><ClipboardList className="w-4 h-4" />Browse Needs</TabsTrigger>
+            <TabsTrigger value="interests" data-tour="tab-interests" className="shrink-0 gap-1.5"><Users className="w-4 h-4" />My Interests</TabsTrigger>
+            <TabsTrigger value="gifts" data-tour="tab-gifts" className="shrink-0 gap-1.5"><Gift className="w-4 h-4" />Gift Library</TabsTrigger>
+            <TabsTrigger value="fulfillments" data-tour="tab-fulfillments" className="shrink-0 gap-1.5"><PackageCheck className="w-4 h-4" />Fulfillments<CountBadge value={stats.activeFulfillments} /></TabsTrigger>
+            <TabsTrigger value="donations" data-tour="tab-donations" className="shrink-0 gap-1.5"><Banknote className="w-4 h-4" />My Donations<CountBadge value={pendingDonations} /></TabsTrigger>
+            <TabsTrigger value="messages" data-tour="tab-messages" className="shrink-0 gap-1.5"><Mail className="w-4 h-4" />Messages<CountBadge value={unreadMessages} /></TabsTrigger>
+            <TabsTrigger value="analytics" data-tour="tab-analytics" className="shrink-0 gap-1.5"><BarChart3 className="w-4 h-4" />Analytics</TabsTrigger>
           </TabsList>
 
           {/* --- BROWSE NEEDS TAB --- */}
@@ -1067,7 +1075,8 @@ export default function GiverDashboardPage() {
                           <div className="flex items-start justify-between gap-4">
                             <div>
                               <h3 className="font-bold text-base">{need.title}</h3>
-                              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                              <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                                <OrgLogo src={organization?.logo_url} name={organization?.name} className="h-5 w-5 text-[10px]" />
                                 {organization?.id ? (
                                   <Link href={`/organizations/${organization.id}`} target="_blank" onClick={e => e.stopPropagation()} className="font-semibold text-blue-600 hover:underline">
                                     {organization.name}
@@ -1454,7 +1463,8 @@ export default function GiverDashboardPage() {
                     </DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4 pt-1">
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                    <p className="flex flex-wrap items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400">
+                      <OrgLogo src={organization?.logo_url} name={organization?.name} className="h-6 w-6 text-[10px]" />
                       {organization?.id ? (
                         <Link href={`/organizations/${organization.id}`} target="_blank" className="font-semibold text-blue-600 hover:underline">
                           {organization.name}
@@ -1596,7 +1606,7 @@ export default function GiverDashboardPage() {
         {/* --- PLEDGE GIFT MODAL (Item 8) --- */}
         {showGiftModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-4 animate-in fade-in">
-            <div className="w-full max-w-lg bg-white dark:bg-[#121B2E] rounded p-6 md:p-8 shadow-2xl space-y-5">
+            <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white dark:bg-[#121B2E] rounded p-6 md:p-8 shadow-2xl space-y-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold bg-purple-50 text-purple-700 mb-2">
@@ -1616,6 +1626,12 @@ export default function GiverDashboardPage() {
               </div>
 
               <form onSubmit={handlePledgeGift} className="space-y-4">
+                <SnapToPledge
+                  onDraft={(draft, photo) => {
+                    setGiftForm(f => ({ ...f, ...draft }))
+                    setGiftPhotos(photos => [photo, ...photos])
+                  }}
+                />
                 <input
                   required
                   placeholder="Offering Title (e.g. 20 Desktops for Computer Lab)"
@@ -1761,6 +1777,7 @@ export default function GiverDashboardPage() {
       {/* --- EDIT PROFILE DIALOG --- */}
       <PasskeyPrompt />
 
+      {giver && <DashboardTour role="giver" name={giver.name} />}
       <SettingsDialog
         open={isSettingsOpen}
         onOpenChange={setIsSettingsOpen}

@@ -2,10 +2,13 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { ASSISTANT_TOOL_DECLARATIONS, runAssistantTool } from "@/lib/assistant-tools"
+import { GEMINI_MODELS, geminiApiKey } from "@/lib/gemini"
+import { clientIp, isRateLimited } from "@/lib/rate-limit"
 
 const SYSTEM_PROMPT = `
-You are the HelpLift Assistant: a friendly, patient and concise guide to the HelpLift
-platform. Help anyone - visitors, givers, organizations - understand and use every part
+You are Lifty, the HelpLift AI assistant: a friendly, patient and concise guide to the
+HelpLift platform. Your name is Lifty. Whenever you greet someone or introduce yourself,
+say your name is Lifty and include a smiling emoji (😊). Help anyone - visitors, givers, organizations - understand and use every part
 of HelpLift, using the knowledge below.
 
 ==================================================================
@@ -314,16 +317,6 @@ HOW TO ANSWER
 - Plain text only: no markdown symbols like ** or #.
 `
 
-// Gemini models in fallback order. Google now steers new API keys to the 3.x
-// models ("gemini-2.5-* is no longer available to new users"); the 2.5 models
-// stay last for older keys that still have access.
-const CANDIDATE_MODELS = [
-  "gemini-3.5-flash-lite",
-  "gemini-3.8-flash",
-  "gemini-2.5-flash-lite",
-  "gemini-2.5-flash",
-]
-
 // Lookups the model may chain in one answer (e.g. find an organization, then
 // its needs) before we stop and ask it to answer with what it has.
 const MAX_TOOL_ROUNDS = 4
@@ -412,36 +405,11 @@ async function describeUser(supabase: Awaited<ReturnType<typeof createClient>>, 
 // for visitors; each message capped at MAX_MESSAGE_LENGTH characters; only the
 // last MAX_HISTORY messages are sent on. The client mirrors these limits.
 //
-// The counter lives in this server instance's memory - enough to stop casual
-// scripting, but on a multi-instance host (e.g. Vercel) each instance counts
-// separately and restarts reset it. Use a shared store (Upstash Redis, a
-// Supabase table) if stricter limits are needed.
+// (See lib/rate-limit.ts for the limiter's single-instance caveat.)
 const RATE_LIMIT = 10
 const RATE_WINDOW_MS = 60_000
 const MAX_MESSAGE_LENGTH = 1000
 const MAX_HISTORY = 20
-
-const recentRequests = new Map<string, number[]>()
-
-function isRateLimited(key: string) {
-  const now = Date.now()
-  const recent = (recentRequests.get(key) || []).filter(time => now - time < RATE_WINDOW_MS)
-  if (recent.length >= RATE_LIMIT) {
-    recentRequests.set(key, recent)
-    return true
-  }
-  recent.push(now)
-  recentRequests.set(key, recent)
-  // Occasionally drop idle keys so the map can't grow without bound.
-  if (recentRequests.size > 5000) {
-    for (const [k, times] of recentRequests) if (!times.some(time => now - time < RATE_WINDOW_MS)) recentRequests.delete(k)
-  }
-  return false
-}
-
-function clientIp(req: Request) {
-  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown"
-}
 
 // What users see when something goes wrong; the real reason is only logged.
 const UNAVAILABLE_MESSAGE = "The assistant is unavailable right now. Please try again in a moment."
@@ -453,7 +421,7 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => null)
     const messages: IncomingMessage[] = Array.isArray(body?.messages) ? body.messages : []
 
-    const apiKey = process.env.GEMINI_API_KEY?.trim()
+    const apiKey = geminiApiKey()
     if (!apiKey) {
       console.error("Assistant: GEMINI_API_KEY is not configured.")
       return NextResponse.json({ message: UNAVAILABLE_MESSAGE }, { status: 503 })
@@ -503,7 +471,7 @@ export async function POST(req: Request) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (isRateLimited(user ? `user:${user.id}` : `ip:${clientIp(req)}`)) {
+    if (isRateLimited(user ? `assistant:user:${user.id}` : `assistant:ip:${clientIp(req)}`, RATE_LIMIT, RATE_WINDOW_MS)) {
       return NextResponse.json(
         { message: "You're sending messages a little too quickly. Please wait a minute and try again." },
         { status: 429 }
@@ -513,7 +481,7 @@ export async function POST(req: Request) {
     const systemPrompt = `${SYSTEM_PROMPT}\nCURRENT USER\nThe user is ${await describeUser(supabase, user?.id ?? null)}.\n`
 
     // 3. Fallback loop across active models
-    for (const model of CANDIDATE_MODELS) {
+    for (const model of GEMINI_MODELS) {
       try {
         const reply = await answerWithModel(model, apiKey, systemPrompt, conversationHistory, supabase)
         return NextResponse.json({ reply })

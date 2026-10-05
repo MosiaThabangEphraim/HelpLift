@@ -50,7 +50,7 @@ export function RangeFilter({ value, onChange }: { value: AnalyticsRange; onChan
           type="button"
           onClick={() => onChange(option.value)}
           aria-pressed={value === option.value}
-          className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors ${
+          className={`rounded px-3 py-1.5 text-xs font-bold transition-colors ${
             value === option.value
               ? "bg-blue-600 text-white"
               : "bg-slate-100 dark:bg-[#1A2740] text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350]"
@@ -78,7 +78,7 @@ export function DateRangeFilter({
   onFromChange: (value: string) => void
   onToChange: (value: string) => void
 }) {
-  const inputClass = "rounded-xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-3 py-1.5 text-xs font-semibold"
+  const inputClass = "rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-3 py-1.5 text-xs font-semibold"
   return (
     <div className="flex flex-wrap items-center gap-2">
       <label className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400">
@@ -118,7 +118,7 @@ export function StatTile({
   decimals?: number
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] p-4">
+    <div className="border-t border-slate-200 dark:border-[#233350] pt-3">
       <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">{label}</p>
       <p className="mt-1 text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
         {typeof value === "number" ? <CountUp value={value} prefix={prefix} decimals={decimals} /> : value}
@@ -156,7 +156,7 @@ export function ChartCard({
   const filename = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
 
   return (
-    <section className="rounded-3xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] p-5 space-y-3">
+    <section className="border-t border-slate-200 dark:border-[#233350] pt-4 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">{title}</h3>
@@ -168,7 +168,7 @@ export function ChartCard({
               <button
                 type="button"
                 onClick={() => downloadChartAsImage(chartRef.current, filename)}
-                className="inline-flex items-center gap-1 rounded-full border border-slate-200 dark:border-[#233350] px-3 py-1 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                className="inline-flex items-center gap-1 rounded border border-slate-200 dark:border-[#233350] px-2.5 py-1 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
               >
                 <Download className="w-3 h-3" /> Download
               </button>
@@ -177,7 +177,7 @@ export function ChartCard({
               type="button"
               onClick={() => setShowTable(value => !value)}
               aria-pressed={showTable}
-              className="rounded-full border border-slate-200 dark:border-[#233350] px-3 py-1 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+              className="rounded border border-slate-200 dark:border-[#233350] px-2.5 py-1 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
             >
               {showTable ? "View as chart" : "View as table"}
             </button>
@@ -186,9 +186,9 @@ export function ChartCard({
       </div>
 
       {isEmpty ? (
-        <p className="rounded-2xl border border-dashed border-slate-300 dark:border-[#233350] p-6 text-center text-sm text-slate-500 dark:text-slate-400">{emptyText}</p>
+        <p className="rounded border border-dashed border-slate-300 dark:border-[#233350] p-6 text-center text-sm text-slate-500 dark:text-slate-400">{emptyText}</p>
       ) : showTable ? (
-        <div className="max-h-[280px] overflow-auto rounded-xl border border-slate-100 dark:border-[#233350]">
+        <div className="max-h-[280px] overflow-auto rounded border border-slate-100 dark:border-[#233350]">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 dark:bg-[#0B1220] text-left text-xs text-slate-500">
               <tr>

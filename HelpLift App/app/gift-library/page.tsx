@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
+import { RefreshButton } from "@/components/refresh-button"
 import { useRouter } from "next/navigation"
 import {
   Gift,
@@ -94,8 +95,9 @@ export default function PublicGiftLibraryPage() {
     }
   }
 
-  const fetchGifts = async () => {
-    setIsLoading(true)
+  // quiet: refresh in place without swapping the list for the loading state.
+  const fetchGifts = async (quiet = false) => {
+    if (!quiet) setIsLoading(true)
     try {
       const res = await fetch("/api/public/gifts")
       const data = await res.json()
@@ -239,7 +241,8 @@ export default function PublicGiftLibraryPage() {
             </p>
           </div>
 
-          <div className="shrink-0 flex flex-col sm:flex-row gap-3">
+          <div className="shrink-0 flex flex-col sm:flex-row items-center gap-3">
+            <RefreshButton variant="pill" onRefresh={() => fetchGifts(true)} />
             <Link
               href="/givers-dashboard"
               className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-sm hover:opacity-90 transition-opacity shadow-md"

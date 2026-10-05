@@ -50,6 +50,9 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import { firstOf } from "@/lib/utils"
 import { useNeedCategories } from "@/lib/use-need-categories"
+import { NeedWriter } from "@/components/need-writer"
+import { DashboardTour } from "@/components/dashboard-tour"
+import { RefreshButton } from "@/components/refresh-button"
 import { BadgesPanel } from "@/components/badges-panel"
 import { OrganizationQrCodeDialog } from "@/components/organization-qr-code-dialog"
 import { NeedQrCodeDialog } from "@/components/need-qr-code-dialog"
@@ -1267,6 +1270,7 @@ export default function OrganizationDashboardPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            <RefreshButton onRefresh={loadData} />
             <Link
               href="/"
               aria-label="Home"
@@ -1290,6 +1294,7 @@ export default function OrganizationDashboardPage() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
+                  data-tour="notifications"
                   aria-label="Notifications"
                   data-tip={unreadCount > 0 ? `Notifications: ${unreadCount} unread. Click to see them.` : "Notifications. You're all caught up."}
                   className="relative inline-flex h-9 w-9 items-center justify-center rounded-sm border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740] transition-colors">
@@ -1371,6 +1376,7 @@ export default function OrganizationDashboardPage() {
             </button>
 
             <button
+              data-tour="badges"
               onClick={() => setShowBadges(true)}
               data-tip="Your organization's badges and progress toward the next one"
               className="inline-flex items-center gap-1.5 rounded-sm border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40 px-4 py-2 text-sm font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-950/70"
@@ -1379,6 +1385,7 @@ export default function OrganizationDashboardPage() {
             </button>
 
             <button
+              data-tour="settings"
               onClick={() => setIsSettingsOpen(true)}
               className="inline-flex items-center gap-1.5 rounded-sm border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
             >
@@ -1454,15 +1461,15 @@ export default function OrganizationDashboardPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-6">
           <TabsList className="w-full flex-nowrap justify-start overflow-x-auto">
             <TabsTrigger value="needs" className="shrink-0 gap-1.5 px-2.5"><ClipboardList className="w-4 h-4" />Needs</TabsTrigger>
-            <TabsTrigger value="fulfillments" className="shrink-0 gap-1.5 px-2.5"><PackageCheck className="w-4 h-4" />Fulfillments<CountBadge value={stats.activeFulfillments} /></TabsTrigger>
-            <TabsTrigger value="interests" className="shrink-0 gap-1.5 px-2.5"><Users className="w-4 h-4" />Interests<CountBadge value={stats.pendingInterests} /></TabsTrigger>
-            <TabsTrigger value="donations" className="shrink-0 gap-1.5 px-2.5"><Banknote className="w-4 h-4" />Donations<CountBadge value={pendingDonations} /></TabsTrigger>
-            <TabsTrigger value="wallet" className="shrink-0 gap-1.5 px-2.5"><Wallet className="w-4 h-4" />Wallet</TabsTrigger>
-            <TabsTrigger value="messages" className="shrink-0 gap-1.5 px-2.5"><Mail className="w-4 h-4" />Messages<CountBadge value={unreadMessages} /></TabsTrigger>
-            <TabsTrigger value="stories" className="shrink-0 gap-1.5 px-2.5"><Sparkles className="w-4 h-4" />Impact Stories</TabsTrigger>
-            <TabsTrigger value="gifts" className="shrink-0 gap-1.5 px-2.5"><Gift className="w-4 h-4" />Gift Library</TabsTrigger>
-            <TabsTrigger value="analytics" className="shrink-0 gap-1.5 px-2.5"><BarChart3 className="w-4 h-4" />Analytics</TabsTrigger>
-            {memberRole === "owner" && <TabsTrigger value="team" className="shrink-0 gap-1.5 px-2.5"><Users className="w-4 h-4" />Team</TabsTrigger>}
+            <TabsTrigger value="fulfillments" data-tour="tab-fulfillments" className="shrink-0 gap-1.5 px-2.5"><PackageCheck className="w-4 h-4" />Fulfillments<CountBadge value={stats.activeFulfillments} /></TabsTrigger>
+            <TabsTrigger value="interests" data-tour="tab-interests" className="shrink-0 gap-1.5 px-2.5"><Users className="w-4 h-4" />Interests<CountBadge value={stats.pendingInterests} /></TabsTrigger>
+            <TabsTrigger value="donations" data-tour="tab-donations" className="shrink-0 gap-1.5 px-2.5"><Banknote className="w-4 h-4" />Donations<CountBadge value={pendingDonations} /></TabsTrigger>
+            <TabsTrigger value="wallet" data-tour="tab-wallet" className="shrink-0 gap-1.5 px-2.5"><Wallet className="w-4 h-4" />Wallet</TabsTrigger>
+            <TabsTrigger value="messages" data-tour="tab-messages" className="shrink-0 gap-1.5 px-2.5"><Mail className="w-4 h-4" />Messages<CountBadge value={unreadMessages} /></TabsTrigger>
+            <TabsTrigger value="stories" data-tour="tab-stories" className="shrink-0 gap-1.5 px-2.5"><Sparkles className="w-4 h-4" />Impact Stories</TabsTrigger>
+            <TabsTrigger value="gifts" data-tour="tab-gifts" className="shrink-0 gap-1.5 px-2.5"><Gift className="w-4 h-4" />Gift Library</TabsTrigger>
+            <TabsTrigger value="analytics" data-tour="tab-analytics" className="shrink-0 gap-1.5 px-2.5"><BarChart3 className="w-4 h-4" />Analytics</TabsTrigger>
+            {memberRole === "owner" && <TabsTrigger value="team" data-tour="tab-team" className="shrink-0 gap-1.5 px-2.5"><Users className="w-4 h-4" />Team</TabsTrigger>}
             {/* Documents lives as a header button now (next to Settings) - pulling it out of this row is what lets everything else fit on one line without scrolling. */}
             <TabsTrigger value="documents" className="hidden" />
           </TabsList>
@@ -1481,6 +1488,7 @@ export default function OrganizationDashboardPage() {
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleCreateNeed} className="space-y-3">
+                  <NeedWriter onDraft={draft => setForm(f => ({ ...f, ...draft }))} />
                   <input
                     required
                     placeholder="Need title (e.g. 50 Winter Jackets for Shelter)"
@@ -3147,6 +3155,7 @@ export default function OrganizationDashboardPage() {
       {/* --- EDIT ORGANIZATION DIALOG --- */}
       <PasskeyPrompt />
 
+      {organization && <DashboardTour role="organization" name={organization.name} />}
       <SettingsDialog
         open={isSettingsOpen}
         onOpenChange={setIsSettingsOpen}

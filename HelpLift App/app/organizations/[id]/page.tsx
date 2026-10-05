@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
+import { RefreshButton } from "@/components/refresh-button"
 import { ShareButtons } from "@/components/share-buttons"
 import {
   Building2,
@@ -111,8 +112,9 @@ export default function OrganizationPublicProfilePage() {
     el.scrollIntoView({ behavior: "smooth", block: "center" })
   }, [sharedStoryId, stories])
 
-  const loadProfile = async () => {
-    setIsLoading(true)
+  // quiet: refresh in place without swapping the profile for the loading state.
+  const loadProfile = async (quiet = false) => {
+    if (!quiet) setIsLoading(true)
     setError("")
     try {
       const res = await fetch(`/api/public/organizations/${id}`)
@@ -301,8 +303,9 @@ export default function OrganizationPublicProfilePage() {
         <section className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+              <h2 className="flex items-center gap-3 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
                 Active Needs ({needs.length})
+                <RefreshButton variant="pill" onRefresh={() => loadProfile(true)} />
               </h2>
               <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400">
                 Support requests published by {org.name}.

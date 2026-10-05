@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     // Try query with urgency column
     let query = supabase
       .from("needs")
-      .select("id, title, description, category, location, latitude, longitude, quantity, target_amount, due_date, status, urgency, created_at, organizations(id, name, type, verification_status, city, province), need_attachments(id, storage_path, file_name)")
+      .select("id, title, description, category, location, latitude, longitude, quantity, target_amount, due_date, status, urgency, created_at, organizations(id, name, type, verification_status, city, province, logo_url), need_attachments(id, storage_path, file_name)")
       .in("status", ["open", "in_progress"])
       .order("created_at", { ascending: false })
 
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
     if (error && error.message?.toLowerCase().includes("urgency")) {
       let fallbackQuery = supabase
         .from("needs")
-        .select("id, title, description, category, location, latitude, longitude, quantity, target_amount, due_date, status, created_at, organizations(id, name, type, verification_status, city, province)")
+        .select("id, title, description, category, location, latitude, longitude, quantity, target_amount, due_date, status, created_at, organizations(id, name, type, verification_status, city, province, logo_url)")
         .in("status", ["open", "in_progress"])
         .order("created_at", { ascending: false })
 

@@ -3,17 +3,25 @@
 import { useState, useEffect, useRef, type ReactNode } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
-import { ArrowRight, Bot, EyeOff, Sparkles, X, User, Send } from "lucide-react"
+import { ArrowRight, Bot, EyeOff, Headphones, Mic, PhoneOff, Sparkles, Square, Volume2, VolumeX, X, User, Send } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { isAssistantEnabled, onAssistantPreferenceChange, setAssistantEnabled } from "@/lib/assistant-preference"
+import { isSpeechToTextSupported, useSpeechToText } from "@/lib/speech-to-text"
+import { isTextToSpeechSupported, primeSpeechSynthesis, speakInSentences } from "@/lib/text-to-speech"
 
-// The floating HelpLift Assistant, rendered once for every page of the site from
+// Lifty, the floating HelpLift AI assistant, rendered once for every page of the site from
 // app/layout.tsx. Answers come from /api/assistant, which works out who the
 // user is from their own session - the role detected here only picks the
 // opening greeting. Signed-in users (givers, organizations, admins) who don't
 // want it can hide it (see lib/assistant-preference.ts) and turn it back on in
 // Settings; visitors who aren't signed in always see it.
+//
+// Voice: the mic button sends one spoken message; the speaker toggle reads
+// Lifty's replies aloud; the headphones start a hands-free voice chat (listen,
+// reply aloud, listen again) until ended. All of it uses the browser's own
+// speech engines (lib/speech-to-text.ts, lib/text-to-speech.ts) - audio never
+// reaches HelpLift - and each control only appears where the browser supports it.
 
 type Role = "giver" | "organization" | "guest"
 type ChatMessage = { role: "user" | "assistant"; text: string; isError?: boolean }
@@ -63,10 +71,42 @@ function withSiteLinks(text: string): ReactNode[] {
   return nodes
 }
 
+// How a page path is read aloud: general pages by name; links to one specific
+// need/organization/story are left to their on-screen buttons.
+function spokenPath(path: string) {
+  if (path === "/needs") return "the needs board"
+  if (path.startsWith("/gift-library")) return "the Gift Library"
+  if (path === "/organizations") return "the organizations directory"
+  if (path === "/register") return "the registration page"
+  if (path === "/login") return "the sign in page"
+  if (/^\/[a-z-]+$/.test(path)) return `the ${path.slice(1).replace(/-/g, " ")} page`
+  return ""
+}
+
+// What Lifty says aloud: no raw link paths, emojis or formatting symbols -
+// plus a short mention when item links were added to the chat.
+function toSpeakable(text: string) {
+  let links = 0
+  const spoken = text
+    .replace(SITE_PATH, (_, bracketed, bare) => {
+      const name = spokenPath(bracketed || bare)
+      if (!name) links++
+      return name
+    })
+    .replace(/^\s*\d+\.\s+/gm, "") // "1. " list numbers would split sentences oddly
+    .replace(/\p{Extended_Pictographic}/gu, "")
+    .replace(/[*#_`>]/g, "")
+    .replace(/\s+([.,!?])/g, "$1")
+    .trim()
+  return links > 0 ? `${spoken} I've added ${links === 1 ? "a link" : "links"} in the chat.` : spoken
+}
+
+const VOICE_REPLIES_KEY = "helplift:lifty-voice-replies"
+
 function greetingFor(role: Role) {
-  if (role === "giver") return "Hi there! I'm your HelpLift Assistant. Need help browsing needs, managing your pledges, or tracking donations?"
-  if (role === "organization") return "Hi there! I'm your HelpLift Assistant. Need help posting needs, uploading verification documents, or claiming gifts?"
-  return "Hi there! I'm your HelpLift Assistant. How can I help you navigate our giving platform today?"
+  if (role === "giver") return "Hi there! I'm Lifty, your HelpLift assistant 😊 Need help browsing needs, managing your pledges, or tracking donations?"
+  if (role === "organization") return "Hi there! I'm Lifty, your HelpLift assistant 😊 Need help posting needs, uploading verification documents, or claiming gifts?"
+  return "Hi there! I'm Lifty, your HelpLift assistant 😊 How can I help you navigate our giving platform today?"
 }
 
 export function HelpLiftAssistant() {
@@ -79,6 +119,96 @@ export function HelpLiftAssistant() {
   const [messages, setMessages] = useState<ChatMessage[]>([{ role: "assistant", text: greetingFor("guest") }])
   const [isTyping, setIsTyping] = useState(false)
   const chatMessagesEndRef = useRef<HTMLDivElement>(null)
+
+  // --- Voice ---
+  const [canListen, setCanListen] = useState(false)
+  const [canSpeak, setCanSpeak] = useState(false)
+  const [voiceReplies, setVoiceReplies] = useState(false) // read replies aloud (remembered on this device)
+  const [conversation, setConversation] = useState(false) // hands-free voice chat
+  const [isSpeaking, setIsSpeaking] = useState(false)
+  const [voiceNote, setVoiceNote] = useState<string | null>(null)
+  // Refs mirror state for callbacks that outlive a render (speech events, fetches).
+  const conversationRef = useRef(false)
+  const voiceRepliesRef = useRef(false)
+  const messagesRef = useRef(messages)
+  messagesRef.current = messages
+  const isTypingRef = useRef(false)
+  const stopSpeakingRef = useRef<(() => void) | null>(null)
+  const sendMessageRef = useRef<(text: string) => void>(() => {})
+
+  const speech = useSpeechToText(text => sendMessageRef.current(text), {
+    continuous: false, // one spoken message, sent when the person pauses
+    onEnd: heardSpeech => {
+      if (!heardSpeech && conversationRef.current) {
+        endConversation("I didn't hear anything, so I ended the voice chat. Tap the headphones to talk again.")
+      }
+    },
+  })
+
+  const stopSpeaking = () => {
+    stopSpeakingRef.current?.()
+    stopSpeakingRef.current = null
+    setIsSpeaking(false)
+  }
+
+  // Says a reply aloud; in a voice chat, starts listening again once it's done.
+  const speakReply = (text: string) => {
+    if (!isTextToSpeechSupported()) return
+    stopSpeaking()
+    setIsSpeaking(true)
+    stopSpeakingRef.current = speakInSentences(toSpeakable(text), () => {
+      stopSpeakingRef.current = null
+      setIsSpeaking(false)
+      if (conversationRef.current) speech.start()
+    })
+  }
+
+  const startConversation = () => {
+    primeSpeechSynthesis() // lets phones speak the replies that arrive later
+    stopSpeaking()
+    setVoiceNote(null)
+    conversationRef.current = true
+    setConversation(true)
+    speech.start()
+  }
+
+  function endConversation(note?: string) {
+    conversationRef.current = false
+    setConversation(false)
+    speech.stop()
+    stopSpeaking()
+    if (note) setVoiceNote(note)
+  }
+
+  const toggleVoiceReplies = () => {
+    const next = !voiceRepliesRef.current
+    voiceRepliesRef.current = next
+    setVoiceReplies(next)
+    try { window.localStorage.setItem(VOICE_REPLIES_KEY, next ? "on" : "off") } catch {}
+    if (next) primeSpeechSynthesis()
+    else stopSpeaking()
+  }
+
+  useEffect(() => {
+    setCanListen(isSpeechToTextSupported())
+    setCanSpeak(isTextToSpeechSupported())
+    try {
+      const saved = window.localStorage.getItem(VOICE_REPLIES_KEY) === "on"
+      voiceRepliesRef.current = saved
+      setVoiceReplies(saved)
+    } catch {}
+    return () => { stopSpeakingRef.current?.() }
+  }, [])
+
+  // A microphone problem (blocked permission etc.) ends any voice chat.
+  useEffect(() => {
+    if (!speech.error) return
+    setVoiceNote(speech.error)
+    if (conversationRef.current) {
+      conversationRef.current = false
+      setConversation(false)
+    }
+  }, [speech.error])
 
   // Tailor the greeting once we know who's signed in - only while the chat is
   // still untouched, so an ongoing conversation is never rewritten.
@@ -115,23 +245,32 @@ export function HelpLiftAssistant() {
   if (signedIn && !enabled) return null
 
   const hideAssistant = () => {
+    endConversation()
     setIsChatOpen(false)
     setAssistantEnabled(false)
-    toast("AI Assistant hidden", {
+    toast("Lifty is hidden", {
       description: "Turn it back on any time in Settings.",
       action: { label: "Undo", onClick: () => setAssistantEnabled(true) },
     })
   }
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const trimmedInput = chatInput.trim().slice(0, MAX_MESSAGE_LENGTH)
-    if (!trimmedInput || isTyping) return
+  const closeChat = () => {
+    endConversation()
+    setIsChatOpen(false)
+  }
 
+  // Typed and spoken messages both go through here.
+  const sendMessage = async (text: string) => {
+    const trimmedInput = text.trim().slice(0, MAX_MESSAGE_LENGTH)
+    if (!trimmedInput || isTypingRef.current) return
+
+    stopSpeaking()
+    setVoiceNote(null)
     const userMessage: ChatMessage = { role: "user", text: trimmedInput }
-    const updatedMessages = [...messages, userMessage]
+    const updatedMessages = [...messagesRef.current, userMessage]
     setMessages(updatedMessages)
     setChatInput("")
+    isTypingRef.current = true
     setIsTyping(true)
 
     try {
@@ -147,20 +286,41 @@ export function HelpLiftAssistant() {
       if (!res.ok || !data.reply) throw new Error(data.message || FRIENDLY_ERROR)
 
       setMessages(prev => [...prev, { role: "assistant", text: data.reply }])
+      if (conversationRef.current || voiceRepliesRef.current) speakReply(data.reply)
     } catch (err: any) {
-      setMessages(prev => [...prev, { role: "assistant", text: err?.message || FRIENDLY_ERROR, isError: true }])
+      const errorText = err?.message || FRIENDLY_ERROR
+      setMessages(prev => [...prev, { role: "assistant", text: errorText, isError: true }])
+      if (conversationRef.current) endConversation(errorText)
     } finally {
+      isTypingRef.current = false
       setIsTyping(false)
     }
+  }
+  sendMessageRef.current = sendMessage
+
+  const handleSendMessage = (e: React.FormEvent) => {
+    e.preventDefault()
+    sendMessage(chatInput)
+  }
+
+  const toggleMic = () => {
+    if (speech.listening) {
+      speech.stop()
+      return
+    }
+    stopSpeaking()
+    setVoiceNote(null)
+    speech.start()
   }
 
   return (
     <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[150]">
       {!isChatOpen ? (
         <button
+          data-tour="lifty"
           onClick={() => setIsChatOpen(true)}
           className="relative group flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-full shadow-[0_10px_30px_rgb(37,99,235,0.4)] hover:scale-105 active:scale-95 transition-all duration-300"
-          aria-label="Open AI Assistant"
+          aria-label="Chat with Lifty, the HelpLift assistant"
         >
           <span className="absolute -top-1 -right-1 flex h-3 w-3">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
@@ -177,23 +337,44 @@ export function HelpLiftAssistant() {
                 <Sparkles className="w-5 h-5 text-white animate-pulse" />
               </div>
               <div>
-                <h4 className="font-bold text-sm leading-tight">HelpLift Assistant</h4>
+                <h4 className="font-bold text-sm leading-tight">Lifty</h4>
                 <p className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Online & Ready</p>
               </div>
             </div>
             <div className="flex items-center gap-1">
+              {canListen && canSpeak && !conversation && (
+                <button
+                  onClick={startConversation}
+                  className="text-slate-400 hover:text-white p-1 rounded transition-colors"
+                  aria-label="Start a voice chat with Lifty"
+                  data-tip="Talk to Lifty hands-free - it listens, answers out loud, then listens again"
+                >
+                  <Headphones className="w-5 h-5" />
+                </button>
+              )}
+              {canSpeak && (
+                <button
+                  onClick={toggleVoiceReplies}
+                  className={`p-1 rounded transition-colors ${voiceReplies ? "text-blue-400 hover:text-blue-300" : "text-slate-400 hover:text-white"}`}
+                  aria-label={voiceReplies ? "Stop reading replies aloud" : "Read Lifty's replies aloud"}
+                  aria-pressed={voiceReplies}
+                  data-tip={voiceReplies ? "Voice replies on - Lifty reads its answers aloud" : "Turn on voice replies"}
+                >
+                  {voiceReplies ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+                </button>
+              )}
               {signedIn && (
                 <button
                   onClick={hideAssistant}
                   className="text-slate-400 hover:text-white p-1 rounded transition-colors"
-                  aria-label="Hide the assistant"
-                  data-tip="Hide the assistant on every page (turn it back on in Settings)"
+                  aria-label="Hide Lifty"
+                  data-tip="Hide Lifty on every page (turn it back on in Settings)"
                 >
                   <EyeOff className="w-5 h-5" />
                 </button>
               )}
               <button
-                onClick={() => setIsChatOpen(false)}
+                onClick={closeChat}
                 className="text-slate-400 hover:text-white p-1 rounded transition-colors"
                 aria-label="Close Chat"
               >
@@ -245,6 +426,47 @@ export function HelpLiftAssistant() {
             <div ref={chatMessagesEndRef} />
           </div>
 
+          {/* Hands-free voice chat status */}
+          {conversation && (
+            <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-t border-blue-100 dark:border-blue-900/60 bg-blue-50 dark:bg-blue-950/40">
+              <div className="flex items-center gap-2 min-w-0 text-xs font-semibold text-blue-700 dark:text-blue-300">
+                {speech.listening ? (
+                  <>
+                    <span className="relative flex h-2.5 w-2.5 shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+                    </span>
+                    Listening... speak now
+                  </>
+                ) : isTyping ? (
+                  "Lifty is thinking..."
+                ) : isSpeaking ? (
+                  <button
+                    type="button"
+                    onClick={() => { stopSpeaking(); speech.start() }}
+                    className="inline-flex items-center gap-1.5 hover:underline"
+                    data-tip="Stop Lifty and speak"
+                  >
+                    <Volume2 className="h-3.5 w-3.5 animate-pulse" /> Lifty is speaking - tap to interrupt
+                  </button>
+                ) : (
+                  "Voice chat on"
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => endConversation()}
+                className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-600 px-3 py-1 text-[11px] font-bold text-white hover:bg-red-700 transition-colors"
+              >
+                <PhoneOff className="h-3 w-3" /> End
+              </button>
+            </div>
+          )}
+
+          {voiceNote && !conversation && (
+            <p role="status" className="px-4 pt-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">{voiceNote}</p>
+          )}
+
           {/* Input form */}
           <form
             onSubmit={handleSendMessage}
@@ -252,13 +474,27 @@ export function HelpLiftAssistant() {
           >
             <input
               type="text"
-              placeholder="Ask anything about HelpLift..."
+              placeholder={speech.listening ? "Listening..." : "Ask Lifty anything about HelpLift..."}
               value={chatInput}
               maxLength={MAX_MESSAGE_LENGTH}
               onChange={(e) => setChatInput(e.target.value)}
-              aria-label="Message the HelpLift Assistant"
+              aria-label="Message Lifty"
               className="flex-1 min-w-0 px-4 py-3 bg-slate-100 dark:bg-slate-800 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm text-slate-800 dark:text-slate-200"
             />
+            {canListen && !conversation && (
+              <button
+                type="button"
+                onClick={toggleMic}
+                disabled={isTyping}
+                aria-label={speech.listening ? "Stop listening" : "Speak your message"}
+                data-tip={speech.listening ? "Stop listening" : "Speak instead of typing - it sends when you pause"}
+                className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-all disabled:opacity-50 ${
+                  speech.listening ? "bg-red-600 text-white animate-pulse" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                }`}
+              >
+                {speech.listening ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </button>
+            )}
             <button
               type="submit"
               disabled={isTyping || !chatInput.trim()}

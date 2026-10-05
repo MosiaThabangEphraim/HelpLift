@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { RefreshButton } from "@/components/refresh-button"
 import {
   AlertCircle,
   ArrowRight,
@@ -67,20 +68,22 @@ export default function OrganizationsDirectoryPage() {
   const [messaging, setMessaging] = useState<{ id: string; label: string } | null>(null)
   const [needSignIn, setNeedSignIn] = useState<string | null>(null)
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await fetch("/api/public/organizations")
-        const data = await res.json()
-        if (!res.ok || !data.success) throw new Error(data.message || "Could not load organizations.")
-        setOrganizations(data.organizations || [])
-      } catch (err: any) {
-        setLoadError(err.message || "Could not load organizations.")
-      } finally {
-        setIsLoading(false)
-      }
+  const loadOrganizations = async () => {
+    try {
+      const res = await fetch("/api/public/organizations")
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data.message || "Could not load organizations.")
+      setOrganizations(data.organizations || [])
+      setLoadError("")
+    } catch (err: any) {
+      setLoadError(err.message || "Could not load organizations.")
+    } finally {
+      setIsLoading(false)
     }
-    load()
+  }
+
+  useEffect(() => {
+    loadOrganizations()
   }, [])
 
   const types = useMemo(() => Array.from(new Set(organizations.map(o => o.type).filter(Boolean))).sort(), [organizations])
@@ -161,6 +164,9 @@ export default function OrganizationsDirectoryPage() {
           <p className="text-slate-600 dark:text-slate-400 text-base md:text-lg">
             Browse the schools, charities and community groups on HelpLift. Every organization listed here has been verified by a HelpLift administrator.
           </p>
+          <div className="flex justify-center">
+            <RefreshButton variant="pill" onRefresh={loadOrganizations} />
+          </div>
         </header>
 
         {/* --- SEARCH & FILTERS --- */}

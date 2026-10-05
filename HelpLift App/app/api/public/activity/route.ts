@@ -10,7 +10,8 @@ export const revalidate = 60
 // other personal detail. Organization names are fine (their profiles are public).
 
 type ActivityType = "donation" | "interest" | "need_posted" | "need_fulfilled" | "organization_joined" | "story" | "gift"
-type ActivityItem = { id: string; type: ActivityType; text: string; at: string; href?: string }
+// Events about a named organization carry its public logo (or name, for the initial fallback).
+type ActivityItem = { id: string; type: ActivityType; text: string; at: string; href?: string; org?: { name: string; logo: string | null } }
 
 const PER_SOURCE = 10
 const MAX_ITEMS = 20
@@ -23,6 +24,10 @@ function firstOf<T>(value: T | T[] | null | undefined): T | null {
 // "an Education need", "a Clothing need"
 function withArticle(word: string) {
   return /^[aeiou]/i.test(word) ? `an ${word}` : `a ${word}`
+}
+
+function orgInfo(org: { name?: string | null; logo_url?: string | null } | null | undefined) {
+  return org?.name ? { name: org.name, logo: org.logo_url || null } : undefined
 }
 
 function inProvince(province: string | null | undefined) {
@@ -38,10 +43,10 @@ export async function GET() {
     const [donations, interests, posted, fulfilled, organizations, stories, gifts] = await Promise.all([
       recent("donations", "id, is_platform_donation, reviewed_at, updated_at, needs(category), organizations(province)", q => q.eq("status", "successful"), "updated_at"),
       recent("support_interests", "id, created_at, needs(category, organizations(province))", q => q),
-      recent("needs", "id, title, created_at, organizations(id, name)", q => q.eq("status", "open")),
-      recent("needs", "id, title, updated_at, organizations(id, name)", q => q.eq("status", "fulfilled"), "updated_at"),
-      recent("organizations", "id, name, province, created_at", q => q.eq("verification_status", "approved")),
-      recent("impact_stories", "id, title, reviewed_at, created_at, organizations(id, name)", q => q.eq("status", "approved")),
+      recent("needs", "id, title, created_at, organizations(id, name, logo_url)", q => q.eq("status", "open")),
+      recent("needs", "id, title, updated_at, organizations(id, name, logo_url)", q => q.eq("status", "fulfilled"), "updated_at"),
+      recent("organizations", "id, name, province, logo_url, created_at", q => q.eq("verification_status", "approved")),
+      recent("impact_stories", "id, title, reviewed_at, created_at, organizations(id, name, logo_url)", q => q.eq("status", "approved")),
       recent("gift_offerings", "id, offering_type, created_at", q => q.eq("status", "approved")),
     ])
 
@@ -69,21 +74,21 @@ export async function GET() {
 
     for (const n of rows(posted)) {
       const org = firstOf<any>(n.organizations)
-      items.push({ id: `posted-${n.id}`, type: "need_posted", text: `${org?.name || "A verified organization"} posted a new need: "${n.title}"`, at: n.created_at, href: `/needs?need=${n.id}` })
+      items.push({ id: `posted-${n.id}`, type: "need_posted", text: `${org?.name || "A verified organization"} posted a new need: "${n.title}"`, at: n.created_at, href: `/needs?need=${n.id}`, org: orgInfo(org) })
     }
 
     for (const n of rows(fulfilled)) {
       const org = firstOf<any>(n.organizations)
-      items.push({ id: `fulfilled-${n.id}`, type: "need_fulfilled", text: `"${n.title}" was fulfilled${org?.name ? ` for ${org.name}` : ""}`, at: n.updated_at, href: org?.id ? `/organizations/${org.id}` : undefined })
+      items.push({ id: `fulfilled-${n.id}`, type: "need_fulfilled", text: `"${n.title}" was fulfilled${org?.name ? ` for ${org.name}` : ""}`, at: n.updated_at, href: org?.id ? `/organizations/${org.id}` : undefined, org: orgInfo(org) })
     }
 
     for (const o of rows(organizations)) {
-      items.push({ id: `org-${o.id}`, type: "organization_joined", text: `${o.name} joined HelpLift as a verified organization${inProvince(o.province)}`, at: o.created_at, href: `/organizations/${o.id}` })
+      items.push({ id: `org-${o.id}`, type: "organization_joined", text: `${o.name} joined HelpLift as a verified organization${inProvince(o.province)}`, at: o.created_at, href: `/organizations/${o.id}`, org: orgInfo(o) })
     }
 
     for (const s of rows(stories)) {
       const org = firstOf<any>(s.organizations)
-      items.push({ id: `story-${s.id}`, type: "story", text: `${org?.name || "An organization"} shared an impact story: "${s.title}"`, at: s.reviewed_at || s.created_at, href: org?.id ? `/organizations/${org.id}?story=${s.id}` : undefined })
+      items.push({ id: `story-${s.id}`, type: "story", text: `${org?.name || "An organization"} shared an impact story: "${s.title}"`, at: s.reviewed_at || s.created_at, href: org?.id ? `/organizations/${org.id}?story=${s.id}` : undefined, org: orgInfo(org) })
     }
 
     for (const g of rows(gifts)) {

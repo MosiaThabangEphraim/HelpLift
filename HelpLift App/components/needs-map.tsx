@@ -23,7 +23,7 @@ export type MapNeed = {
   location?: string | null
   latitude?: number | string | null
   longitude?: number | string | null
-  organizations?: { name?: string | null } | { name?: string | null }[] | null
+  organizations?: { name?: string | null; logo_url?: string | null } | { name?: string | null; logo_url?: string | null }[] | null
 }
 
 type PinGroup = { lat: number; lng: number; needs: MapNeed[] }
@@ -36,9 +36,12 @@ function urgencyOf(need: MapNeed) {
   return need.urgency && URGENCY_COLORS[need.urgency] ? need.urgency : "medium"
 }
 
+function orgOf(need: MapNeed) {
+  return Array.isArray(need.organizations) ? need.organizations[0] : need.organizations
+}
+
 function orgName(need: MapNeed) {
-  const org = Array.isArray(need.organizations) ? need.organizations[0] : need.organizations
-  return org?.name || "Verified organization"
+  return orgOf(need)?.name || "Verified organization"
 }
 
 function coordinate(value: number | string | null | undefined) {
@@ -118,7 +121,18 @@ export function NeedsMap({ needs }: { needs: MapNeed[] }) {
 
         const tooltip = document.createElement("div")
         if (single) {
-          tooltip.append(textElement("strong", group.needs[0].title), document.createElement("br"), textElement("span", orgName(group.needs[0])))
+          const need = group.needs[0]
+          const logo = orgOf(need)?.logo_url
+          tooltip.className = "helplift-map-tooltip"
+          if (logo) {
+            const img = document.createElement("img")
+            img.src = logo
+            img.alt = ""
+            tooltip.append(img)
+          }
+          const text = document.createElement("div")
+          text.append(textElement("strong", need.title), document.createElement("br"), textElement("span", orgName(need)))
+          tooltip.append(text)
         } else {
           tooltip.append(textElement("strong", `${group.needs.length} needs here`), document.createElement("br"), textElement("span", "Click to choose one"))
         }

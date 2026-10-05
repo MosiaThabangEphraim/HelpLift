@@ -22,12 +22,23 @@ export function appendSpeech(previous: string, chunk: string): string {
 // Drives one microphone button: starts/stops native speech recognition and
 // reports each finished phrase via onFinalText. Recognition runs entirely in
 // the browser (or the OS's on-device engine); HelpLift never receives audio.
-export function useSpeechToText(onFinalText: (text: string) => void) {
+//
+// By default it keeps listening until stopped (dictating into a form field).
+// `continuous: false` stops by itself after the person pauses - one spoken
+// message, as Lifty's voice chat uses - and `onEnd` reports when listening
+// stopped and whether any speech was recognized.
+export function useSpeechToText(
+  onFinalText: (text: string) => void,
+  options: { continuous?: boolean; onEnd?: (heardSpeech: boolean) => void } = {}
+) {
   const [listening, setListening] = useState(false)
   const [error, setError] = useState("")
   const recognitionRef = useRef<any>(null)
   const onFinalTextRef = useRef(onFinalText)
   onFinalTextRef.current = onFinalText
+  const onEndRef = useRef(options.onEnd)
+  onEndRef.current = options.onEnd
+  const continuous = options.continuous ?? true
 
   const stop = useCallback(() => {
     recognitionRef.current?.stop()
@@ -41,15 +52,19 @@ export function useSpeechToText(onFinalText: (text: string) => void) {
       return
     }
     const recognition = new Ctor()
+    let heardSpeech = false
     recognition.lang = typeof navigator !== "undefined" ? navigator.language || "en-US" : "en-US"
-    recognition.continuous = true
+    recognition.continuous = continuous
     recognition.interimResults = false
     recognition.onresult = (event: any) => {
       let text = ""
       for (let i = event.resultIndex; i < event.results.length; i++) {
         if (event.results[i].isFinal) text += event.results[i][0].transcript
       }
-      if (text.trim()) onFinalTextRef.current(text)
+      if (text.trim()) {
+        heardSpeech = true
+        onFinalTextRef.current(text)
+      }
     }
     recognition.onerror = (event: any) => {
       if (event.error === "no-speech" || event.error === "aborted") return
@@ -60,7 +75,10 @@ export function useSpeechToText(onFinalText: (text: string) => void) {
       )
       setListening(false)
     }
-    recognition.onend = () => setListening(false)
+    recognition.onend = () => {
+      setListening(false)
+      onEndRef.current?.(heardSpeech)
+    }
     recognitionRef.current = recognition
     try {
       recognition.start()
@@ -68,7 +86,7 @@ export function useSpeechToText(onFinalText: (text: string) => void) {
     } catch {
       // start() throws if a recognition session is already running (e.g. a fast double-click); ignore.
     }
-  }, [])
+  }, [continuous])
 
   // Stop listening if the component unmounts (dialog closed, navigated away) mid-session.
   useEffect(() => () => { recognitionRef.current?.stop() }, [])

@@ -80,6 +80,55 @@ function getVoicesAsync(): Promise<SpeechSynthesisVoice[]> {
   })
 }
 
+// Speaks a longer text (e.g. a Lifty reply) sentence by sentence - Chrome cuts
+// single utterances off after ~15 seconds, and shorter pieces start playing
+// sooner - with the same best-voice choice as the "read aloud" buttons.
+// Cancels anything already speaking. `onDone` runs once the last sentence
+// finishes (not when cancelled). Returns a function that stops it.
+export function speakInSentences(text: string, onDone?: () => void): () => void {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+    onDone?.()
+    return () => {}
+  }
+  let cancelled = false
+  const chunks = (text.match(/[^.!?\n]+[.!?]*/g) || []).map(chunk => chunk.trim()).filter(Boolean)
+  window.speechSynthesis.cancel()
+  if (chunks.length === 0) {
+    onDone?.()
+    return () => {}
+  }
+
+  getVoicesAsync().then((voices) => {
+    if (cancelled) return
+    const lang = typeof navigator !== "undefined" ? navigator.language || "en-US" : "en-US"
+    const voice = pickBestVoice(voices, lang)
+    chunks.forEach((chunk, index) => {
+      const utterance = new SpeechSynthesisUtterance(chunk)
+      utterance.lang = lang
+      if (voice) utterance.voice = voice
+      if (index === chunks.length - 1) {
+        utterance.onend = () => { if (!cancelled) onDone?.() }
+        utterance.onerror = (event) => { if (!cancelled && event.error !== "interrupted" && event.error !== "canceled") onDone?.() }
+      }
+      window.speechSynthesis.speak(utterance) // queued - plays after the previous chunk
+    })
+  })
+
+  return () => {
+    cancelled = true
+    window.speechSynthesis.cancel()
+  }
+}
+
+// Mobile Safari only allows speech that starts from a tap. Calling this inside
+// a click handler "unlocks" it, so later replies can be spoken automatically.
+export function primeSpeechSynthesis() {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return
+  const silent = new SpeechSynthesisUtterance("")
+  silent.volume = 0
+  window.speechSynthesis.speak(silent)
+}
+
 // Drives one "read aloud" button: speaks the given text via the browser's
 // (or OS's) built-in voice, entirely on-device - HelpLift never sends this
 // text anywhere or pays for it, same "free, local, no external call" shape

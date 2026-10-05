@@ -35,7 +35,7 @@ function ExportButton({ label, onClick }: { label: string; onClick: () => void }
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-[#233350] px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+      className="inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
     >
       <Download className="w-3.5 h-3.5" /> Export {label}
     </button>
@@ -186,12 +186,12 @@ export function GiverAnalytics({ donations, interests, fulfillments, gifts }: Pr
       </div>
 
       {nothingAtAll && (
-        <p className="rounded-2xl border border-dashed border-slate-300 dark:border-[#233350] p-6 text-center text-sm text-slate-500 dark:text-slate-400">
+        <p className="rounded border border-dashed border-slate-300 dark:border-[#233350] p-6 text-center text-sm text-slate-500 dark:text-slate-400">
           Your giving analytics will appear here once you donate, offer help or pledge a gift.
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-3 xl:grid-cols-6">
         <StatTile label="Total donated" value={view.funds} prefix="R" decimals={2} note={view.awaitingCount ? `${view.awaitingCount} awaiting verification` : "Confirmed donations"} />
         <StatTile label="Donations made" value={view.successfulCount} note="Confirmed by an administrator" />
         <StatTile label="Needs supported" value={view.supportedNeeds} note="Donated to or offered help with" />
@@ -200,7 +200,7 @@ export function GiverAnalytics({ donations, interests, fulfillments, gifts }: Pr
         <StatTile label="Gifts pledged" value={view.pledgeCount} note={`${view.approvedPledges} approved`} />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-x-10 gap-y-8 lg:grid-cols-2">
         <ChartCard
           title="Your giving over time"
           description={peakNote(view.givingByMonth, money) || "Confirmed donations per month"}
@@ -268,7 +268,7 @@ export function GiverAnalytics({ donations, interests, fulfillments, gifts }: Pr
         </ChartCard>
       </div>
 
-      <section className="rounded-3xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] p-5 space-y-3">
+      <section className="border-t border-slate-200 dark:border-[#233350] pt-4 space-y-3">
         <div>
           <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Export your data (CSV)</h3>
           <p className="text-xs text-slate-500 dark:text-slate-400">

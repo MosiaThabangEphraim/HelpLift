@@ -35,6 +35,8 @@ import { appendSpeech } from "@/lib/speech-to-text"
 import { getCurrentPosition, haversineKm, NEAR_ME_RADIUS_KM, reverseGeocodePlaceNames } from "@/lib/geolocation"
 import { LocateFixed } from "lucide-react"
 import { ViewToggle, type ListView } from "@/components/view-toggle"
+import { OrgLogo } from "@/components/org-logo"
+import { RefreshButton } from "@/components/refresh-button"
 
 type OrganizationInfo = {
   id: string
@@ -43,6 +45,7 @@ type OrganizationInfo = {
   verification_status: string
   city?: string | null
   province?: string | null
+  logo_url?: string | null
 }
 
 type PublicNeed = {
@@ -153,8 +156,9 @@ export default function PublicNeedsPage() {
     }
   }
 
-  const fetchNeeds = async () => {
-    setIsLoading(true)
+  // quiet: refresh in place without swapping the list for the loading state.
+  const fetchNeeds = async (quiet = false) => {
+    if (!quiet) setIsLoading(true)
     try {
       const res = await fetch("/api/public/needs")
       const data = await res.json()
@@ -380,6 +384,9 @@ export default function PublicNeedsPage() {
             Explore verified requests from vetted non-profits, schools, and community groups.
             Contribute supplies, professional services, or direct assistance where it matters most.
           </p>
+          <div className="flex justify-center">
+            <RefreshButton variant="pill" onRefresh={() => fetchNeeds(true)} />
+          </div>
         </header>
 
         {/* --- FEEDBACK ALERTS --- */}
@@ -599,7 +606,7 @@ export default function PublicNeedsPage() {
                         href={`/organizations/${org.id}`}
                         className="group inline-flex items-center gap-2 p-2.5 rounded bg-slate-50 dark:bg-[#0B1220]/60 border border-slate-100 dark:border-[#233350] hover:border-blue-300 dark:hover:border-blue-800 transition-colors w-full"
                       >
-                        <Building2 className="w-4 h-4 text-blue-600 shrink-0" />
+                        <OrgLogo src={org.logo_url} name={org.name} className="h-6 w-6 text-[10px]" />
                         <span className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-blue-600 transition-colors truncate">
                           {org.name}
                         </span>

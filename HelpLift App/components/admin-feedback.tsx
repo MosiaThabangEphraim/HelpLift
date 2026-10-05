@@ -127,7 +127,7 @@ export function AdminFeedback() {
           </div>
 
           {visible.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-slate-300 dark:border-[#233350] p-6 text-center text-sm text-slate-500">No feedback matches.</p>
+            <p className="rounded border border-dashed border-slate-300 dark:border-[#233350] p-6 text-center text-sm text-slate-500">No feedback matches.</p>
           ) : (
             <div className="space-y-3">
               {visible.map(item => (
@@ -137,7 +137,7 @@ export function AdminFeedback() {
                   tabIndex={0}
                   onClick={() => setSelected(item)}
                   onKeyDown={activateOnKey}
-                  className="cursor-pointer rounded-2xl border border-slate-200 dark:border-[#233350] p-4 space-y-2 hover:border-blue-300 dark:hover:border-blue-800 hover:shadow-sm transition-all"
+                  className="cursor-pointer rounded border border-slate-200 dark:border-[#233350] p-4 space-y-2 hover:border-blue-300 dark:hover:border-blue-800 hover:shadow-sm transition-all"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-3">

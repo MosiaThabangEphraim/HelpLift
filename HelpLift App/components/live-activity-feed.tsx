@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { BookOpen, CheckCircle2, Gift, Hand, Heart, Megaphone, ShieldCheck, type LucideIcon } from "lucide-react"
+import { OrgLogo } from "@/components/org-logo"
 
 // Homepage "live" feed of recent, anonymised platform activity from
 // /api/public/activity. Refreshes every minute while the tab is visible.
 
 type ActivityType = "donation" | "interest" | "need_posted" | "need_fulfilled" | "organization_joined" | "story" | "gift"
-type ActivityItem = { id: string; type: ActivityType; text: string; at: string; href?: string }
+type ActivityItem = { id: string; type: ActivityType; text: string; at: string; href?: string; org?: { name: string; logo: string | null } }
 
 const REFRESH_MS = 60_000
 
@@ -96,9 +97,14 @@ export function LiveActivityFeed() {
             const { icon: Icon, className } = TYPE_STYLES[item.type] ?? TYPE_STYLES.need_posted
             const body = (
               <>
-                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${className}`}>
-                  <Icon className="h-4 w-4" />
-                </span>
+                {item.org ? (
+                  // Organization events show who it was; anonymous ones keep their type icon.
+                  <OrgLogo src={item.org.logo} name={item.org.name} className="h-8 w-8 rounded-full" />
+                ) : (
+                  <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${className}`}>
+                    <Icon className="h-4 w-4" />
+                  </span>
+                )}
                 <span className="min-w-0">
                   <span className="block text-sm leading-snug text-slate-700 dark:text-slate-200">{item.text}</span>
                   <time dateTime={item.at} className="block mt-0.5 text-xs text-slate-400 dark:text-slate-500">{timeAgo(item.at, now)}</time>

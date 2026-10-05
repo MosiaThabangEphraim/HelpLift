@@ -42,6 +42,7 @@ import { ReadAloudButton } from "@/components/read-aloud-button"
 import { CountUp } from "@/components/count-up"
 import { NeedsMap } from "@/components/needs-map"
 import { LiveActivityFeed } from "@/components/live-activity-feed"
+import { OrgLogo } from "@/components/org-logo"
 
 // -------------------- Data (HelpLift Ecosystem) --------------------
 const faqs = [
@@ -168,6 +169,7 @@ export default function LandingPage() {
             organizationId: s.organizations?.id || null,
             title: s.title,
             organization: s.organizations?.name || "Verified Organization",
+            organizationLogo: s.organizations?.logo_url || null,
             location: [s.organizations?.city, s.organizations?.province].filter(Boolean).join(", ") || "Community Outreach",
             review: s.content,
             reviewer: s.author_role || "Operations Team",
@@ -463,8 +465,9 @@ export default function LandingPage() {
                       </div>
                       <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100 line-clamp-1">{need.title}</h3>
                       <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-3 leading-relaxed">{need.description}</p>
-                      <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 pt-1 truncate">
-                        {org?.name || "Verified Organization"} {need.location ? `· ${need.location}` : ""}
+                      <p className="flex items-center gap-2 text-xs font-semibold text-blue-600 dark:text-blue-400 pt-1 min-w-0">
+                        <OrgLogo src={org?.logo_url} name={org?.name || "Verified Organization"} className="h-6 w-6 text-[10px]" />
+                        <span className="truncate">{org?.name || "Verified Organization"} {need.location ? `· ${need.location}` : ""}</span>
                       </p>
                     </div>
                     <Link href={`/needs?search=${encodeURIComponent(need.title)}`} className="inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 transition-colors shadow-sm">
@@ -591,9 +594,7 @@ export default function LandingPage() {
 
                       <div className="flex items-center justify-between gap-4 pt-6 border-t border-slate-100 dark:border-slate-800">
                         <div className="flex items-center gap-4 min-w-0">
-                          <div className="w-12 h-12 shrink-0 rounded bg-slate-900 dark:bg-blue-600 flex items-center justify-center shadow-md">
-                            <span className="text-white font-bold">{currentStory.reviewer.charAt(0)}</span>
-                          </div>
+                          <OrgLogo src={currentStory.organizationLogo} name={currentStory.organization} className="h-12 w-12 text-base shadow-md" />
                           <div className="min-w-0">
                             <div className="font-bold text-slate-900 dark:text-slate-100 truncate">{currentStory.reviewer}</div>
                             <div className="text-sm font-medium text-blue-600 dark:text-blue-400 truncate">{currentStory.organization}</div>
@@ -646,9 +647,7 @@ export default function LandingPage() {
                   <p className="text-base text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line">{openStory.review}</p>
                   <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-slate-100 dark:border-slate-800">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-slate-900 dark:bg-blue-600 flex items-center justify-center shrink-0">
-                        <span className="text-white font-bold text-sm">{openStory.reviewer.charAt(0)}</span>
-                      </div>
+                      <OrgLogo src={openStory.organizationLogo} name={openStory.organization} className="h-10 w-10 text-sm" />
                       <div>
                         <div className="font-bold text-sm text-slate-900 dark:text-slate-100">{openStory.reviewer}</div>
                         <div className="text-xs font-medium text-blue-600 dark:text-blue-400">{openStory.organization}</div>
@@ -784,9 +783,35 @@ export default function LandingPage() {
                   </div>
                 ))}
               </div>
+
+              {/* Scam safety notice - sits under the FAQs (one of which covers the same topic). */}
+              <div className="mt-10 rounded-[2rem] border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-8">
+                <div className="flex items-start gap-4">
+                  <div className="shrink-0 rounded bg-amber-100 dark:bg-amber-900/50 p-3 text-amber-700 dark:text-amber-400">
+                    <ShieldCheck className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">Stay safe: HelpLift will never ask you to pay</h3>
+                    <p className="mt-2 text-slate-600 dark:text-slate-300 leading-relaxed">
+                      We will never ask you to pay a fee to receive a donation, claim a gift, verify your account, or "unlock"
+                      funds - and we will never ask for your password, PIN, or a one-time verification code. Every payment on
+                      HelpLift happens through the platform's own donation flow, never by direct bank transfer to an
+                      individual, WhatsApp, or a "processing fee" request.
+                    </p>
+                    <p className="mt-3 text-slate-600 dark:text-slate-300 leading-relaxed">
+                      If anyone claiming to be from HelpLift asks you to pay upfront or share your login details, it's a scam
+                      - please{" "}
+                      <a href="#contact" className="font-semibold text-amber-700 dark:text-amber-400 hover:underline">report it to us</a>{" "}
+                      right away.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[2.5rem] p-10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] relative overflow-hidden">
+            {/* Right column: contact form with the platform-support card under it. */}
+            <div className="space-y-8">
+            <div id="contact" className="scroll-mt-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[2.5rem] p-10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] relative overflow-hidden">
                <div className="absolute -top-10 -right-10 w-40 h-40 bg-blue-50 dark:bg-blue-950 rounded blur-2xl -z-10" />
                <h3 className="text-2xl font-bold mb-2 text-slate-900 dark:text-slate-100">Partner with us or get in touch</h3>
                <p className="text-slate-500 dark:text-slate-400 mb-2">Need help registering your organization? Reach out. This is also where you can contact us with any other inquiry or question.</p>
@@ -843,7 +868,7 @@ export default function LandingPage() {
                </form>
             </div>
 
-            <div className="md:col-start-2 bg-pink-50 dark:bg-pink-950/30 border border-pink-100 dark:border-pink-900 rounded-[2.5rem] p-10 relative overflow-hidden">
+            <div className="bg-pink-50 dark:bg-pink-950/30 border border-pink-100 dark:border-pink-900 rounded-[2.5rem] p-10 relative overflow-hidden">
               <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-pink-100 dark:bg-pink-900/40 rounded blur-2xl -z-10" />
               <div className="flex items-center gap-2 mb-2">
                 <Heart className="w-5 h-5 text-pink-600" />
@@ -862,31 +887,6 @@ export default function LandingPage() {
                 <span>Support The Platform</span>
               </button>
             </div>
-          </div>
-        </section>
-
-        {/* --- SCAM SAFETY NOTICE --- */}
-        <section className="max-w-6xl mx-auto px-4 py-8">
-          <div className="rounded-[2.5rem] border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-8 md:p-10">
-            <div className="flex items-start gap-4">
-              <div className="shrink-0 rounded bg-amber-100 dark:bg-amber-900/50 p-3 text-amber-700 dark:text-amber-400">
-                <ShieldCheck className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">Stay safe: HelpLift will never ask you to pay</h3>
-                <p className="mt-2 text-slate-600 dark:text-slate-300 leading-relaxed">
-                  We will never ask you to pay a fee to receive a donation, claim a gift, verify your account, or "unlock"
-                  funds - and we will never ask for your password, PIN, or a one-time verification code. Every payment on
-                  HelpLift happens through the platform's own donation flow, never by direct bank transfer to an
-                  individual, WhatsApp, or a "processing fee" request.
-                </p>
-                <p className="mt-3 text-slate-600 dark:text-slate-300 leading-relaxed">
-                  If anyone claiming to be from HelpLift asks you to pay upfront or share your login details, it's a scam
-                  - please{" "}
-                  <a href="#faq" className="font-semibold text-amber-700 dark:text-amber-400 hover:underline">report it to us</a>{" "}
-                  right away.
-                </p>
-              </div>
             </div>
           </div>
         </section>
