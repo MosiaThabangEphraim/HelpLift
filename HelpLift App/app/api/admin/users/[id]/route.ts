@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { logUserAction } from "@/lib/activity-log"
 import { createServerClient } from "@supabase/ssr"
 
 const ALLOWED_ROLES = ["admin", "organization", "giver"] as const
@@ -101,8 +102,29 @@ export async function PATCH(
       }
     }
 
+    // Giver details live on the givers row: phone, account type - and the
+    // giver's display name, kept in step with the profile's full name.
+    const giverUpdate: Record<string, string | null> = {}
+    if (typeof body.phone === "string") giverUpdate.phone = body.phone.trim() || null
+    if (body.account_type !== undefined) {
+      if (!["individual", "business", "group"].includes(body.account_type)) {
+        return NextResponse.json({ message: "Account type must be individual, business or group." }, { status: 400 })
+      }
+      giverUpdate.account_type = body.account_type
+    }
+    if (typeof profileUpdate.full_name === "string") giverUpdate.name = profileUpdate.full_name
+    let giverChanged = false
+    if (Object.keys(giverUpdate).length > 0) {
+      const { data: giverRow } = await serviceClient().from("givers").select("id").eq("profile_id", id).maybeSingle()
+      if (giverRow) {
+        const { error: giverError } = await serviceClient().from("givers").update(giverUpdate).eq("id", giverRow.id)
+        if (giverError) return NextResponse.json({ message: giverError.message }, { status: 400 })
+        giverChanged = true
+      }
+    }
+
     const hasProfileFields = Object.keys(profileUpdate).length > 0
-    if (!hasProfileFields && !passwordChanged) {
+    if (!hasProfileFields && !passwordChanged && !giverChanged) {
       return NextResponse.json({ message: "No updatable fields provided." }, { status: 400 })
     }
 
@@ -161,6 +183,15 @@ export async function PATCH(
       profile = data
     }
 
+    const changes = [
+      body.full_name !== undefined && "name",
+      body.role !== undefined && "role",
+      body.suspended !== undefined && (body.suspended ? "suspended" : "unsuspended"),
+      passwordChanged && "password reset",
+      (body.phone !== undefined || body.account_type !== undefined) && "giver details",
+    ].filter(Boolean).join(", ")
+    await logUserAction(supabase, "Edited a user account", `${profile?.full_name || profile?.email || "User"}${changes ? ` - ${changes}` : ""}`)
+
     return NextResponse.json({ profile })
   } catch (error: any) {
     console.error("Admin user update error:", error)
@@ -190,9 +221,33 @@ export async function DELETE(
       return NextResponse.json({ message: "You can't delete the account you're currently signed in as. Sign in as another administrator to delete this one." }, { status: 400 })
     }
 
-    const { error } = await serviceClient().auth.admin.deleteUser(id)
+    // Deleting an account cascades to its giver/organization rows - and from
+    // there to their donations and withdrawals. Financial records must be
+    // kept, so accounts that hold any can't be deleted (suspend them instead).
+    const service = serviceClient()
+    const [{ data: giverRows }, { data: orgRows }] = await Promise.all([
+      service.from("givers").select("id").eq("profile_id", id),
+      service.from("organizations").select("id").eq("profile_id", id),
+    ])
+    const giverIds = (giverRows || []).map((row: any) => row.id)
+    const orgIds = (orgRows || []).map((row: any) => row.id)
+    const counts = await Promise.all([
+      giverIds.length ? service.from("donations").select("id", { count: "exact", head: true }).in("giver_id", giverIds) : Promise.resolve({ count: 0 }),
+      orgIds.length ? service.from("donations").select("id", { count: "exact", head: true }).in("organization_id", orgIds) : Promise.resolve({ count: 0 }),
+      orgIds.length ? service.from("organization_withdrawals").select("id", { count: "exact", head: true }).in("organization_id", orgIds) : Promise.resolve({ count: 0 }),
+    ])
+    const financialRecords = counts.reduce((total, result: any) => total + (result.count || 0), 0)
+    if (financialRecords > 0) {
+      return NextResponse.json({
+        message: `This account has ${financialRecords} financial record${financialRecords === 1 ? "" : "s"} (donations or withdrawals), which must be kept - so it can't be deleted. Suspend the account instead.`,
+      }, { status: 409 })
+    }
+
+    const { data: target } = await service.from("profiles").select("full_name, email, role").eq("id", id).maybeSingle()
+    const { error } = await service.auth.admin.deleteUser(id)
     if (error) return NextResponse.json({ message: error.message }, { status: 400 })
 
+    await logUserAction(supabase, "Deleted a user account", `${target?.full_name || target?.email || "User"}${target?.role ? ` (${target.role})` : ""}`)
     return NextResponse.json({ success: true })
   } catch (error: any) {
     console.error("Admin user delete error:", error)

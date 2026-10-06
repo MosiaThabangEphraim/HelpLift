@@ -95,9 +95,9 @@ export function NeedDetailDialog({
 
         <div className="space-y-4 pt-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full capitalize ${statusBadgeClassesForNeed(need.status)}`}>{need.status.replace(/_/g, " ")}</span>
-            {need.urgency === "high" && <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-red-100 text-red-700">High Urgency</span>}
-            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-[#1A2740]">{need.category}</span>
+            <span className={`text-[11px] font-bold px-2.5 py-1 rounded capitalize ${statusBadgeClassesForNeed(need.status)}`}>{need.status.replace(/_/g, " ")}</span>
+            {need.urgency === "high" && <span className="text-[11px] font-bold px-2.5 py-1 rounded bg-red-100 text-red-700">High Urgency</span>}
+            <span className="text-[11px] font-bold px-2.5 py-1 rounded bg-slate-100 dark:bg-[#1A2740]">{need.category}</span>
           </div>
 
           <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -143,9 +143,9 @@ export function NeedDetailDialog({
                 {need.attachments.map(att => (
                   <a key={att.id} href={att.url} target="_blank" rel="noreferrer" className="block">
                     {/\.(png|jpe?g|gif|webp)$/i.test(att.file_name || att.url) ? (
-                      <img src={att.url} alt={att.file_name || "Attachment"} className="h-16 w-16 rounded-lg object-cover border border-slate-200 dark:border-[#233350]" />
+                      <img src={att.url} alt={att.file_name || "Attachment"} className="h-16 w-16 rounded object-cover border border-slate-200 dark:border-[#233350]" />
                     ) : (
-                      <span className="flex items-center justify-center h-16 w-16 rounded-lg border border-slate-200 dark:border-[#233350] text-[10px] font-bold text-blue-600 text-center px-1">📄 {att.file_name?.slice(0, 10) || "File"}</span>
+                      <span className="flex items-center justify-center h-16 w-16 rounded border border-slate-200 dark:border-[#233350] text-[10px] font-bold text-blue-600 text-center px-1">📄 {att.file_name?.slice(0, 10) || "File"}</span>
                     )}
                   </a>
                 ))}
@@ -154,11 +154,11 @@ export function NeedDetailDialog({
           )}
 
           {need.status === "rejected" && need.rejection_reason && (
-            <p className="text-xs italic text-red-700 dark:text-red-400 rounded-xl bg-red-50 dark:bg-red-950/20 p-3">Previous rejection reason: {need.rejection_reason}</p>
+            <p className="text-xs italic text-red-700 dark:text-red-400 rounded bg-red-50 dark:bg-red-950/20 p-3">Previous rejection reason: {need.rejection_reason}</p>
           )}
 
           {isReopenRequest && need.reopen_reason && (
-            <p className="text-xs italic text-purple-700 dark:text-purple-400 rounded-xl bg-purple-50 dark:bg-purple-950/20 p-3">Organization's motivation for reopening: {need.reopen_reason}</p>
+            <p className="text-xs italic text-purple-700 dark:text-purple-400 rounded bg-purple-50 dark:bg-purple-950/20 p-3">Organization's motivation for reopening: {need.reopen_reason}</p>
           )}
 
           {showRejectForm && (
@@ -171,7 +171,7 @@ export function NeedDetailDialog({
                   value={rejectReason}
                   onChange={e => setRejectReason(e.target.value)}
                   placeholder={isReopenRequest ? "Reason for declining the reopen request (optional, shared with the organization)..." : "Reason for rejection (optional, shared with the organization)..."}
-                  className="w-full min-h-16 p-3 pr-11 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded-2xl text-sm outline-none focus:border-red-500"
+                  className="w-full min-h-16 p-3 pr-11 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded text-sm outline-none focus:border-red-500"
                 />
                 <MicButton className="top-2 right-2" onText={text => setRejectReason(r => appendSpeech(r, text))} />
               </div>

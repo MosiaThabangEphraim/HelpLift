@@ -22,6 +22,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
+import { logClientAction } from "@/components/activity-tracker"
 
 const DASHBOARD_PATH: Record<string, string> = {
   giver: "/givers-dashboard",
@@ -81,6 +82,7 @@ export default function PublicNavbar() {
 
   const toggleDarkMode = () => {
     setTheme(NEXT_THEME[themeMode])
+    logClientAction("Changed the theme", `Switched to ${String(NEXT_THEME[themeMode]).replace("-", " ")} mode`)
   }
 
   const handleLoginRedirect = () => router.push("/login")
@@ -104,7 +106,7 @@ export default function PublicNavbar() {
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center transition-transform group-hover:scale-105">
+            <div className="w-8 h-8 bg-primary rounded flex items-center justify-center transition-transform group-hover:scale-105">
               <HeartHandshake className="w-5 h-5 text-primary-foreground" />
             </div>
             <span className="font-black tracking-tighter text-xl text-foreground">
@@ -118,7 +120,7 @@ export default function PublicNavbar() {
               asChild
               variant="ghost"
               size="sm"
-              className={`rounded-full px-4 gap-2 font-bold text-sm ${
+              className={`rounded px-4 gap-2 font-bold text-sm ${
                 isNeedsPage ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
               }`}
             >
@@ -131,7 +133,7 @@ export default function PublicNavbar() {
               asChild
               variant="ghost"
               size="sm"
-              className={`rounded-full px-4 gap-2 font-bold text-sm ${
+              className={`rounded px-4 gap-2 font-bold text-sm ${
                 isGiftLibraryPage ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
               }`}
             >
@@ -144,7 +146,7 @@ export default function PublicNavbar() {
               asChild
               variant="ghost"
               size="sm"
-              className={`rounded-full px-4 gap-2 font-bold text-sm ${
+              className={`rounded px-4 gap-2 font-bold text-sm ${
                 isOrganizationsPage ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
               }`}
             >
@@ -161,7 +163,7 @@ export default function PublicNavbar() {
             <button
               onClick={toggleDarkMode}
               aria-label={THEME_LABEL[themeMode]}
-              className="p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-all active:scale-90"
+              className="p-2 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-all active:scale-90"
             >
               {themeMode === "light" && <Moon className="w-6 h-6 md:w-5 md:h-5" />}
               {themeMode === "dark" && <Contrast className="w-6 h-6 md:w-5 md:h-5" />}
@@ -175,7 +177,7 @@ export default function PublicNavbar() {
                 asChild
                 variant="ghost"
                 size="sm"
-                className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-full px-2 md:px-4 transition-all overflow-hidden group"
+                className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded px-2 md:px-4 transition-all overflow-hidden group"
               >
                 <Link href="/verify-email">
                   <ShieldCheck className="w-7 h-7 md:w-4 md:h-4 shrink-0" />
@@ -192,7 +194,7 @@ export default function PublicNavbar() {
                 asChild
                 variant="ghost"
                 size="sm"
-                className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-full px-2 md:px-4 transition-all overflow-hidden group"
+                className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded px-2 md:px-4 transition-all overflow-hidden group"
               >
                 <Link href="/login">
                   <ChevronLeft className="w-7 h-7 md:w-4 md:h-4 shrink-0" />
@@ -216,7 +218,7 @@ export default function PublicNavbar() {
                   size="sm"
                   className={`${
                     isAuthView ? "hidden" : "hidden md:flex"
-                  } gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-full px-2 md:px-4 transition-all overflow-hidden group`}
+                  } gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded px-2 md:px-4 transition-all overflow-hidden group`}
                   asChild
                 >
                   <a href={isAdminLoginPage ? "/" : "/#about"}>
@@ -242,7 +244,7 @@ export default function PublicNavbar() {
                 size="sm"
                 onClick={() => router.push(dashboardPath)}
                 data-tip="You're signed in - go to your dashboard"
-                className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-full px-2 md:px-4 transition-all overflow-hidden group"
+                className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded px-2 md:px-4 transition-all overflow-hidden group"
               >
                 <LayoutDashboard className="w-7 h-7 md:w-4 md:h-4 shrink-0" />
                 <span className="font-bold max-w-0 md:max-w-[140px] inline-block transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden">
@@ -256,7 +258,7 @@ export default function PublicNavbar() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-full px-2 md:px-4 transition-all overflow-hidden group"
+                    className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded px-2 md:px-4 transition-all overflow-hidden group"
                     onClick={handleLoginRedirect}
                   >
                     <LogIn className="w-7 h-7 md:w-4 md:h-4 shrink-0" />
@@ -272,7 +274,7 @@ export default function PublicNavbar() {
                     variant="ghost"
                     size="sm"
                     onClick={() => router.push("/register")}
-                    className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-full px-2 md:px-4 transition-all overflow-hidden group"
+                    className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded px-2 md:px-4 transition-all overflow-hidden group"
                   >
                     <UserPlus className="w-7 h-7 md:w-4 md:h-4 shrink-0" />
                     <span className="font-bold max-w-0 md:max-w-[100px] inline-block transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden">
@@ -289,7 +291,7 @@ export default function PublicNavbar() {
                 asChild
                 variant="ghost"
                 size="sm"
-                className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-full px-2 md:px-4 transition-all overflow-hidden group"
+                className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded px-2 md:px-4 transition-all overflow-hidden group"
               >
                 <Link href="/">
                   <Home className="w-7 h-7 md:w-4 md:h-4 shrink-0" />

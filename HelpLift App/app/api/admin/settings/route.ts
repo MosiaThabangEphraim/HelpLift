@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { getMaintenanceMode, getWithdrawalLimits, getPlatformDonationLimits, getBadgeThresholds, getLoginBanner } from "@/lib/platform-settings"
+import { getMaintenanceMode, getWithdrawalLimits, getPlatformDonationLimits, getBadgeThresholds, getLoginBanner, getHomepageNotice } from "@/lib/platform-settings"
 
 // The PATCH here always replaces the whole badge_thresholds object (never a
 // partial), since readSetting's fallback merge in lib/platform-settings.ts
@@ -53,14 +53,15 @@ export async function GET() {
     const supabase = await createClient()
     const auth = await requireAdmin(supabase)
     if (auth.error) return auth.error
-    const [maintenanceMode, withdrawalLimits, platformDonationLimits, badgeThresholds, loginBanner] = await Promise.all([
+    const [maintenanceMode, withdrawalLimits, platformDonationLimits, badgeThresholds, loginBanner, homepageNotice] = await Promise.all([
       getMaintenanceMode(supabase),
       getWithdrawalLimits(supabase),
       getPlatformDonationLimits(supabase),
       getBadgeThresholds(supabase),
       getLoginBanner(supabase),
+      getHomepageNotice(supabase),
     ])
-    return NextResponse.json({ maintenanceMode, withdrawalLimits, platformDonationLimits, badgeThresholds, loginBanner })
+    return NextResponse.json({ maintenanceMode, withdrawalLimits, platformDonationLimits, badgeThresholds, loginBanner, homepageNotice })
   } catch (error) {
     console.error("Admin settings load error:", error)
     return NextResponse.json({ message: "Settings are unavailable." }, { status: 503 })
@@ -75,7 +76,7 @@ export async function PATCH(request: Request) {
 
     const body = await request.json().catch(() => ({}))
     const { key, value } = body
-    if (key !== "maintenance_mode" && key !== "withdrawal_limits" && key !== "platform_donation_limits" && key !== "badge_thresholds" && key !== "login_banner") {
+    if (key !== "maintenance_mode" && key !== "withdrawal_limits" && key !== "platform_donation_limits" && key !== "badge_thresholds" && key !== "login_banner" && key !== "homepage_notice") {
       return NextResponse.json({ message: "Unknown setting." }, { status: 400 })
     }
 
@@ -83,7 +84,7 @@ export async function PATCH(request: Request) {
       if (typeof value?.enabled !== "boolean" || typeof value?.message !== "string" || !value.message.trim()) {
         return NextResponse.json({ message: "Provide enabled (true/false) and a message." }, { status: 400 })
       }
-    } else if (key === "login_banner") {
+    } else if (key === "login_banner" || key === "homepage_notice") {
       // Unlike maintenance mode, a login banner may be saved disabled with an
       // empty message (e.g. clearing it) - a message is only required while
       // turning it on. attachments defaults to [] for older callers that
@@ -94,6 +95,7 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ message: "Provide enabled (true/false) and a message." }, { status: 400 })
       }
       if (!Array.isArray(value.attachments)) value.attachments = []
+      if (key === "homepage_notice" && typeof value.title !== "string") value.title = ""
       if (value.enabled && !value.message.trim()) {
         return NextResponse.json({ message: "Enter a message to show, or turn the banner off." }, { status: 400 })
       }
@@ -109,10 +111,10 @@ export async function PATCH(request: Request) {
       value.max = max
     }
 
+    // Upsert, so settings added later (e.g. homepage_notice) work without a migration creating their row first.
     const { error } = await supabase
       .from("platform_settings")
-      .update({ value, updated_at: new Date().toISOString(), updated_by: auth.user.id })
-      .eq("key", key)
+      .upsert({ key, value, updated_at: new Date().toISOString(), updated_by: auth.user.id }, { onConflict: "key" })
     if (error) return NextResponse.json({ message: error.message }, { status: 400 })
 
     return NextResponse.json({ success: true })

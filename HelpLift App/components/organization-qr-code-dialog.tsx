@@ -74,10 +74,10 @@ export function OrganizationQrCodeDialog({
           </p>
 
           {error && (
-            <div className="rounded-xl bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">{error}</div>
+            <div className="rounded bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">{error}</div>
           )}
 
-          <div className="flex items-center justify-center rounded-2xl border border-slate-200 dark:border-[#233350] bg-white p-4">
+          <div className="flex items-center justify-center rounded border border-slate-200 dark:border-[#233350] bg-white p-4">
             {dataUrl ? (
               <img src={dataUrl} alt={`QR code linking to ${organizationName}'s HelpLift profile`} className="w-56 h-56" />
             ) : (

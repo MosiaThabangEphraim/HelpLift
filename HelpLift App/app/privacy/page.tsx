@@ -23,7 +23,7 @@ export default function PrivacyPolicyPage() {
             <ArrowLeft className="w-4 h-4" /> Back to home
           </Link>
           <h1 className="text-3xl md:text-4xl font-black tracking-tight text-slate-900 dark:text-white">Privacy Policy</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Effective 18 September 2026</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Effective 6 October 2026</p>
         </div>
 
         <Section title="1. Who we are">
@@ -44,7 +44,9 @@ export default function PrivacyPolicyPage() {
           <p><strong className="text-slate-800 dark:text-slate-100">Verification documents.</strong> Organizations upload registration certificates, tax exemption letters, founding documents, and proof of banking details so our administrators can verify the organization before it can publish needs or receive donations.</p>
           <p><strong className="text-slate-800 dark:text-slate-100">Donation and payment information.</strong> When you donate - by bank transfer (EFT) or via PayFast - we record the amount, payment method, a reference code, and (for EFT) a proof-of-payment file you upload for admin verification. Card and instant-EFT payments made through PayFast are processed by PayFast directly; we do not see or store your card number.</p>
           <p><strong className="text-slate-800 dark:text-slate-100">Content you post.</strong> Needs, impact stories (including photos and videos you upload), and messages you send to other users (including any file attachments) are stored on the platform. Impact stories and published needs are publicly visible.</p>
-          <p><strong className="text-slate-800 dark:text-slate-100">Usage and security information.</strong> We log sign-in timestamps and an approximate device/browser identifier and time zone, used only to help us detect suspicious account activity.</p>
+          <p><strong className="text-slate-800 dark:text-slate-100">Sign-in records.</strong> Each time someone tries to sign in - successfully or not - we record the email entered, the result (for example a wrong password or a locked account), the sign-in method, the IP address, an approximate location (country and city) and the device/browser type. These records are used only to protect accounts and detect suspicious activity.</p>
+          <p><strong className="text-slate-800 dark:text-slate-100">Activity on the platform.</strong> While you are signed in, we record which pages you open and the key actions you take (for example posting a need, starting a donation, pledging a gift or sending a message) - only that the action happened, never the contents of your messages, forms, passwords or payment details. Administrators use this to keep the platform safe, investigate problems and support users. Visitors who are not signed in are not tracked this way.</p>
+          <p><strong className="text-slate-800 dark:text-slate-100">Developer reports.</strong> Reports sent from our Developers page are anonymous: they are not linked to an account. We keep a contact email only if you choose to give one, together with the browser/device type to help reproduce bugs.</p>
         </Section>
 
         <Section title="3. How we use your information">
@@ -53,7 +55,7 @@ export default function PrivacyPolicyPage() {
             <li>To process and track donations and gift-library pledges, including verifying proof-of-payment and forwarding confirmed funds to the relevant organization's registered bank account.</li>
             <li>To let givers, organizations, and administrators message one another about needs, donations, and fulfillments.</li>
             <li>To send account, verification, and donation-status notifications by email.</li>
-            <li>To detect and prevent fraud, abuse, and violations of our Terms of Service.</li>
+            <li>To detect and prevent fraud, abuse, and violations of our Terms of Service, including by reviewing sign-in records and platform activity.</li>
             <li>To maintain records required for financial and tax purposes (for example, an organization's tax-exemption status).</li>
             <li>To improve the platform and respond to support requests submitted through our contact form.</li>
           </ul>
@@ -97,6 +99,9 @@ export default function PrivacyPolicyPage() {
             profile information is removed, but records of donations and financial transactions are retained for
             as long as required for accounting, audit, and legal purposes, since these form part of an
             organization's financial record.
+          </p>
+          <p>
+            Sign-in records and platform activity records are kept for 90 days and then deleted automatically.
           </p>
         </Section>
 

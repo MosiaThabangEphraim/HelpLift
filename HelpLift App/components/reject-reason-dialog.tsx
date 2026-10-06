@@ -70,7 +70,7 @@ export function RejectReasonDialog({
               value={reason}
               onChange={e => setReason(e.target.value)}
               placeholder="e.g. The photos don't match the story. Please upload clearer images."
-              className="w-full rounded-xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-3 py-2 pr-11 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              className="w-full rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-3 py-2 pr-11 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             />
             <MicButton className="top-2 right-2" onText={text => setReason(r => appendSpeech(r, text))} />
           </div>

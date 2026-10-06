@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { stageFormFiles } from "@/lib/stage-uploads"
+import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import Link from "next/link"
 import { ArrowRight, Camera, ImageUp, Loader2, X } from "lucide-react"
 import { optimizeAndValidateFile } from "@/lib/media-optimizer"
@@ -108,7 +110,7 @@ export function SnapToPledge({ onDraft }: { onDraft: (draft: PledgeDraft, photo:
 
       const formData = new FormData()
       formData.append("photo", photo)
-      const res = await fetch("/api/giver/gifts/analyze-photo", { method: "POST", body: formData })
+      const res = await fetch("/api/giver/gifts/analyze-photo", { method: "POST", body: await stageFormFiles(formData) })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.message || "Lifty couldn't look at this photo right now. Please try again.")
       if (!data.donatable) throw new Error(data.message || "Lifty couldn't spot anything to pledge in this photo.")
@@ -133,7 +135,7 @@ export function SnapToPledge({ onDraft }: { onDraft: (draft: PledgeDraft, photo:
           onClick={takePhoto}
           disabled={isAnalyzing}
           data-tip={`Take a photo of what you'd like to give and Lifty fills in the form. ${privacyTip}`}
-          className="inline-flex items-center gap-1.5 rounded-full bg-purple-600 px-3 py-1 text-xs font-bold text-white shadow-sm hover:bg-purple-700 disabled:opacity-60 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded bg-purple-600 px-3 py-1 text-xs font-bold text-white shadow-sm hover:bg-purple-700 disabled:opacity-60 transition-colors"
         >
           {isAnalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
           {isAnalyzing ? "Looking..." : "Snap to pledge"}
@@ -141,7 +143,7 @@ export function SnapToPledge({ onDraft }: { onDraft: (draft: PledgeDraft, photo:
         {/* A separate picker without the capture hint, so phones can choose from the gallery too. */}
         <label
           data-tip={`Choose a photo and Lifty fills in the form. ${privacyTip}`}
-          className={`inline-flex items-center gap-1 rounded-full border border-purple-200 dark:border-purple-900 px-2.5 py-1 text-xs font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/40 transition-colors ${isAnalyzing ? "opacity-60 pointer-events-none" : "cursor-pointer"}`}
+          className={`inline-flex items-center gap-1 rounded border border-purple-200 dark:border-purple-900 px-2.5 py-1 text-xs font-semibold text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/40 transition-colors ${isAnalyzing ? "opacity-60 pointer-events-none" : "cursor-pointer"}`}
         >
           <ImageUp className="h-3.5 w-3.5" /> Upload
           <input
@@ -171,7 +173,7 @@ export function SnapToPledge({ onDraft }: { onDraft: (draft: PledgeDraft, photo:
 
       {cameraOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 p-4" role="dialog" aria-modal="true" aria-label="Take a photo">
-          <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-slate-900 p-4 shadow-2xl space-y-3">
+          <div className="w-full max-w-lg rounded bg-white dark:bg-slate-900 p-4 shadow-2xl space-y-3">
             <div className="flex items-center justify-between">
               <p className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-slate-100">
                 <Camera className="h-4 w-4 text-purple-600" /> Take a photo of your items
@@ -180,7 +182,7 @@ export function SnapToPledge({ onDraft }: { onDraft: (draft: PledgeDraft, photo:
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="relative overflow-hidden rounded-xl bg-black aspect-[4/3]">
+            <div className="relative overflow-hidden rounded bg-black aspect-[4/3]">
               <video
                 ref={videoRef}
                 autoPlay
@@ -208,7 +210,7 @@ export function SnapToPledge({ onDraft }: { onDraft: (draft: PledgeDraft, photo:
                 onClick={capture}
                 disabled={!cameraReady}
                 autoFocus
-                className="inline-flex items-center gap-2 rounded-full bg-purple-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:bg-purple-700 disabled:opacity-50 transition-colors"
+                className="inline-flex items-center gap-2 rounded bg-purple-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:bg-purple-700 disabled:opacity-50 transition-colors"
               >
                 <Camera className="h-4 w-4" /> Capture
               </button>

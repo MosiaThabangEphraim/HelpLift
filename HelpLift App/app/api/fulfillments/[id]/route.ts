@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/staged-uploads"
+import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { createClient } from "@/lib/supabase/server"
 
 export async function GET(
@@ -77,7 +79,8 @@ export async function PATCH(
       const formData = await request.formData()
       status = String(formData.get("status") || "")
       notes = String(formData.get("notes") || "")
-      proofFiles = formData.getAll("proofs").filter((f): f is File => f instanceof File && f.size > 0)
+      proofFiles = await readUploadedFiles(formData, "proofs")
+      { const uploadProblem = checkUploadLimits(proofFiles, UPLOAD_LIMITS.fulfillmentProofs); if (uploadProblem) return NextResponse.json({ message: uploadProblem }, { status: 400 }) }
     } else {
       const body = await request.json()
       status = body.status

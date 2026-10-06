@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server"
+import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/staged-uploads"
+import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
+import { logUserAction } from "@/lib/activity-log"
 import { createClient } from "@/lib/supabase/server"
 
 export async function GET() {
@@ -59,7 +62,8 @@ export async function POST(request: Request) {
       conditions = String(formData.get("conditions") || "")
       location = String(formData.get("location") || "")
       expiry_date = String(formData.get("expiry_date") || "")
-      photoFiles = formData.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0)
+      photoFiles = await readUploadedFiles(formData, "photos")
+      { const uploadProblem = checkUploadLimits(photoFiles, UPLOAD_LIMITS.giftPhotos); if (uploadProblem) return NextResponse.json({ message: uploadProblem }, { status: 400 }) }
     } else {
       const body = await request.json()
       title = body.title || ""
@@ -123,6 +127,7 @@ export async function POST(request: Request) {
       }
     }
 
+    await logUserAction(supabase, "Pledged to the Gift Library", gift?.title)
     return NextResponse.json({ success: true, gift, photosUploaded }, { status: 201 })
   } catch (err: any) {
     console.error("Create gift offering error:", err)

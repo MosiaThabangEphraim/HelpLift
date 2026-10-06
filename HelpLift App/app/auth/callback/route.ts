@@ -3,6 +3,8 @@ import { cookies } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { setSignupRole } from "@/lib/google-signup"
+import { methodFromProvider, recordLoginAttempt } from "@/lib/login-audit"
+import { logActivity } from "@/lib/activity-log"
 
 // Where Google and LinkedIn both send the person back to (through Supabase) -
 // one callback for every OAuth provider, since almost nothing here is
@@ -75,6 +77,10 @@ export async function GET(request: Request) {
     if (!user) return fail("oauth")
 
     const profile = await fetchProfileWithRetry(supabase, user.id)
+    const method = methodFromProvider(user.app_metadata?.provider)
+    const portal = intent === "admin" ? "admin" : "user"
+    const audit = (outcome: Parameters<typeof recordLoginAttempt>[1]["outcome"], detail?: string) =>
+      recordLoginAttempt(request, { email: user.email, profileId: profile?.id ?? null, outcome, method, portal, detail })
     if (!profile) {
       await supabase.auth.signOut()
       return fail("profile")
@@ -86,13 +92,17 @@ export async function GET(request: Request) {
       if (profile.role !== "admin") {
         // The provider created a stray, empty account for someone who isn't
         // an administrator: remove it rather than leave it behind.
+        await audit("wrong_portal", "A non-administrator account tried the administrator portal")
         if (isNewSignUp) await createAdminClient().auth.admin.deleteUser(user.id)
         await supabase.auth.signOut()
         return failTo("/admin-login", "not_admin")
       }
+      await audit("success")
+      await logActivity({ profileId: user.id, role: profile.role, action: "Signed in", detail: `With ${method}` })
       return NextResponse.redirect(`${base}/admin-dashboard`)
     }
     if (profile.role === "admin") {
+      await audit("wrong_portal", "Administrator used the user sign-in page")
       await supabase.auth.signOut()
       return fail("admin")
     }
@@ -106,6 +116,7 @@ export async function GET(request: Request) {
           return fail("oauth")
         }
       }
+      await audit("success", "New sign-up - sent to finish registration")
       return NextResponse.redirect(`${base}/register/complete`)
     }
 
@@ -119,6 +130,8 @@ export async function GET(request: Request) {
         await supabase.from("givers").update({ avatar_url: picture }).eq("profile_id", user.id).is("avatar_url", null)
       }
     }
+    await audit("success")
+    await logActivity({ profileId: user.id, role: profile.role, action: "Signed in", detail: `With ${method}` })
     return NextResponse.redirect(`${base}${profile.role === "organization" ? "/organisation-dashboard" : "/givers-dashboard"}`)
   } catch (error) {
     console.error("OAuth sign-in callback error:", error)

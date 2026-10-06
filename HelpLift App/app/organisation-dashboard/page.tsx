@@ -1,6 +1,10 @@
 "use client"
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react"
+import { useTabTransition } from "@/lib/use-tab-transition"
+import { CountUp } from "@/components/count-up"
+import { stageFormFiles } from "@/lib/stage-uploads"
+import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { showFeedback } from "@/lib/inline-feedback"
@@ -52,6 +56,7 @@ import { firstOf } from "@/lib/utils"
 import { useNeedCategories } from "@/lib/use-need-categories"
 import { NeedWriter } from "@/components/need-writer"
 import { DashboardTour } from "@/components/dashboard-tour"
+import { recordSignOut } from "@/components/activity-tracker"
 import { RefreshButton } from "@/components/refresh-button"
 import { BadgesPanel } from "@/components/badges-panel"
 import { OrganizationQrCodeDialog } from "@/components/organization-qr-code-dialog"
@@ -108,7 +113,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { FeedbackButton } from "@/components/feedback-button"
 import { SupportPlatformDialog } from "@/components/support-platform-dialog"
 import { SettingsDialog } from "@/components/settings-dialog"
-import { LiveClock } from "@/components/live-clock"
+import { AnalogClock } from "@/components/analog-clock"
 import { PasskeyPrompt } from "@/components/passkey-prompt"
 import { useNotificationAlerts } from "@/hooks/use-notification-alerts"
 
@@ -262,6 +267,12 @@ export default function OrganizationDashboardPage() {
   const [retryPrefill, setRetryPrefill] = useState<{ amount: number; method: "eft" | "payfast" | "paypal" } | null>(null)
   const [selectedGift, setSelectedGift] = useState<GiftDetailSummary | null>(null)
   const [activeTab, setActiveTab] = useState("needs")
+  // Smooth tab transitions (lib/use-tab-transition.ts), in tab-bar order.
+  const { changeTab, tabMotion } = useTabTransition(
+    ["needs", "fulfillments", "interests", "donations", "wallet", "messages", "stories", "gifts", "analytics", "team", "documents"],
+    activeTab,
+    setActiveTab
+  )
 
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [selectedDocType, setSelectedDocType] = useState("supporting_document")
@@ -398,6 +409,14 @@ export default function OrganizationDashboardPage() {
   const [isUploadingProof, setIsUploadingProof] = useState(false)
   const [proofUploadNote, setProofUploadNote] = useState<{ type: "success" | "error"; text: string } | null>(null)
   const [proofRefreshKey, setProofRefreshKey] = useState(0)
+
+  // Bumped by the header's refresh button: sections that load their own data
+  // (given it as refreshKey below) re-fetch too - in place, keeping their filters.
+  const [refreshKey, setRefreshKey] = useState(0)
+  const refreshAll = async () => {
+    setRefreshKey(key => key + 1)
+    await loadData()
+  }
 
   const loadData = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -633,7 +652,7 @@ export default function OrganizationDashboardPage() {
     try {
       const formData = new FormData()
       extraProofFiles.forEach(file => formData.append("proofs", file))
-      const res = await fetch(`/api/fulfillments/${selectedFulfillment.id}/proofs`, { method: "POST", body: formData })
+      const res = await fetch(`/api/fulfillments/${selectedFulfillment.id}/proofs`, { method: "POST", body: await stageFormFiles(formData, UPLOAD_LIMITS.fulfillmentProofs) })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.message || "Could not add proof.")
       setProofUploadNote({ type: "success", text: data.message || "Proof added." })
@@ -664,10 +683,15 @@ export default function OrganizationDashboardPage() {
     formData.set("urgency", form.urgency)
     newNeedAttachments.forEach(file => formData.append("attachments", file))
 
-    const response = await fetch("/api/organization/needs", {
-      method: "POST",
-      body: formData,
-    })
+    let body: FormData
+    try {
+      body = await stageFormFiles(formData, UPLOAD_LIMITS.needAttachments)
+    } catch (err: any) {
+      setError(err.message)
+      setIsSaving(false)
+      return
+    }
+    const response = await fetch("/api/organization/needs", { method: "POST", body })
 
     if (!response.ok) {
       setError((await response.json()).message || "Need creation failed.")
@@ -711,7 +735,14 @@ export default function OrganizationDashboardPage() {
     formData.set("reopen_reason", reopen_reason)
     files.forEach(file => formData.append("attachments", file))
 
-    const response = await fetch(`/api/organization/needs/${need.id}`, { method: "PATCH", body: formData })
+    let body: FormData
+    try {
+      body = await stageFormFiles(formData, UPLOAD_LIMITS.needAttachments)
+    } catch (err: any) {
+      setError(err.message)
+      return
+    }
+    const response = await fetch(`/api/organization/needs/${need.id}`, { method: "PATCH", body })
     if (!response.ok) setError((await response.json()).message || "Reopen request failed.")
     else { showFeedback("Reopen request sent for admin approval."); await loadData() }
   }
@@ -778,7 +809,7 @@ export default function OrganizationDashboardPage() {
         const formData = new FormData()
         formData.append("file", file)
         formData.append("document_type", selectedDocType)
-        const response = await fetch("/api/organization/documents", { method: "POST", body: formData })
+        const response = await fetch("/api/organization/documents", { method: "POST", body: await stageFormFiles(formData, UPLOAD_LIMITS.organizationDocument) })
         if (!response.ok) throw new Error((await response.json()).message || `Failed to upload ${file.name}.`)
       }
       setSelectedFiles([])
@@ -829,7 +860,7 @@ export default function OrganizationDashboardPage() {
 
       const res = await fetch(`/api/fulfillments/${verifyingFulfillment.id}`, {
         method: "PATCH",
-        body: formData,
+        body: await stageFormFiles(formData, UPLOAD_LIMITS.fulfillmentProofs),
       })
 
       if (!res.ok) {
@@ -902,7 +933,7 @@ export default function OrganizationDashboardPage() {
 
       const res = await fetch("/api/organization/stories", {
         method: "POST",
-        body: formData,
+        body: await stageFormFiles(formData, UPLOAD_LIMITS.storyImages),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || "Failed to publish story.")
@@ -977,7 +1008,7 @@ export default function OrganizationDashboardPage() {
       const formData = new FormData()
       editStoryNewImages.forEach((file) => formData.append("images", file))
       editStoryNewVideoUrls.forEach((url) => formData.append("video_urls", url))
-      const res = await fetch(`/api/organization/stories/${editingStory.id}/media`, { method: "POST", body: formData })
+      const res = await fetch(`/api/organization/stories/${editingStory.id}/media`, { method: "POST", body: await stageFormFiles(formData, UPLOAD_LIMITS.storyImages) })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.message || "Unable to add media.")
       setEditStoryNewImages([])
@@ -1050,7 +1081,7 @@ export default function OrganizationDashboardPage() {
       documents.forEach(file => formData.append("documents", file))
       const res = await fetch(`/api/organization/gifts/${giftId}/claim`, {
         method: "POST",
-        body: formData,
+        body: await stageFormFiles(formData, UPLOAD_LIMITS.giftClaimDocuments),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || "Failed to claim gift.")
@@ -1064,6 +1095,7 @@ export default function OrganizationDashboardPage() {
   }
 
   const logout = async () => {
+    await recordSignOut()
     await supabase.auth.signOut()
     router.replace("/login")
   }
@@ -1128,10 +1160,15 @@ export default function OrganizationDashboardPage() {
     formData.set("bank_account_type", (sourceData.get("bank_account_type") as string)?.trim() || "")
     if (logoFile) formData.set("logo", logoFile)
 
-    const res = await fetch("/api/organization/profile", {
-      method: "PATCH",
-      body: formData,
-    })
+    let body: FormData
+    try {
+      body = await stageFormFiles(formData, UPLOAD_LIMITS.organizationLogo)
+    } catch (err: any) {
+      setError(err.message)
+      setIsSavingOrg(false)
+      return
+    }
+    const res = await fetch("/api/organization/profile", { method: "PATCH", body })
     if (!res.ok) {
       const d = await res.json().catch(() => ({}))
       setError(d.message || "Organization profile update failed.")
@@ -1235,16 +1272,16 @@ export default function OrganizationDashboardPage() {
       <div className="mx-auto max-w-[2400px] px-4 md:px-10 py-10 md:py-14 space-y-6">
 
         <div className="flex justify-end">
-          <LiveClock />
+          <AnalogClock />
         </div>
 
         {/* --- HEADER --- */}
         <header className="flex flex-wrap items-center justify-between gap-5">
           <div className="flex items-center gap-4">
             {organization?.logo_url ? (
-              <img src={organization.logo_url} alt={`${organization.name} logo`} className="h-14 w-14 rounded-lg object-cover shadow-lg shadow-blue-600/20" />
+              <img src={organization.logo_url} alt={`${organization.name} logo`} className="h-14 w-14 rounded object-cover shadow-lg shadow-blue-600/20" />
             ) : (
-              <div className="rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 p-3.5 text-white shadow-lg shadow-blue-600/20">
+              <div className="rounded bg-gradient-to-br from-blue-600 to-indigo-600 p-3.5 text-white shadow-lg shadow-blue-600/20">
                 <Building2 className="h-6 w-6" />
               </div>
             )}
@@ -1270,7 +1307,7 @@ export default function OrganizationDashboardPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <RefreshButton onRefresh={loadData} />
+            <RefreshButton onRefresh={refreshAll} />
             <Link
               href="/"
               aria-label="Home"
@@ -1411,7 +1448,7 @@ export default function OrganizationDashboardPage() {
         </header>
 
         {memberRole !== "owner" && (
-          <div className="rounded-lg border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/30 p-4 text-sm font-semibold text-blue-800 dark:text-blue-300">
+          <div className="rounded border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/30 p-4 text-sm font-semibold text-blue-800 dark:text-blue-300">
             You're signed in as a {ROLE_LABELS[memberRole].toLowerCase()} of {organization?.name}.{" "}
             {memberRole === "viewer"
               ? "You have read-only access, so actions that change data will be declined, and you can’t message administrators."
@@ -1420,7 +1457,7 @@ export default function OrganizationDashboardPage() {
         )}
 
         {organization?.verification_status === "more_info_requested" && (
-          <div className="rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-2">
+          <div className="rounded border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-2">
             <p className="text-sm font-bold text-amber-800 dark:text-amber-300">An administrator needs more information before approving your account</p>
             {organization.verification_notes && (
               <p className="text-sm text-amber-700 dark:text-amber-400 italic">"{organization.verification_notes}"</p>
@@ -1442,14 +1479,14 @@ export default function OrganizationDashboardPage() {
         )}
 
         {organization?.verification_status !== "approved" && organization?.verification_status !== "more_info_requested" && (
-          <div className="rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-4 text-sm font-semibold text-amber-800 dark:text-amber-300">
+          <div className="rounded border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-4 text-sm font-semibold text-amber-800 dark:text-amber-300">
             Your account is {organization?.verification_status}. Upload your documents in the Documents tab and wait for admin approval before publishing needs.
           </div>
         )}
 
         {/* --- STATS ROW: what needs your attention right now, nothing
              that's just a total (that's what the Analytics tab is for) --- */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-x-6 gap-y-4">
           <StatCard icon={ClipboardList} label="Open Needs" value={stats.openNeeds} accent="emerald" />
           <StatCard icon={Users} label="Pending Interests" value={stats.pendingInterests} accent="amber" />
           <StatCard icon={PackageCheck} label="Active Fulfillments" value={stats.activeFulfillments} accent="purple" />
@@ -1458,7 +1495,7 @@ export default function OrganizationDashboardPage() {
         </div>
 
         {/* --- TABS --- */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-6">
+        <Tabs value={activeTab} onValueChange={changeTab} className="gap-6">
           <TabsList className="w-full flex-nowrap justify-start overflow-x-auto">
             <TabsTrigger value="needs" className="shrink-0 gap-1.5 px-2.5"><ClipboardList className="w-4 h-4" />Needs</TabsTrigger>
             <TabsTrigger value="fulfillments" data-tour="tab-fulfillments" className="shrink-0 gap-1.5 px-2.5"><PackageCheck className="w-4 h-4" />Fulfillments<CountBadge value={stats.activeFulfillments} /></TabsTrigger>
@@ -1480,8 +1517,8 @@ export default function OrganizationDashboardPage() {
           <fieldset disabled={memberRole === "viewer"} className="min-w-0 disabled:opacity-90">
 
           {/* --- NEEDS TAB --- */}
-          <TabsContent value="needs" className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
-            <Card className="border-0 rounded-lg shadow-none">
+          <TabsContent value="needs" className={`grid gap-0 lg:grid-cols-[1.1fr_0.9fr] ${tabMotion}`}>
+            <Card className="border-0 rounded shadow-none">
               <CardHeader>
                 <CardTitle>Create a need</CardTitle>
                 <CardDescription>Needs are saved as drafts and can be published after admin approval.</CardDescription>
@@ -1514,7 +1551,7 @@ export default function OrganizationDashboardPage() {
                   </div>
 
                   {similarNeeds.length > 0 && (
-                    <div role="status" className="rounded-lg border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-2">
+                    <div role="status" className="rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-2">
                       <p className="flex items-center gap-2 text-sm font-bold text-amber-800 dark:text-amber-300">
                         <AlertTriangle className="w-4 h-4 shrink-0" /> This looks similar to an existing need
                       </p>
@@ -1609,6 +1646,7 @@ export default function OrganizationDashboardPage() {
                       onChange={e => setNewNeedAttachments(Array.from(e.target.files || []))}
                       className="sr-only"
                     />
+                      <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{describeUploadLimit(UPLOAD_LIMITS.needAttachments)}</span>
                   </label>
 
                   <button
@@ -1622,7 +1660,7 @@ export default function OrganizationDashboardPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-0 rounded-lg shadow-none">
+            <Card className="border-0 rounded shadow-none">
               <CardHeader>
                 <CardTitle>Your needs</CardTitle>
                 <CardDescription>Only needs created by this organization appear here.</CardDescription>
@@ -1721,9 +1759,9 @@ export default function OrganizationDashboardPage() {
                             {attachments.map(att => (
                               <a key={att.id} href={att.url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="block">
                                 {/\.(png|jpe?g|gif|webp)$/i.test(att.file_name || att.url) ? (
-                                  <img src={att.url} alt={att.file_name || "Attachment"} className="h-14 w-14 rounded-lg object-cover" />
+                                  <img src={att.url} alt={att.file_name || "Attachment"} className="h-14 w-14 rounded object-cover" />
                                 ) : (
-                                  <span className="flex items-center justify-center h-14 w-14 rounded-lg text-[10px] font-bold text-blue-600 text-center px-1">📄 {att.file_name?.slice(0, 10) || "File"}</span>
+                                  <span className="flex items-center justify-center h-14 w-14 rounded text-[10px] font-bold text-blue-600 text-center px-1">📄 {att.file_name?.slice(0, 10) || "File"}</span>
                                 )}
                               </a>
                             ))}
@@ -1821,8 +1859,8 @@ export default function OrganizationDashboardPage() {
           </TabsContent>
 
           {/* --- FULFILLMENTS TAB --- */}
-          <TabsContent value="fulfillments">
-            <Card className="border-0 rounded-lg shadow-none">
+          <TabsContent value="fulfillments" className={tabMotion}>
+            <Card className="border-0 rounded shadow-none">
               <CardHeader>
                 <CardTitle>Fulfillment tracking</CardTitle>
                 <CardDescription>Track accepted support through verified completion. Click a row for full details.</CardDescription>
@@ -1897,8 +1935,8 @@ export default function OrganizationDashboardPage() {
           </TabsContent>
 
           {/* --- INTERESTS TAB --- */}
-          <TabsContent value="interests">
-            <Card className="border-0 rounded-lg shadow-none">
+          <TabsContent value="interests" className={tabMotion}>
+            <Card className="border-0 rounded shadow-none">
               <CardHeader>
                 <CardTitle>Giver interests</CardTitle>
                 <CardDescription>Review support offers for your needs.</CardDescription>
@@ -1936,7 +1974,7 @@ export default function OrganizationDashboardPage() {
                                 target="_blank"
                                 rel="noreferrer"
                                 data-tip="Open this photo full-size in a new tab"
-                                className="block w-12 h-12 rounded-lg overflow-hidden shrink-0"
+                                className="block w-12 h-12 rounded overflow-hidden shrink-0"
                               >
                                 {photo.url && <img src={photo.url} alt={photo.file_name || "Attached photo"} className="w-full h-full object-cover" />}
                               </a>
@@ -1994,7 +2032,7 @@ export default function OrganizationDashboardPage() {
           </TabsContent>
 
           {/* --- DONATIONS TAB (read-only; admin reviews proof of payment) --- */}
-          <TabsContent value="donations" className="space-y-4">
+          <TabsContent value="donations" className={`space-y-4 ${tabMotion}`}>
             {payfastBanner === "success" && (
               <OutcomeBanner
                 variant="success"
@@ -2025,7 +2063,7 @@ export default function OrganizationDashboardPage() {
                 onDismiss={() => setPaypalBanner(null)}
               />
             )}
-            <Card className="border-0 rounded-lg shadow-none">
+            <Card className="border-0 rounded shadow-none">
               <CardHeader>
                 <CardTitle>Monetary donations</CardTitle>
                 <CardDescription>Donations toward your needs. Proof of payment is verified by a HelpLift administrator.</CardDescription>
@@ -2085,7 +2123,7 @@ export default function OrganizationDashboardPage() {
               </CardContent>
             </Card>
 
-            <Card className="mt-6 border-0 rounded-lg shadow-none">
+            <Card className="mt-6 border-0 rounded shadow-none">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Heart className="w-5 h-5 text-pink-600" />
@@ -2135,21 +2173,21 @@ export default function OrganizationDashboardPage() {
           </TabsContent>
 
           {/* --- WALLET TAB --- */}
-          <TabsContent value="wallet">
-            <Card className="border-0 rounded-lg shadow-none">
+          <TabsContent value="wallet" className={tabMotion}>
+            <Card className="border-0 rounded shadow-none">
               <CardHeader>
                 <CardTitle>Wallet</CardTitle>
                 <CardDescription>Money HelpLift has received on your behalf, and your withdrawal requests.</CardDescription>
               </CardHeader>
               <CardContent>
-                <OrganizationWallet memberRole={memberRole} />
+                <OrganizationWallet refreshKey={refreshKey} memberRole={memberRole} />
               </CardContent>
             </Card>
           </TabsContent>
 
           {/* --- MESSAGES TAB --- */}
-          <TabsContent value="messages">
-            <Card className="border-0 rounded-lg shadow-none">
+          <TabsContent value="messages" className={tabMotion}>
+            <Card className="border-0 rounded shadow-none">
               <CardHeader>
                 <CardTitle>Messages</CardTitle>
                 <CardDescription>Direct messages from HelpLift admins and givers.</CardDescription>
@@ -2166,7 +2204,7 @@ export default function OrganizationDashboardPage() {
                       tabIndex={0}
                       onClick={() => openMessage(item)}
                       onKeyDown={activateOnKey}
-                      className={`w-full rounded-lg border p-4 text-left cursor-pointer ${item.read_at ? "border-slate-200 dark:border-[#233350]" : "border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40"}`}
+                      className={`w-full rounded border p-4 text-left cursor-pointer ${item.read_at ? "border-slate-200 dark:border-[#233350]" : "border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40"}`}
                     >
                       <div className="flex items-center justify-between gap-3">
                         <p className="font-bold text-sm">{item.sender_name || "Unknown sender"}</p>
@@ -2182,14 +2220,14 @@ export default function OrganizationDashboardPage() {
                     </div>
                   ))
                 ))}
-                {messageView === "sent" && <SentMessages canReply={memberRole !== "viewer"} />}
+                {messageView === "sent" && <SentMessages refreshKey={refreshKey} canReply={memberRole !== "viewer"} />}
               </CardContent>
             </Card>
           </TabsContent>
 
           {/* --- IMPACT STORIES TAB --- */}
-          <TabsContent value="stories" className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-            <Card className="border-0 rounded-lg shadow-none">
+          <TabsContent value="stories" className={`grid gap-6 lg:grid-cols-[0.9fr_1.1fr] ${tabMotion}`}>
+            <Card className="border-0 rounded shadow-none">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-amber-500" />
@@ -2226,7 +2264,7 @@ export default function OrganizationDashboardPage() {
                     className="field"
                   />
 
-                  <label className="flex items-center gap-3 p-3 rounded-lg border border-dashed border-slate-300 dark:border-[#2C3E63] cursor-pointer hover:border-blue-500 transition-colors text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  <label className="flex items-center gap-3 p-3 rounded border border-dashed border-slate-300 dark:border-[#2C3E63] cursor-pointer hover:border-blue-500 transition-colors text-xs font-semibold text-slate-600 dark:text-slate-300">
                     <ImageIcon className="w-4 h-4 text-blue-600 shrink-0" />
                     <span className="truncate">
                       {storyImages.length === 0
@@ -2234,6 +2272,7 @@ export default function OrganizationDashboardPage() {
                         : `${storyImages.length} photo${storyImages.length === 1 ? "" : "s"} selected`}
                     </span>
                     <input type="file" accept="image/*" multiple onChange={e => setStoryImages(Array.from(e.target.files || []))} className="sr-only" />
+                    <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{describeUploadLimit(UPLOAD_LIMITS.storyImages)}</span>
                   </label>
                   {storyImages.length > 0 && (
                     <div className="flex flex-wrap gap-2">
@@ -2292,7 +2331,7 @@ export default function OrganizationDashboardPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-0 rounded-lg shadow-none">
+            <Card className="border-0 rounded shadow-none">
               <CardHeader>
                 <CardTitle>Your Impact Stories ({stories.length})</CardTitle>
                 <CardDescription>Visible publicly on your organization profile and HelpLift showcase.</CardDescription>
@@ -2350,8 +2389,8 @@ export default function OrganizationDashboardPage() {
           </TabsContent>
 
           {/* --- GIFT LIBRARY TAB --- */}
-          <TabsContent value="gifts" className="space-y-6">
-            <Card className="border-0 rounded-lg shadow-none">
+          <TabsContent value="gifts" className={`space-y-6 ${tabMotion}`}>
+            <Card className="border-0 rounded shadow-none">
               <CardHeader className="flex-row items-start justify-between space-y-0">
                 <div>
                   <CardTitle className="flex items-center gap-2">
@@ -2422,7 +2461,7 @@ export default function OrganizationDashboardPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-0 rounded-lg shadow-none">
+            <Card className="border-0 rounded shadow-none">
               <CardHeader>
                 <CardTitle>Your Claim Requests</CardTitle>
                 <CardDescription>Claims you've made are finalized once a HelpLift administrator approves them.</CardDescription>
@@ -2452,9 +2491,9 @@ export default function OrganizationDashboardPage() {
           </TabsContent>
 
           {/* --- DOCUMENTS TAB --- */}
-          <TabsContent value="documents" className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+          <TabsContent value="documents" className={`grid gap-6 lg:grid-cols-[0.85fr_1.15fr] ${tabMotion}`}>
             <div className="space-y-6">
-            <Card className="border-0 rounded-lg shadow-none">
+            <Card className="border-0 rounded shadow-none">
               <CardHeader>
                 <CardTitle>Uploaded documents</CardTitle>
               </CardHeader>
@@ -2503,7 +2542,7 @@ export default function OrganizationDashboardPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-0 rounded-lg shadow-none">
+            <Card className="border-0 rounded shadow-none">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Award className="h-5 w-5 text-blue-600" /> Certificate of Compliance</CardTitle>
                 <CardDescription>
@@ -2533,7 +2572,7 @@ export default function OrganizationDashboardPage() {
             </Card>
             </div>
 
-            <Card className="border-0 rounded-lg shadow-none">
+            <Card className="border-0 rounded shadow-none">
               <CardHeader>
                 <CardTitle>Verification documents</CardTitle>
                 <CardDescription>Upload registration or tax evidence for admin review. Maximum 10 MB.</CardDescription>
@@ -2558,7 +2597,7 @@ export default function OrganizationDashboardPage() {
                       <option value="supporting_document">Other Verification Document</option>
                     </select>
                   </div>
-                  <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-slate-300 dark:border-[#2C3E63] p-5 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:border-blue-500">
+                  <label className="flex cursor-pointer items-center gap-3 rounded border border-dashed border-slate-300 dark:border-[#2C3E63] p-5 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:border-blue-500">
                     <UploadCloud className="h-5 w-5 text-blue-600" />
                     <span className="truncate">
                       {selectedFiles.length === 0
@@ -2568,6 +2607,7 @@ export default function OrganizationDashboardPage() {
                         : `${selectedFiles.length} documents selected`}
                     </span>
                     <input type="file" multiple accept=".pdf,.png,.jpg,.jpeg" onChange={event => setSelectedFiles(Array.from(event.target.files || []))} className="sr-only" />
+                    <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{`${UPLOAD_LIMITS.organizationDocument.kinds} - up to ${UPLOAD_LIMITS.organizationDocument.maxMB} MB each`}</span>
                   </label>
                   <button disabled={isUploading || selectedFiles.length === 0} className="inline-flex w-full items-center justify-center gap-2 rounded-sm bg-slate-900 px-5 py-3 font-bold text-white disabled:opacity-50">
                     {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
@@ -2580,13 +2620,13 @@ export default function OrganizationDashboardPage() {
           </TabsContent>
 
           {memberRole === "owner" && (
-            <TabsContent value="team">
-              <OrganizationTeam />
+            <TabsContent value="team" className={tabMotion}>
+              <OrganizationTeam refreshKey={refreshKey} />
             </TabsContent>
           )}
           </fieldset>
 
-          <TabsContent value="analytics">
+          <TabsContent value="analytics" className={tabMotion}>
             <OrganizationAnalytics needs={needs} donations={donations} interests={interests} fulfillments={fulfillments} />
           </TabsContent>
         </Tabs>
@@ -2595,7 +2635,7 @@ export default function OrganizationDashboardPage() {
         <Dialog open={showBadges} onOpenChange={setShowBadges}>
           <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
             <DialogTitle className="sr-only">Badges</DialogTitle>
-            <BadgesPanel endpoint="/api/organization/badges" />
+            <BadgesPanel refreshKey={refreshKey} endpoint="/api/organization/badges" />
           </DialogContent>
         </Dialog>
 
@@ -2678,9 +2718,9 @@ export default function OrganizationDashboardPage() {
                         {attachments.map(att => (
                           <a key={att.id} href={att.url} target="_blank" rel="noreferrer" className="block">
                             {/\.(png|jpe?g|gif|webp)$/i.test(att.file_name || att.url) ? (
-                              <img src={att.url} alt={att.file_name || "Attachment"} className="h-16 w-16 rounded-lg object-cover" />
+                              <img src={att.url} alt={att.file_name || "Attachment"} className="h-16 w-16 rounded object-cover" />
                             ) : (
-                              <span className="flex items-center justify-center h-16 w-16 rounded-lg text-[10px] font-bold text-blue-600 text-center px-1">📄 {att.file_name?.slice(0, 10) || "File"}</span>
+                              <span className="flex items-center justify-center h-16 w-16 rounded text-[10px] font-bold text-blue-600 text-center px-1">📄 {att.file_name?.slice(0, 10) || "File"}</span>
                             )}
                           </a>
                         ))}
@@ -2785,7 +2825,7 @@ export default function OrganizationDashboardPage() {
                     value={reopenReason}
                     onChange={e => setReopenReason(e.target.value)}
                     placeholder="Explain why this need should be reopened..."
-                    className="w-full min-h-20 p-3 pr-11 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded-2xl text-sm outline-none focus:border-blue-500"
+                    className="w-full min-h-20 p-3 pr-11 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded text-sm outline-none focus:border-blue-500"
                   />
                   <MicButton className="top-2 right-2" onText={text => setReopenReason(r => appendSpeech(r, text))} />
                 </div>
@@ -2795,7 +2835,7 @@ export default function OrganizationDashboardPage() {
                 {reopenFiles.length > 0 && (
                   <ul className="space-y-1.5">
                     {reopenFiles.map((file, index) => (
-                      <li key={`${file.name}-${index}`} className="flex items-center justify-between gap-2 rounded-xl bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      <li key={`${file.name}-${index}`} className="flex items-center justify-between gap-2 rounded bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
                         <span className="truncate">{file.name}</span>
                         <button
                           type="button"
@@ -2812,7 +2852,7 @@ export default function OrganizationDashboardPage() {
                 )}
                 <label
                   data-tip="You can attach multiple files - select several at once, or add them one at a time"
-                  className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 dark:border-[#233350] p-4 text-center cursor-pointer hover:border-blue-400 transition-colors"
+                  className="flex flex-col items-center justify-center gap-2 rounded border-2 border-dashed border-slate-300 dark:border-[#233350] p-4 text-center cursor-pointer hover:border-blue-400 transition-colors"
                 >
                   <UploadCloud className="w-5 h-5 text-slate-400" />
                   <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
@@ -2828,6 +2868,7 @@ export default function OrganizationDashboardPage() {
                       e.target.value = ""
                     }}
                   />
+                    <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{describeUploadLimit(UPLOAD_LIMITS.needAttachments)}</span>
                 </label>
               </div>
               <DialogFooter className="gap-2">
@@ -2862,7 +2903,7 @@ export default function OrganizationDashboardPage() {
       {/* --- VERIFICATION PROOF MODAL (Item 6) --- */}
       {verifyingFulfillment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="w-full max-w-md bg-white dark:bg-[#121B2E] rounded-lg p-6 md:p-8 shadow-2xl space-y-5">
+          <div className="w-full max-w-md bg-white dark:bg-[#121B2E] rounded p-6 md:p-8 shadow-2xl space-y-5">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-bold bg-emerald-50 text-emerald-700 mb-2">
@@ -2882,7 +2923,7 @@ export default function OrganizationDashboardPage() {
             </div>
 
             <form onSubmit={handleVerifyFulfillment} className="space-y-4">
-              <label className="flex flex-col items-center justify-center gap-2 p-5 rounded-lg border border-dashed border-slate-300 dark:border-[#2C3E63] cursor-pointer hover:border-emerald-500 transition-colors text-xs font-semibold text-slate-600 dark:text-slate-300 text-center">
+              <label className="flex flex-col items-center justify-center gap-2 p-5 rounded border border-dashed border-slate-300 dark:border-[#2C3E63] cursor-pointer hover:border-emerald-500 transition-colors text-xs font-semibold text-slate-600 dark:text-slate-300 text-center">
                 <UploadCloud className="w-5 h-5 text-emerald-600 shrink-0" />
                 <span>
                   {proofFiles.length > 0
@@ -2896,6 +2937,7 @@ export default function OrganizationDashboardPage() {
                   onChange={e => setProofFiles(Array.from(e.target.files || []))}
                   className="sr-only"
                 />
+                  <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{describeUploadLimit(UPLOAD_LIMITS.fulfillmentProofs)}</span>
               </label>
 
               <div className="relative">
@@ -2903,7 +2945,7 @@ export default function OrganizationDashboardPage() {
                   placeholder="Fulfillment completion notes (e.g. 50 blankets handed over to shelter director on Tuesday)..."
                   value={proofNotes}
                   onChange={e => setProofNotes(e.target.value)}
-                  className="w-full min-h-24 p-3 pr-11 border border-slate-200 dark:border-[#233350] bg-slate-50 dark:bg-[#1A2740] rounded-lg text-xs outline-none focus:border-emerald-500"
+                  className="w-full min-h-24 p-3 pr-11 border border-slate-200 dark:border-[#233350] bg-slate-50 dark:bg-[#1A2740] rounded text-xs outline-none focus:border-emerald-500"
                 />
                 <MicButton className="top-2 right-2" onText={text => setProofNotes(n => appendSpeech(n, text))} />
               </div>
@@ -3091,7 +3133,7 @@ export default function OrganizationDashboardPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="flex items-center gap-3 p-3 rounded-lg border border-dashed border-slate-300 dark:border-[#2C3E63] cursor-pointer hover:border-blue-500 transition-colors text-xs font-semibold text-slate-600 dark:text-slate-300">
+                <label className="flex items-center gap-3 p-3 rounded border border-dashed border-slate-300 dark:border-[#2C3E63] cursor-pointer hover:border-blue-500 transition-colors text-xs font-semibold text-slate-600 dark:text-slate-300">
                   <ImageIcon className="w-4 h-4 text-blue-600 shrink-0" />
                   <span className="truncate">
                     {editStoryNewImages.length === 0
@@ -3099,6 +3141,7 @@ export default function OrganizationDashboardPage() {
                       : `${editStoryNewImages.length} photo${editStoryNewImages.length === 1 ? "" : "s"} selected`}
                   </span>
                   <input type="file" accept="image/*" multiple onChange={e => setEditStoryNewImages(Array.from(e.target.files || []))} className="sr-only" />
+                  <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{describeUploadLimit(UPLOAD_LIMITS.storyImages)}</span>
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -3170,7 +3213,7 @@ export default function OrganizationDashboardPage() {
       />
 
       <Dialog open={isEditingOrg} onOpenChange={open => !open && closeOrgDialog()}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent showCloseButton={false} className="sm:max-w-lg">
           <DialogHeader className="flex flex-row items-center justify-between">
             <DialogTitle>
               {orgDialogMode === "email" ? "Change Login Email" : orgDialogMode === "password" ? "Change Password" : orgDialogMode === "delete" ? "Delete Account" : "Edit Your Organization"}
@@ -3230,6 +3273,7 @@ export default function OrganizationDashboardPage() {
                   <label className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-sm border border-dashed border-slate-300 dark:border-[#233350] cursor-pointer hover:border-blue-500 transition-colors text-xs font-semibold text-slate-600 dark:text-slate-300">
                     <span className="truncate">{logoFile ? logoFile.name : "Upload logo (PNG or JPG)"}</span>
                     <input type="file" accept="image/png,image/jpeg" className="sr-only" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />
+                    <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{describeUploadLimit(UPLOAD_LIMITS.organizationLogo)}</span>
                   </label>
                 </div>
               </div>
@@ -3518,11 +3562,11 @@ export default function OrganizationDashboardPage() {
                 </div>
                 {display.description && <p className="text-sm text-slate-600 dark:text-slate-300">{display.description}</p>}
                 <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  {!display.isGift && display.tag && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded-lg">{display.tag}</span>}
-                  {display.location && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded-lg">📍 {display.location}</span>}
-                  {display.quantity && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded-lg">Qty: {display.quantity}</span>}
-                  {display.dueDate && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded-lg">Due {display.dueDate}</span>}
-                  {display.conditions && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded-lg">Terms: {display.conditions}</span>}
+                  {!display.isGift && display.tag && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded">{display.tag}</span>}
+                  {display.location && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded">📍 {display.location}</span>}
+                  {display.quantity && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded">Qty: {display.quantity}</span>}
+                  {display.dueDate && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded">Due {display.dueDate}</span>}
+                  {display.conditions && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded">Terms: {display.conditions}</span>}
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
@@ -3585,7 +3629,7 @@ export default function OrganizationDashboardPage() {
                   </div>
                 )}
                 {memberRole !== "viewer" && (selectedFulfillment.status === "in_progress" || selectedFulfillment.status === "completed") && (
-                  <div className="space-y-2 rounded-lg border border-dashed border-slate-300 dark:border-[#233350] p-3">
+                  <div className="space-y-2 rounded border border-dashed border-slate-300 dark:border-[#233350] p-3">
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Add more proof</p>
                     <p className="text-xs text-slate-500 dark:text-slate-400">Attach extra photos, receipts or documents (images or PDFs, up to 10 MB each). The giver is notified.</p>
                     <input
@@ -3595,6 +3639,7 @@ export default function OrganizationDashboardPage() {
                       onChange={event => setExtraProofFiles(Array.from(event.target.files || []))}
                       className="block w-full text-xs file:mr-3 file:rounded-sm file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-blue-700"
                     />
+                      <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{describeUploadLimit(UPLOAD_LIMITS.fulfillmentProofs)}</span>
                     {proofUploadNote && (
                       <p className={`text-xs font-semibold ${proofUploadNote.type === "success" ? "text-emerald-600" : "text-red-600"}`}>{proofUploadNote.text}</p>
                     )}
@@ -3698,20 +3743,21 @@ export default function OrganizationDashboardPage() {
 
 function StatCard({ icon: Icon, label, value, accent }: { icon: React.ComponentType<{ className?: string }>; label: string; value: number; accent: "blue" | "emerald" | "amber" | "purple" | "pink" }) {
   const accentClasses = {
-    blue: "bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400",
-    emerald: "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400",
-    amber: "bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400",
-    purple: "bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400",
-    pink: "bg-pink-50 dark:bg-pink-950/50 text-pink-600 dark:text-pink-400",
+    blue: "text-blue-600 dark:text-blue-400",
+    emerald: "text-emerald-600 dark:text-emerald-400",
+    amber: "text-amber-600 dark:text-amber-400",
+    purple: "text-purple-600 dark:text-purple-400",
+    pink: "text-pink-600 dark:text-pink-400",
   }[accent]
 
+  // Same flat design as the admin dashboard's tiles: no box or fill, just a rule above and below.
   return (
-    <div className="rounded-lg bg-white dark:bg-[#121B2E] p-4 flex items-center gap-3 shadow-sm">
-      <div className={`rounded-sm p-2.5 ${accentClasses}`}>
-        <Icon className="w-5 h-5" />
-      </div>
+    <div className="flex items-center gap-3 border-y border-slate-200 dark:border-[#233350] py-3">
+      <Icon className={`h-5 w-5 shrink-0 ${accentClasses}`} />
       <div>
-        <p className="text-2xl font-extrabold leading-none">{value}</p>
+        <p className="text-2xl font-extrabold leading-none">
+          <CountUp value={value} />
+        </p>
         <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">{label}</p>
       </div>
     </div>
@@ -3733,7 +3779,7 @@ function CountBadge({ value }: { value: number }) {
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="rounded-lg border border-dashed border-slate-300 dark:border-[#2C3E63] p-8 text-center text-sm text-slate-500 dark:text-slate-400">
+    <div className="rounded border border-dashed border-slate-300 dark:border-[#2C3E63] p-8 text-center text-sm text-slate-500 dark:text-slate-400">
       {text}
     </div>
   )

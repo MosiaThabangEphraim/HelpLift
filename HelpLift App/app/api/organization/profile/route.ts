@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/staged-uploads"
+import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { createClient } from "@/lib/supabase/server"
 import { getOrgContext, roleAtLeast, insufficientRoleMessage } from "@/lib/organization-access"
 
@@ -47,12 +49,10 @@ export async function PATCH(request: Request) {
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await request.formData()
+      logoFile = await readUploadedFile(formData, "logo")
+      { const uploadProblem = checkUploadLimits(logoFile ? [logoFile] : [], UPLOAD_LIMITS.organizationLogo); if (uploadProblem) return NextResponse.json({ message: uploadProblem }, { status: 400 }) }
       formData.forEach((value, key) => {
-        if (key === "logo" && value instanceof File && value.size > 0) {
-          logoFile = value
-        } else if (typeof value === "string") {
-          raw[key] = value
-        }
+        if (key !== "logo" && typeof value === "string") raw[key] = value
       })
     } else {
       raw = await request.json()

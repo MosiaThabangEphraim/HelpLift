@@ -4,6 +4,8 @@ export type MaintenanceMode = { enabled: boolean; message: string }
 export type WithdrawalLimits = { min: number; max: number | null }
 export type PlatformDonationLimits = { min: number; max: number | null }
 export type LoginBanner = { enabled: boolean; message: string; attachments: { path: string; name: string }[] }
+// The public notice on the homepage - for everyone who opens the site, signed in or not.
+export type HomepageNotice = { enabled: boolean; title: string; message: string; attachments: { path: string; name: string }[] }
 export type BadgeThresholds = {
   giver: {
     milestoneAmounts: { bronze: number; silver: number; gold: number }
@@ -33,6 +35,7 @@ const DEFAULT_MAINTENANCE: MaintenanceMode = {
 const DEFAULT_WITHDRAWAL_LIMITS: WithdrawalLimits = { min: 100, max: null }
 const DEFAULT_PLATFORM_DONATION_LIMITS: PlatformDonationLimits = { min: 20, max: null }
 const DEFAULT_LOGIN_BANNER: LoginBanner = { enabled: false, message: "", attachments: [] }
+const DEFAULT_HOMEPAGE_NOTICE: HomepageNotice = { enabled: false, title: "", message: "", attachments: [] }
 const DEFAULT_BADGE_THRESHOLDS: BadgeThresholds = {
   giver: {
     milestoneAmounts: { bronze: 500, silver: 2500, gold: 10000 },
@@ -84,6 +87,12 @@ export function getPlatformDonationLimits(supabase: SupabaseClient): Promise<Pla
 // A dismissible admin note shown on /login - see 20260928000300_login_banner.sql.
 export function getLoginBanner(supabase: SupabaseClient): Promise<LoginBanner> {
   return readSetting(supabase, "login_banner", DEFAULT_LOGIN_BANNER)
+}
+
+// Stored like login_banner, under "homepage_notice" (created on first use -
+// the settings writes upsert, so no migration is needed).
+export function getHomepageNotice(supabase: SupabaseClient): Promise<HomepageNotice> {
+  return readSetting(supabase, "homepage_notice", DEFAULT_HOMEPAGE_NOTICE)
 }
 
 // readSetting's fallback merge is shallow (top-level keys only), so a saved

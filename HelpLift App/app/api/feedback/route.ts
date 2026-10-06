@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { logUserAction } from "@/lib/activity-log"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 
@@ -89,6 +90,7 @@ export async function POST(request: Request) {
       console.warn("Feedback notification warning:", notifyError)
     }
 
+    await logUserAction(supabase, "Sent platform feedback")
     return NextResponse.json({ success: true, message: "Thank you! Your feedback has been sent to the HelpLift team." }, { status: 201 })
   } catch (error) {
     console.error("Feedback error:", error)

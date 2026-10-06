@@ -1,6 +1,8 @@
 "use client"
 
 import { FormEvent, useEffect, useState } from "react"
+import { stageFormFiles } from "@/lib/stage-uploads"
+import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { useRouter } from "next/navigation"
 import { Clock, AlertTriangle, XCircle, LogOut, Mail, UploadCloud, FileText, Loader2, CheckCircle2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
@@ -90,7 +92,7 @@ export default function PendingVerificationPage() {
         const formData = new FormData()
         formData.append("file", file)
         formData.append("document_type", selectedDocType)
-        const response = await fetch("/api/organization/documents", { method: "POST", body: formData })
+        const response = await fetch("/api/organization/documents", { method: "POST", body: await stageFormFiles(formData, UPLOAD_LIMITS.organizationDocument) })
         if (!response.ok) throw new Error((await response.json()).message || `Failed to upload ${file.name}.`)
       }
       setSelectedFiles([])
@@ -204,6 +206,7 @@ export default function PendingVerificationPage() {
                   : `${selectedFiles.length} documents selected`}
               </span>
               <input type="file" multiple accept=".pdf,.png,.jpg,.jpeg" onChange={event => setSelectedFiles(Array.from(event.target.files || []))} className="sr-only" />
+              <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{`${UPLOAD_LIMITS.organizationDocument.kinds} - up to ${UPLOAD_LIMITS.organizationDocument.maxMB} MB each`}</span>
             </label>
             <button disabled={isUploading || selectedFiles.length === 0} className="inline-flex w-full items-center justify-center gap-2 rounded bg-slate-900 px-5 py-3 font-bold text-white disabled:opacity-50">
               {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
+import { ReadAloudButton } from "@/components/read-aloud-button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ArrowRight, HeartHandshake, Loader2, AlertCircle, CheckCircle2, Mail, Lock, Fingerprint, Megaphone, Paperclip, Quote as QuoteIcon, X, UserPlus, ShieldCheck } from "lucide-react"
 import { getRandomQuote, GIVING_QUOTES, type Quote } from "@/lib/quotes"
@@ -145,6 +146,8 @@ function LoginContent() {
         await supabase.auth.signOut()
         throw new Error("Administrators sign in through the administrator portal.")
       }
+      // Passkey sign-ins never reach api/login, so record this one for the admin Security tab.
+      fetch("/api/login/record-passkey", { method: "POST" }).catch(() => {})
       setIsLoading(true)
       router.push(profile.role === "organization" ? "/organisation-dashboard" : "/givers-dashboard")
     } catch (err) {
@@ -296,12 +299,13 @@ function LoginContent() {
           {adminBanner && (
             <div className="space-y-4 pt-1">
               <p className="whitespace-pre-line text-sm font-semibold text-slate-700 dark:text-slate-200">{adminBanner.message}</p>
+              <ReadAloudButton text={adminBanner.message} label="Listen" />
               {adminBanner.attachments.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {adminBanner.attachments.map((a, i) =>
                     /\.(png|jpe?g|gif|webp|svg)$/i.test(a.name) ? (
                       <a key={i} href={a.url} target="_blank" rel="noopener noreferrer">
-                        <img src={a.url} alt={a.name} className="h-16 w-16 rounded-lg object-cover border border-blue-200 dark:border-blue-900" />
+                        <img src={a.url} alt={a.name} className="h-16 w-16 rounded object-cover border border-blue-200 dark:border-blue-900" />
                       </a>
                     ) : (
                       <a
@@ -309,7 +313,7 @@ function LoginContent() {
                         href={a.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1.5 text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900"
+                        className="inline-flex items-center gap-1.5 rounded border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1.5 text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900"
                       >
                         <Paperclip className="h-3.5 w-3.5 shrink-0" />
                         <span className="max-w-[140px] truncate">{a.name}</span>
@@ -350,6 +354,7 @@ function LoginContent() {
           <div className="flex items-start gap-3">
             <Megaphone className="h-5 w-5 shrink-0 mt-0.5" />
             <p className="flex-1 font-semibold whitespace-pre-line">{adminBanner.message}</p>
+            <ReadAloudButton text={adminBanner.message} label="Listen to this announcement" iconOnly className="shrink-0" />
             <button
               type="button"
               onClick={dismissAdminBanner}
@@ -364,7 +369,7 @@ function LoginContent() {
               {adminBanner.attachments.map((a, i) =>
                 /\.(png|jpe?g|gif|webp|svg)$/i.test(a.name) ? (
                   <a key={i} href={a.url} target="_blank" rel="noopener noreferrer">
-                    <img src={a.url} alt={a.name} className="h-16 w-16 rounded-lg object-cover border border-blue-200 dark:border-blue-900" />
+                    <img src={a.url} alt={a.name} className="h-16 w-16 rounded object-cover border border-blue-200 dark:border-blue-900" />
                   </a>
                 ) : (
                   <a
@@ -372,7 +377,7 @@ function LoginContent() {
                     href={a.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 dark:border-blue-900 bg-white dark:bg-blue-950/60 px-2.5 py-1.5 text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900"
+                    className="inline-flex items-center gap-1.5 rounded border border-blue-200 dark:border-blue-900 bg-white dark:bg-blue-950/60 px-2.5 py-1.5 text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900"
                   >
                     <Paperclip className="h-3.5 w-3.5 shrink-0" />
                     <span className="max-w-[140px] truncate">{a.name}</span>

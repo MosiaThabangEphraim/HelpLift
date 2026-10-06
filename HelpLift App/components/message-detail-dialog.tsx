@@ -142,7 +142,7 @@ export function MessageDetailDialog({
                   <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
                     Conversation · {thread!.messages.length} message{thread!.messages.length === 1 ? "" : "s"}
                   </p>
-                  <div className="max-h-[80vh] space-y-3.5 overflow-y-auto rounded-2xl bg-slate-50 dark:bg-[#0B1220] p-3">
+                  <div className="max-h-[80vh] space-y-3.5 overflow-y-auto rounded bg-slate-50 dark:bg-[#0B1220] p-3">
                     {thread!.messages.map(item => (
                       <div key={item.id} className={`flex flex-col gap-1 ${item.mine ? "items-end" : "items-start"}`}>
                         <p className="px-1 text-[11px] font-bold text-slate-500 dark:text-slate-400">
@@ -151,7 +151,7 @@ export function MessageDetailDialog({
                           {item.sender_role && !item.mine ? <span className="capitalize font-medium"> · {item.sender_role}</span> : null}
                         </p>
                         <div
-                          className={`max-w-[85%] rounded-[20px] px-4 py-2.5 text-sm shadow-sm ${
+                          className={`max-w-[85%] rounded px-4 py-2.5 text-sm shadow-sm ${
                             item.mine
                               ? "bg-blue-600 text-white rounded-br-md"
                               : "bg-white dark:bg-[#1A2740] text-slate-800 dark:text-slate-100 rounded-bl-md border border-slate-200/70 dark:border-transparent"
@@ -184,7 +184,7 @@ export function MessageDetailDialog({
                   </div>
 
                   {message.reply_to_snippet && (
-                    <blockquote className="rounded-xl border-l-4 border-blue-500 bg-slate-50 dark:bg-[#0B1220] px-3 py-2 text-xs text-slate-600 dark:text-slate-300">
+                    <blockquote className="rounded border-l-4 border-blue-500 bg-slate-50 dark:bg-[#0B1220] px-3 py-2 text-xs text-slate-600 dark:text-slate-300">
                       <p className="mb-0.5 flex items-center gap-1 font-bold text-slate-500 dark:text-slate-400">
                         <CornerUpLeft className="w-3 h-3" /> In reply to your message
                       </p>

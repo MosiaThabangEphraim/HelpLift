@@ -42,7 +42,7 @@ export function MonthlySpotlight() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {data.giver && (
-            <div className="rounded-3xl border border-amber-200 dark:border-amber-900 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/20 p-6 flex items-center gap-5 shadow-sm">
+            <div className="rounded border border-amber-200 dark:border-amber-900 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/20 p-6 flex items-center gap-5 shadow-sm">
               <UserAvatar src={data.giver.avatarUrl} name={data.giver.name} className="size-16 text-2xl shadow-lg shadow-amber-500/30 ring-2 ring-white dark:ring-[#0B1220]" />
               <div className="min-w-0">
                 <p className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Giver of the Month</p>
@@ -55,8 +55,8 @@ export function MonthlySpotlight() {
           )}
 
           {data.organization && (
-            <div className="rounded-3xl border border-blue-200 dark:border-blue-900 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/20 p-6 flex items-center gap-5 shadow-sm">
-              <div className="shrink-0 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 p-4 text-white shadow-lg shadow-blue-500/30 overflow-hidden">
+            <div className="rounded border border-blue-200 dark:border-blue-900 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/20 p-6 flex items-center gap-5 shadow-sm">
+              <div className="shrink-0 rounded bg-gradient-to-br from-blue-500 to-indigo-600 p-4 text-white shadow-lg shadow-blue-500/30 overflow-hidden">
                 {data.organization.logoUrl ? (
                   <img src={data.organization.logoUrl} alt={data.organization.name} className="w-7 h-7 object-cover rounded" />
                 ) : (

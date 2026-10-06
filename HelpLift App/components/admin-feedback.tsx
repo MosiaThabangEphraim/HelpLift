@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { AdminDeleteButton } from "@/components/admin-delete-button"
 import { Loader2, Star } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartCard, RankedBars, StatTile, VizRoot } from "@/components/analytics/chart-parts"
@@ -31,7 +32,8 @@ const number = (value: number) => String(Math.round(value))
 
 // Admin's Feedback tab: the ratings and improvement ideas givers and
 // organizations have sent, with a summary and filters.
-export function AdminFeedback() {
+export function AdminFeedback({ refreshKey = 0 }: { refreshKey?: number }) {
+  // refreshKey: bumped by the dashboard's refresh button to re-fetch in place (filters are kept).
   const [items, setItems] = useState<Feedback[] | null>(null)
   const [error, setError] = useState("")
   const [ratingFilter, setRatingFilter] = useState<"all" | "1" | "2" | "3" | "4" | "5">("all")
@@ -48,11 +50,11 @@ export function AdminFeedback() {
         setItems(data.feedback || [])
       } catch (err: any) {
         setError(err.message || "Could not load feedback.")
-        setItems([])
+        setItems(current => current ?? [])
       }
     }
     load()
-  }, [])
+  }, [refreshKey])
 
   const summary = useMemo(() => {
     const all = items || []
@@ -80,11 +82,11 @@ export function AdminFeedback() {
     return <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>
   }
 
-  const selectClass = "rounded-xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-3 py-2 text-sm font-semibold"
+  const selectClass = "rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-3 py-2 text-sm font-semibold"
 
   return (
     <VizRoot>
-      {error && <p className="rounded-xl bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">{error}</p>}
+      {error && <p className="rounded bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">{error}</p>}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatTile label="Average rating" value={summary.count ? summary.average.toFixed(1) : "-"} note={summary.count ? "out of 5" : "No ratings yet"} />
@@ -143,9 +145,12 @@ export function AdminFeedback() {
                     <div className="flex items-center gap-3">
                       <Stars value={item.rating} />
                       <span className="text-sm font-bold">{item.sender_name}</span>
-                      <span className="rounded-full bg-slate-100 dark:bg-[#1A2740] px-2 py-0.5 text-[11px] font-bold capitalize text-slate-600 dark:text-slate-300">{item.sender_role}</span>
+                      <span className="rounded bg-slate-100 dark:bg-[#1A2740] px-2 py-0.5 text-[11px] font-bold capitalize text-slate-600 dark:text-slate-300">{item.sender_role}</span>
                     </div>
-                    <span className="text-[11px] text-slate-400">{new Date(item.created_at).toLocaleString()}</span>
+                    <div className="flex items-center gap-2" onClick={event => event.stopPropagation()}>
+                      <span className="text-[11px] text-slate-400">{new Date(item.created_at).toLocaleString()}</span>
+                      <AdminDeleteButton kind="feedback" id={item.id} iconOnly onDeleted={() => setItems(current => (current || []).filter(f => f.id !== item.id))} />
+                    </div>
                   </div>
                   {item.message ? (
                     <p className="line-clamp-2 whitespace-pre-line text-sm text-slate-700 dark:text-slate-300">{item.message}</p>

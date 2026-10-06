@@ -3,11 +3,17 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { lockAccountAndSendCode, MAX_LOGIN_ATTEMPTS } from "@/lib/login-lockout"
 import { sendTwoFactorCode } from "@/lib/two-factor"
+import { recordLoginAttempt } from "@/lib/login-audit"
+import { logActivity } from "@/lib/activity-log"
 
 export async function POST(req: Request) {
   try {
     const { email, password, adminPortal } = await req.json()
     if (!email || !password) return NextResponse.json({ success: false, message: "Email and password are required." }, { status: 400 })
+    // Every outcome below is recorded for the admin Security tab (lib/login-audit.ts).
+    const portal = adminPortal ? "admin" : "user"
+    const audit = (outcome: Parameters<typeof recordLoginAttempt>[1]["outcome"], profileId?: string | null, detail?: string) =>
+      recordLoginAttempt(req, { email, profileId, outcome, method: "password", portal, detail })
 
     // Only a REGISTERED email gets tracked/locked at all - there's no
     // profile row to count attempts against otherwise, and doing so would
@@ -20,6 +26,7 @@ export async function POST(req: Request) {
       .maybeSingle()
 
     if (lockProfile?.locked_until && new Date(lockProfile.locked_until).getTime() > Date.now()) {
+      await audit("locked", lockProfile.id, "Tried to sign in while the account was locked")
       return NextResponse.json({
         success: false,
         locked: true,
@@ -35,6 +42,7 @@ export async function POST(req: Request) {
         const attempts = (lockProfile.failed_login_attempts || 0) + 1
         if (attempts >= MAX_LOGIN_ATTEMPTS) {
           await lockAccountAndSendCode(lockProfile.id, lockProfile.email, lockProfile.full_name)
+          await audit("account_locked_now", lockProfile.id, `Locked after ${attempts} incorrect attempts`)
           return NextResponse.json({
             success: false,
             locked: true,
@@ -42,6 +50,7 @@ export async function POST(req: Request) {
           }, { status: 423 })
         }
         await admin.from("profiles").update({ failed_login_attempts: attempts }).eq("id", lockProfile.id)
+        await audit("wrong_password", lockProfile.id, `Attempt ${attempts} of ${MAX_LOGIN_ATTEMPTS}${authError?.message && !/invalid login credentials/i.test(authError.message) ? ` - ${authError.message}` : ""}`)
         if (attempts === MAX_LOGIN_ATTEMPTS - 1) {
           return NextResponse.json({
             success: false,
@@ -49,6 +58,7 @@ export async function POST(req: Request) {
           }, { status: 401 })
         }
       }
+      if (!lockProfile) await audit("unknown_account", null, "No account with this email")
       return NextResponse.json({ success: false, message: authError?.message || "Invalid email or password." }, { status: 401 })
     }
 
@@ -60,10 +70,12 @@ export async function POST(req: Request) {
     if (profileError || !profile) return NextResponse.json({ success: false, message: "Your account profile is incomplete. Please contact support." }, { status: 500 })
     if (profile.role === "admin" && !adminPortal) {
       await supabase.auth.signOut()
+      await audit("wrong_portal", profile.id, "Administrator used the user sign-in page")
       return NextResponse.json({ success: false, message: "Use the administrator sign-in portal." }, { status: 403 })
     }
     if (adminPortal && profile.role !== "admin") {
       await supabase.auth.signOut()
+      await audit("wrong_portal", profile.id, `A ${profile.role} account tried the administrator portal`)
       return NextResponse.json({ success: false, message: "This account does not have administrator access." }, { status: 403 })
     }
 
@@ -77,6 +89,7 @@ export async function POST(req: Request) {
       // just the emailed code) to do it.
       await supabase.auth.signOut()
       const attemptToken = await sendTwoFactorCode(profile.id, profile.email, profile.full_name)
+      await audit("two_factor_sent", profile.id, "Correct password - two-factor code emailed")
       return NextResponse.json({
         success: false,
         twoFactorRequired: true,
@@ -86,6 +99,8 @@ export async function POST(req: Request) {
       }, { status: 401 })
     }
 
+    await audit("success", profile.id)
+    await logActivity({ profileId: profile.id, role: profile.role, action: "Signed in", detail: "Email and password" })
     return NextResponse.json({
       success: true,
       message: "Login successful",

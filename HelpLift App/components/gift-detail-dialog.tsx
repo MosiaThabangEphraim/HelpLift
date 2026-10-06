@@ -1,6 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { AdminDeleteButton } from "@/components/admin-delete-button"
+import { stageFormFiles } from "@/lib/stage-uploads"
+import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { FileText, Gift, Loader2, MapPin, Calendar, ThumbsDown, ThumbsUp, UploadCloud, X, XCircle } from "lucide-react"
 import {
   Dialog,
@@ -163,16 +166,16 @@ export function GiftDetailDialog({ open, onOpenChange, gift, role, canClaim, onM
 
         <div className="space-y-4 pt-1">
           {error && (
-            <div className="rounded-xl bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">
+            <div className="rounded bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">
               {error}
             </div>
           )}
 
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 capitalize">{gift.offering_type}</span>
-            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full capitalize ${statusPillClasses(gift.status)}`}>{gift.status}</span>
+            <span className="text-[11px] font-bold px-2.5 py-1 rounded bg-purple-50 text-purple-700 capitalize">{gift.offering_type}</span>
+            <span className={`text-[11px] font-bold px-2.5 py-1 rounded capitalize ${statusPillClasses(gift.status)}`}>{gift.status}</span>
             {role === "admin" && pendingClaims.length > 0 && (
-              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded bg-amber-50 text-amber-700">
                 {pendingClaims.length} pending claim{pendingClaims.length === 1 ? "" : "s"}
               </span>
             )}
@@ -219,7 +222,7 @@ export function GiftDetailDialog({ open, onOpenChange, gift, role, canClaim, onM
                     target="_blank"
                     rel="noreferrer"
                     data-tip="Open this photo full-size in a new tab"
-                    className="block aspect-square rounded-xl border border-slate-200 dark:border-[#233350] overflow-hidden bg-slate-50 dark:bg-[#0B1220]"
+                    className="block aspect-square rounded border border-slate-200 dark:border-[#233350] overflow-hidden bg-slate-50 dark:bg-[#0B1220]"
                   >
                     {photo.url ? (
                       <img src={photo.url} alt={photo.file_name || "Offering photo"} className="w-full h-full object-cover" />
@@ -233,19 +236,19 @@ export function GiftDetailDialog({ open, onOpenChange, gift, role, canClaim, onM
           )}
 
           {(gift.giverName || gift.giverEmail) && (
-            <div className="rounded-xl bg-slate-50 dark:bg-[#0B1220] p-3 text-xs text-slate-500 dark:text-slate-400">
+            <div className="rounded bg-slate-50 dark:bg-[#0B1220] p-3 text-xs text-slate-500 dark:text-slate-400">
               Pledged by: <span className="font-semibold text-slate-700 dark:text-slate-200">{gift.giverName || "Giver"}</span>{gift.giverEmail ? ` (${gift.giverEmail})` : ""}
             </div>
           )}
 
           {gift.claimedByOrgName && (
-            <div className="rounded-xl bg-blue-50 dark:bg-blue-950/30 p-3 text-xs font-semibold text-blue-700 dark:text-blue-300">
+            <div className="rounded bg-blue-50 dark:bg-blue-950/30 p-3 text-xs font-semibold text-blue-700 dark:text-blue-300">
               Claimed by: {gift.claimedByOrgName}
             </div>
           )}
 
           {gift.status === "rejected" && gift.rejection_reason && (
-            <div className="rounded-xl bg-red-50 dark:bg-red-950/30 p-3 text-xs font-semibold text-red-700 dark:text-red-300">
+            <div className="rounded bg-red-50 dark:bg-red-950/30 p-3 text-xs font-semibold text-red-700 dark:text-red-300">
               Reason: {gift.rejection_reason}
             </div>
           )}
@@ -285,10 +288,10 @@ export function GiftDetailDialog({ open, onOpenChange, gift, role, canClaim, onM
             <div className="space-y-3 pt-1">
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Claims on this offering</p>
               {[...pendingClaims, ...decidedClaims].map(claim => (
-                <div key={claim.id} className="rounded-2xl border border-slate-200 dark:border-[#233350] p-3 space-y-2">
+                <div key={claim.id} className="rounded border border-slate-200 dark:border-[#233350] p-3 space-y-2">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <p className="text-sm font-bold">{claim.organization_name}</p>
-                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full capitalize ${claimStatusPillClasses(claim.status)}`}>{claim.status}</span>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded capitalize ${claimStatusPillClasses(claim.status)}`}>{claim.status}</span>
                   </div>
                   <p className="text-sm text-slate-600 dark:text-slate-300 italic">"{claim.motivation}"</p>
                   {claim.documents.length > 0 && (
@@ -300,7 +303,7 @@ export function GiftDetailDialog({ open, onOpenChange, gift, role, canClaim, onM
                           target="_blank"
                           rel="noreferrer"
                           data-tip="Open this supporting document in a new tab"
-                          className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-[#233350] bg-slate-50 dark:bg-[#0B1220] px-2.5 py-1.5 text-[11px] font-bold text-blue-600 hover:underline"
+                          className="inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] bg-slate-50 dark:bg-[#0B1220] px-2.5 py-1.5 text-[11px] font-bold text-blue-600 hover:underline"
                         >
                           <FileText className="w-3 h-3 shrink-0" /> {doc.file_name || "Document"}
                         </a>
@@ -310,19 +313,9 @@ export function GiftDetailDialog({ open, onOpenChange, gift, role, canClaim, onM
                   {claim.status !== "pending" && claim.claim_notes && (
                     <p className="text-xs text-red-600 dark:text-red-400">Note: {claim.claim_notes}</p>
                   )}
-                  {claim.status !== "pending" && onClaimDelete && (
+                  {onClaimDelete && (
                     <div className="flex justify-end">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => deleteClaim(claim.id)}
-                        disabled={deletingClaimId === claim.id}
-                        className="text-red-600 border-red-200 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/30"
-                      >
-                        {deletingClaimId === claim.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
-                        <span>Delete claim record</span>
-                      </Button>
+                      <AdminDeleteButton kind="claim" id={claim.id} label="Delete claim" onDeleted={() => deleteClaim(claim.id)} />
                     </div>
                   )}
                   {claim.status === "pending" && onClaimReview && (
@@ -339,7 +332,7 @@ export function GiftDetailDialog({ open, onOpenChange, gift, role, canClaim, onM
                             value={claimReasonById[claim.id] || ""}
                             onChange={(e) => setClaimReasonById(prev => ({ ...prev, [claim.id]: e.target.value }))}
                             placeholder="Reason for declining (optional, shared with the organization)..."
-                            className="w-full min-h-16 p-3 pr-11 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded-2xl text-sm outline-none focus:border-red-500"
+                            className="w-full min-h-16 p-3 pr-11 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded text-sm outline-none focus:border-red-500"
                           />
                           <MicButton className="top-2 right-2" onText={text => setClaimReasonById(prev => ({ ...prev, [claim.id]: appendSpeech(prev[claim.id] || "", text) }))} />
                         </div>
@@ -372,7 +365,7 @@ export function GiftDetailDialog({ open, onOpenChange, gift, role, canClaim, onM
           {role === "organization" && gift.status === "approved" && canClaim && onClaim && (
             <div className="space-y-2 pt-1">
               {gift.myClaimPending ? (
-                <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 rounded-xl bg-amber-50 dark:bg-amber-950/30 p-3">
+                <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 rounded bg-amber-50 dark:bg-amber-950/30 p-3">
                   Your organization already has a claim on this offering awaiting a decision.
                 </p>
               ) : showClaimForm ? (
@@ -390,7 +383,7 @@ export function GiftDetailDialog({ open, onOpenChange, gift, role, canClaim, onM
                         value={motivation}
                         onChange={(e) => setMotivation(e.target.value)}
                         placeholder="Tell the admin why your organization needs this offering..."
-                        className="w-full min-h-20 p-3 pr-11 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded-2xl text-sm outline-none focus:border-purple-500"
+                        className="w-full min-h-20 p-3 pr-11 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded text-sm outline-none focus:border-purple-500"
                       />
                       <MicButton className="top-2 right-2" onText={text => setMotivation(m => appendSpeech(m, text))} />
                     </div>
@@ -400,7 +393,7 @@ export function GiftDetailDialog({ open, onOpenChange, gift, role, canClaim, onM
                     {claimDocuments.length > 0 && (
                       <ul className="space-y-1.5">
                         {claimDocuments.map((file, index) => (
-                          <li key={`${file.name}-${index}`} className="flex items-center justify-between gap-2 rounded-xl bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                          <li key={`${file.name}-${index}`} className="flex items-center justify-between gap-2 rounded bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
                             <span className="truncate">{file.name}</span>
                             <button
                               type="button"
@@ -417,7 +410,7 @@ export function GiftDetailDialog({ open, onOpenChange, gift, role, canClaim, onM
                     )}
                     <label
                       data-tip="You can attach multiple documents - select several at once, or add them one at a time"
-                      className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 dark:border-[#233350] p-4 text-center cursor-pointer hover:border-purple-400 transition-colors"
+                      className="flex flex-col items-center justify-center gap-2 rounded border-2 border-dashed border-slate-300 dark:border-[#233350] p-4 text-center cursor-pointer hover:border-purple-400 transition-colors"
                     >
                       <UploadCloud className="w-5 h-5 text-slate-400" />
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
@@ -433,6 +426,7 @@ export function GiftDetailDialog({ open, onOpenChange, gift, role, canClaim, onM
                           e.target.value = ""
                         }}
                       />
+                        <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{describeUploadLimit(UPLOAD_LIMITS.giftClaimDocuments)}</span>
                     </label>
                   </div>
                   <DialogFooter className="gap-2">

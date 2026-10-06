@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { stageFormFiles } from "@/lib/stage-uploads"
+import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { Banknote, CheckCircle2, CreditCard, Heart, Loader2, UploadCloud } from "lucide-react"
 import {
   Dialog,
@@ -156,7 +158,7 @@ export function GuestSupportPlatformDialog({ open, onOpenChange, onDone }: Guest
       proofFiles.forEach((file) => formData.append("proofs", file))
       formData.append("payer_notes", payerNotes)
       formData.append("email", email.trim())
-      const res = await fetch(`/api/public/donations/platform/${donation.id}`, { method: "PATCH", body: formData })
+      const res = await fetch(`/api/public/donations/platform/${donation.id}`, { method: "PATCH", body: await stageFormFiles(formData, UPLOAD_LIMITS.donationProofs) })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.message || "Unable to submit proof of payment.")
       setStep("done")
@@ -179,14 +181,14 @@ export function GuestSupportPlatformDialog({ open, onOpenChange, onDone }: Guest
         </DialogHeader>
 
         {error && (
-          <div className="rounded-xl bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">
+          <div className="rounded bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">
             {error}
           </div>
         )}
 
         {step === "form" && (
           <div className="space-y-4 pt-1">
-            <div className="rounded-2xl bg-pink-50 dark:bg-pink-950/30 border border-pink-200 dark:border-pink-900 p-4 space-y-1.5">
+            <div className="rounded bg-pink-50 dark:bg-pink-950/30 border border-pink-200 dark:border-pink-900 p-4 space-y-1.5">
               <p className="text-sm font-semibold text-pink-800 dark:text-pink-300">
                 This donation goes directly to HelpLift - not to any organization.
               </p>
@@ -206,7 +208,7 @@ export function GuestSupportPlatformDialog({ open, onOpenChange, onDone }: Guest
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Jane Doe"
-                  className="w-full px-4 py-3 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded-2xl text-sm font-semibold outline-none focus:border-pink-500 transition-colors"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded text-sm font-semibold outline-none focus:border-pink-500 transition-colors"
                 />
               </div>
               <div className="space-y-1.5">
@@ -218,7 +220,7 @@ export function GuestSupportPlatformDialog({ open, onOpenChange, onDone }: Guest
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="jane@example.com"
-                  className="w-full px-4 py-3 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded-2xl text-sm font-semibold outline-none focus:border-pink-500 transition-colors"
+                  className="w-full px-4 py-3 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded text-sm font-semibold outline-none focus:border-pink-500 transition-colors"
                 />
               </div>
             </div>
@@ -236,7 +238,7 @@ export function GuestSupportPlatformDialog({ open, onOpenChange, onDone }: Guest
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="100.00"
-                  className="w-full pl-8 pr-4 py-3 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded-2xl text-sm font-semibold outline-none focus:border-pink-500 transition-colors"
+                  className="w-full pl-8 pr-4 py-3 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded text-sm font-semibold outline-none focus:border-pink-500 transition-colors"
                 />
               </div>
               <p className="text-[11px] text-slate-400">
@@ -252,7 +254,7 @@ export function GuestSupportPlatformDialog({ open, onOpenChange, onDone }: Guest
                 <button
                   type="button"
                   onClick={() => setMethod("eft")}
-                  className={`rounded-2xl border-2 p-3.5 text-left transition-colors ${
+                  className={`rounded border-2 p-3.5 text-left transition-colors ${
                     method === "eft"
                       ? "border-pink-500 bg-pink-50 dark:bg-pink-950/30"
                       : "border-slate-200 dark:border-[#233350] hover:border-slate-300 dark:hover:border-[#2C3E63]"
@@ -265,7 +267,7 @@ export function GuestSupportPlatformDialog({ open, onOpenChange, onDone }: Guest
                 <button
                   type="button"
                   onClick={() => setMethod("payfast")}
-                  className={`rounded-2xl border-2 p-3.5 text-left transition-colors ${
+                  className={`rounded border-2 p-3.5 text-left transition-colors ${
                     method === "payfast"
                       ? "border-pink-500 bg-pink-50 dark:bg-pink-950/30"
                       : "border-slate-200 dark:border-[#233350] hover:border-slate-300 dark:hover:border-[#2C3E63]"
@@ -278,7 +280,7 @@ export function GuestSupportPlatformDialog({ open, onOpenChange, onDone }: Guest
                 <button
                   type="button"
                   onClick={() => setMethod("paypal")}
-                  className={`rounded-2xl border-2 p-3.5 text-left transition-colors ${
+                  className={`rounded border-2 p-3.5 text-left transition-colors ${
                     method === "paypal"
                       ? "border-pink-500 bg-pink-50 dark:bg-pink-950/30"
                       : "border-slate-200 dark:border-[#233350] hover:border-slate-300 dark:hover:border-[#2C3E63]"
@@ -305,7 +307,7 @@ export function GuestSupportPlatformDialog({ open, onOpenChange, onDone }: Guest
                       key={account.key}
                       type="button"
                       onClick={() => setBank(account.key)}
-                      className={`rounded-2xl border-2 p-3.5 text-left transition-colors ${
+                      className={`rounded border-2 p-3.5 text-left transition-colors ${
                         bank === account.key
                           ? "border-pink-500 bg-pink-50 dark:bg-pink-950/30"
                           : "border-slate-200 dark:border-[#233350] hover:border-slate-300 dark:hover:border-[#2C3E63]"
@@ -331,12 +333,12 @@ export function GuestSupportPlatformDialog({ open, onOpenChange, onDone }: Guest
 
         {step === "details" && donation && paidAccount && (
           <div className="space-y-4 pt-1">
-            <div className="rounded-2xl border border-pink-200 dark:border-pink-900 bg-pink-50 dark:bg-pink-950/30 p-4 space-y-1">
+            <div className="rounded border border-pink-200 dark:border-pink-900 bg-pink-50 dark:bg-pink-950/30 p-4 space-y-1">
               <p className="text-xs font-bold uppercase tracking-wider text-pink-600 dark:text-pink-400">Amount to transfer</p>
               <p className="text-2xl font-black text-slate-900 dark:text-white">{formatCurrency(donation.amount)}</p>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 dark:border-[#233350] p-4 space-y-2.5">
+            <div className="rounded border border-slate-200 dark:border-[#233350] p-4 space-y-2.5">
               <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{paidAccount.bankName}</p>
               <DetailRow label="Account name" value={paidAccount.accountName} />
               <DetailRow label="Account number" value={paidAccount.accountNumber} mono />
@@ -369,7 +371,7 @@ export function GuestSupportPlatformDialog({ open, onOpenChange, onDone }: Guest
             </p>
             <div className="space-y-1.5">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Proof of payment</label>
-              <label className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 dark:border-[#233350] p-6 text-center cursor-pointer hover:border-pink-400 transition-colors">
+              <label className="flex flex-col items-center justify-center gap-2 rounded border-2 border-dashed border-slate-300 dark:border-[#233350] p-6 text-center cursor-pointer hover:border-pink-400 transition-colors">
                 <UploadCloud className="w-6 h-6 text-slate-400" />
                 <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                   {proofFiles.length === 0
@@ -385,6 +387,7 @@ export function GuestSupportPlatformDialog({ open, onOpenChange, onDone }: Guest
                   className="hidden"
                   onChange={(e) => setProofFiles(Array.from(e.target.files || []))}
                 />
+                  <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{describeUploadLimit(UPLOAD_LIMITS.donationProofs)}</span>
               </label>
             </div>
             <div className="space-y-1.5">
@@ -397,7 +400,7 @@ export function GuestSupportPlatformDialog({ open, onOpenChange, onDone }: Guest
                   value={payerNotes}
                   onChange={(e) => setPayerNotes(e.target.value)}
                   placeholder="E.g., paid from a joint account, or any detail that may help verification..."
-                  className="w-full min-h-20 p-3 pr-11 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded-2xl text-sm outline-none focus:border-pink-500"
+                  className="w-full min-h-20 p-3 pr-11 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded text-sm outline-none focus:border-pink-500"
                 />
                 <MicButton className="top-2 right-2" onText={text => setPayerNotes(n => appendSpeech(n, text))} />
               </div>

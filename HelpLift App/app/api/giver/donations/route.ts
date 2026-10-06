@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { logUserAction } from "@/lib/activity-log"
 import { createClient } from "@/lib/supabase/server"
 import { getActiveBankAccounts } from "@/lib/bank-accounts"
 import { buildPaymentFields } from "@/lib/payfast"
@@ -97,6 +98,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ message: configError.message || "PayFast is not configured." }, { status: 503 })
       }
 
+      await logUserAction(supabase, "Started a donation", "PayFast")
       return NextResponse.json({ donation, payfast }, { status: 201 })
     }
 
@@ -128,6 +130,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ message: configError.message || "PayPal is not configured." }, { status: 503 })
       }
 
+      await logUserAction(supabase, "Started a donation", "PayPal")
       return NextResponse.json({ donation, paypal }, { status: 201 })
     }
 
@@ -145,6 +148,7 @@ export async function POST(request: Request) {
       .single()
     if (error) return NextResponse.json({ message: error.message }, { status: 400 })
 
+    await logUserAction(supabase, "Started a donation", "EFT")
     return NextResponse.json({ donation, bank: bankAccount }, { status: 201 })
   } catch (error) {
     console.error("Donation creation error:", error)

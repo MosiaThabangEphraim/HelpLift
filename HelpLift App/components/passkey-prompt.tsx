@@ -82,7 +82,7 @@ export function PasskeyPrompt() {
     <div
       role="dialog"
       aria-label="Add a passkey"
-      className="fixed bottom-4 right-4 z-[9990] w-[min(92vw,22rem)] rounded-2xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] p-4 shadow-2xl"
+      className="fixed bottom-4 right-4 z-[9990] w-[min(92vw,22rem)] rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] p-4 shadow-2xl"
     >
       {done ? (
         <div className="flex items-center gap-3">
@@ -95,7 +95,7 @@ export function PasskeyPrompt() {
       ) : (
         <div className="space-y-3">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-blue-600 text-white">
               <Fingerprint className="h-5 w-5" />
             </div>
             <div>

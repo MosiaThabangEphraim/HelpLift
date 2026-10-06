@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { logUserAction } from "@/lib/activity-log"
 import { createClient } from "@/lib/supabase/server"
 import { getOrgContext, roleAtLeast, insufficientRoleMessage } from "@/lib/organization-access"
 import { getWalletSummary } from "@/lib/wallet"
@@ -58,6 +59,7 @@ export async function POST(request: Request) {
       console.warn("Withdrawal request notification warning:", notifyErr)
     }
 
+    await logUserAction(supabase, "Requested a withdrawal")
     return NextResponse.json({ withdrawal }, { status: 201 })
   } catch (error) {
     console.error("Withdrawal request error:", error)

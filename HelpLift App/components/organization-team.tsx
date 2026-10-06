@@ -19,11 +19,12 @@ const ROLE_HELP: Record<OrgRole, string> = {
 }
 
 const selectClass =
-  "rounded-xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+  "rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
 
 // Owner-only team management: invite by email, change roles, remove members,
 // revoke pending invitations. All authorization is enforced by the API routes.
-export function OrganizationTeam() {
+export function OrganizationTeam({ refreshKey = 0 }: { refreshKey?: number }) {
+  // refreshKey: bumped by the dashboard's refresh button to re-fetch in place (filters are kept).
   const [members, setMembers] = useState<Member[]>([])
   const [invitations, setInvitations] = useState<PendingInvite[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -46,7 +47,7 @@ export function OrganizationTeam() {
     setIsLoading(false)
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load() }, [load, refreshKey])
 
   const invite = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -134,7 +135,7 @@ export function OrganizationTeam() {
         </CardHeader>
         <CardContent className="space-y-4">
           {feedback && (
-            <div className={`p-3 rounded-2xl text-sm font-semibold flex items-start gap-2 ${
+            <div className={`p-3 rounded text-sm font-semibold flex items-start gap-2 ${
               feedback.type === "success"
                 ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
                 : "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300"
@@ -193,7 +194,7 @@ export function OrganizationTeam() {
                       {member.name && member.email && <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{member.email}</p>}
                     </div>
                     {member.is_primary ? (
-                      <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 shrink-0" title="The original account holder can’t be demoted or removed">{ROLE_LABELS.owner} · account holder</span>
+                      <span className="text-xs font-bold px-3 py-1 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 shrink-0" title="The original account holder can’t be demoted or removed">{ROLE_LABELS.owner} · account holder</span>
                     ) : (
                       <div className="flex items-center gap-2 shrink-0">
                         {busyMemberId === member.id && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
@@ -212,7 +213,7 @@ export function OrganizationTeam() {
                           <button
                             onClick={() => removeMember(member)}
                             disabled={busyMemberId === member.id}
-                            className="p-2 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-60"
+                            className="p-2 rounded text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-60"
                             aria-label="Remove member and delete their account"
                           >
                             <Trash2 className="w-4 h-4" />

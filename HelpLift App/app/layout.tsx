@@ -11,8 +11,11 @@ import { GrayscaleDarkSync } from "@/components/grayscale-dark-sync"
 import { RouteHistoryTracker } from "@/components/route-history-tracker"
 import { OfflineProvider } from "@/components/offline-provider"
 import { FontSizeProvider } from "@/components/font-size-provider"
+import { ReduceMotionProvider } from "@/components/reduce-motion-provider"
+import { ClickSoundProvider } from "@/components/click-sound-provider"
 import { SiteVisitTracker } from "@/components/site-visit-tracker"
 import { HelpLiftAssistant } from "@/components/helplift-assistant"
+import { ActivityTracker } from "@/components/activity-tracker"
 import "./globals.css"
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" })
@@ -71,7 +74,7 @@ export default function RootLayout({
               receives focus. */}
           <a
             href="#main-content"
-            className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[200] focus:rounded-full focus:bg-slate-900 focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-white focus:shadow-lg dark:focus:bg-white dark:focus:text-slate-900"
+            className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[200] focus:rounded focus:bg-slate-900 focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-white focus:shadow-lg dark:focus:bg-white dark:focus:text-slate-900"
           >
             Skip to main content
           </a>
@@ -87,8 +90,11 @@ export default function RootLayout({
           <RouteHistoryTracker />
           <OfflineProvider />
           <FontSizeProvider />
+          <ReduceMotionProvider />
+          <ClickSoundProvider />
           <SiteVisitTracker />
           <HelpLiftAssistant />
+          <ActivityTracker />
         </ThemeProvider>
         <Analytics />
       </body>

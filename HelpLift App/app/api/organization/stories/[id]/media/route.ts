@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/staged-uploads"
+import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { createClient } from "@/lib/supabase/server"
 import { getOrgContext, roleAtLeast, insufficientRoleMessage } from "@/lib/organization-access"
 
@@ -21,7 +23,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (!story) return NextResponse.json({ message: "Story not found." }, { status: 404 })
 
     const formData = await request.formData()
-    const imageFiles = formData.getAll("images").filter((f): f is File => f instanceof File && f.size > 0)
+    const imageFiles = await readUploadedFiles(formData, "images")
+    { const uploadProblem = checkUploadLimits(imageFiles, UPLOAD_LIMITS.storyImages); if (uploadProblem) return NextResponse.json({ message: uploadProblem }, { status: 400 }) }
     const videoUrls = formData.getAll("video_urls").map((v) => String(v).trim()).filter(Boolean)
 
     for (const url of videoUrls) {

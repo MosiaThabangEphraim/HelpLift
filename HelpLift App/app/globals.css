@@ -273,7 +273,7 @@ body {
   justify-content: space-between;
   gap: 1rem;
   border: 1px solid #e2e8f0;
-  border-radius: 1rem;
+  border-radius: 4px;
   padding: 1.25rem;
 }
 
@@ -464,4 +464,26 @@ body::-webkit-scrollbar {
   border-radius: 4px;
   object-fit: cover;
   flex-shrink: 0;
+}
+
+/* Reduce motion (Settings -> Reduce motion, lib/reduce-motion.ts, or the
+   device's own setting): animations and transitions off site-wide. Loading
+   spinners keep turning so it's still clear something is loading. */
+html.reduce-motion *:not(.animate-spin),
+html.reduce-motion *:not(.animate-spin)::before,
+html.reduce-motion *:not(.animate-spin)::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *:not(.animate-spin),
+  *:not(.animate-spin)::before,
+  *:not(.animate-spin)::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

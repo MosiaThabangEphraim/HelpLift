@@ -75,7 +75,7 @@ function BadgeIconTile({ badge, size = "sm" }: { badge: BadgeStatus; size?: "sm"
   const iconDims = size === "lg" ? "w-8 h-8" : "w-5 h-5"
   return (
     <div
-      className={`shrink-0 rounded-xl ${dims} ${
+      className={`shrink-0 rounded ${dims} ${
         badge.earned ? "bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-sm shadow-amber-500/30" : "bg-slate-100 dark:bg-[#1A2740] text-slate-400"
       }`}
     >
@@ -89,8 +89,8 @@ function ProgressBar({ badge, size = "sm" }: { badge: BadgeStatus; size?: "sm" |
   const pct = Math.min(100, Math.round((badge.progressCurrent / Math.max(1, badge.progressTarget)) * 100))
   return (
     <div className="space-y-1">
-      <div className={`rounded-full bg-slate-100 dark:bg-[#1A2740] overflow-hidden ${size === "lg" ? "h-2.5" : "h-1.5"}`}>
-        <div className="h-full rounded-full bg-blue-500" style={{ width: `${pct}%` }} />
+      <div className={`rounded bg-slate-100 dark:bg-[#1A2740] overflow-hidden ${size === "lg" ? "h-2.5" : "h-1.5"}`}>
+        <div className="h-full rounded bg-blue-500" style={{ width: `${pct}%` }} />
       </div>
       <p className={size === "lg" ? "text-xs text-slate-500 dark:text-slate-400" : "text-[11px] text-slate-400"}>
         {formatProgressValue(badge.progressCurrent, badge.unit)} / {formatProgressValue(badge.progressTarget, badge.unit)}
@@ -105,7 +105,7 @@ function BadgeCard({ badge, onSelect }: { badge: BadgeStatus; onSelect: (badge: 
       type="button"
       onClick={() => onSelect(badge)}
       data-tip="View full details"
-      className={`w-full text-left rounded-2xl border p-4 space-y-2 transition-colors ${
+      className={`w-full text-left rounded border p-4 space-y-2 transition-colors ${
         badge.earned
           ? "border-amber-200 dark:border-amber-900 bg-amber-50/60 dark:bg-amber-950/20 hover:bg-amber-100/60 dark:hover:bg-amber-950/40"
           : "border-slate-200 dark:border-[#233350] opacity-80 hover:opacity-100 hover:border-slate-300 dark:hover:border-[#2C3E63]"
@@ -143,7 +143,7 @@ function BadgeDetailDialog({ badge, onOpenChange }: { badge: BadgeStatus | null;
 
               {badge.earned ? (
                 <>
-                  <div className="flex items-center gap-2 rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm font-semibold text-amber-700 dark:text-amber-400">
+                  <div className="flex items-center gap-2 rounded border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm font-semibold text-amber-700 dark:text-amber-400">
                     <CheckCircle2 className="w-4 h-4 shrink-0" />
                     {badge.earnedAt ? `Earned on ${formatEarnedDate(badge.earnedAt)}` : "Earned"}
                   </div>
@@ -154,7 +154,7 @@ function BadgeDetailDialog({ badge, onOpenChange }: { badge: BadgeStatus | null;
                   />
                 </>
               ) : (
-                <div className="flex items-center gap-2 rounded-xl border border-slate-200 dark:border-[#233350] p-3 text-sm font-semibold text-slate-500 dark:text-slate-400">
+                <div className="flex items-center gap-2 rounded border border-slate-200 dark:border-[#233350] p-3 text-sm font-semibold text-slate-500 dark:text-slate-400">
                   <Lock className="w-4 h-4 shrink-0" />
                   Not yet earned
                 </div>
@@ -179,7 +179,7 @@ const RANK_STYLES = [
 function LeaderboardRow({ rank, entry }: { rank: number; entry: LeaderboardEntry }) {
   const image = entry.avatarUrl || entry.logoUrl
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 dark:border-[#233350] p-3">
+    <div className="flex items-center gap-3 rounded border border-slate-200 dark:border-[#233350] p-3">
       <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-extrabold ${RANK_STYLES[rank - 1] || "bg-slate-100 dark:bg-[#1A2740] text-slate-500 dark:text-slate-400"}`}>
         {rank}
       </div>
@@ -189,7 +189,7 @@ function LeaderboardRow({ rank, entry }: { rank: number; entry: LeaderboardEntry
           the browser's own broken-image render. */}
       <UserAvatar src={image} name={entry.name} className="size-9 border border-slate-200 dark:border-[#233350]" />
       <p className="min-w-0 flex-1 truncate text-sm font-bold">{entry.name}</p>
-      <span className="flex shrink-0 items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 text-xs font-bold text-amber-700 dark:text-amber-400">
+      <span className="flex shrink-0 items-center gap-1 rounded bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 text-xs font-bold text-amber-700 dark:text-amber-400">
         <Trophy className="h-3 w-3" /> {entry.badgeCount}
       </span>
     </div>
@@ -216,7 +216,7 @@ function LeaderboardView() {
     return () => { cancelled = true }
   }, [])
 
-  if (error) return <div className="rounded-xl bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">{error}</div>
+  if (error) return <div className="rounded bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">{error}</div>
   if (!data) return <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-amber-600" /></div>
 
   return (
@@ -250,7 +250,8 @@ function LeaderboardView() {
 // role-specific; the display is not). See lib/badges.ts for how each badge
 // is computed, and app/api/giver/badges + app/api/organization/badges for
 // the endpoints this fetches from.
-export function BadgesPanel({ endpoint }: { endpoint: string }) {
+export function BadgesPanel({ endpoint, refreshKey = 0 }: { endpoint: string; refreshKey?: number }) {
+  // refreshKey: bumped by the dashboard's refresh button to re-fetch in place (filters are kept).
   const [view, setView] = useState<"badges" | "leaderboard">("badges")
   const [badges, setBadges] = useState<BadgeStatus[] | null>(null)
   const [error, setError] = useState("")
@@ -269,7 +270,7 @@ export function BadgesPanel({ endpoint }: { endpoint: string }) {
       })
       .catch(() => { if (!cancelled) setError("Could not load badges.") })
     return () => { cancelled = true }
-  }, [endpoint])
+  }, [endpoint, refreshKey])
 
   const earnedBadges = (badges || []).filter((b) => b.earned)
   const inProgressBadges = (badges || []).filter((b) => !b.earned)
@@ -278,7 +279,7 @@ export function BadgesPanel({ endpoint }: { endpoint: string }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
-          <div className="rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 p-3 text-white shadow-lg shadow-amber-500/20">
+          <div className="rounded bg-gradient-to-br from-amber-400 to-orange-500 p-3 text-white shadow-lg shadow-amber-500/20">
             <Star className="w-6 h-6" fill="currentColor" />
           </div>
           <div>
@@ -290,14 +291,14 @@ export function BadgesPanel({ endpoint }: { endpoint: string }) {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-1 rounded-full border border-slate-200 dark:border-[#233350] p-1">
+        <div className="flex items-center gap-1 rounded border border-slate-200 dark:border-[#233350] p-1">
           {(["badges", "leaderboard"] as const).map((option) => (
             <button
               key={option}
               type="button"
               onClick={() => setView(option)}
               aria-pressed={view === option}
-              className={`rounded-full px-3.5 py-1.5 text-xs font-bold capitalize transition-colors ${
+              className={`rounded px-3.5 py-1.5 text-xs font-bold capitalize transition-colors ${
                 view === option
                   ? "bg-amber-500 text-white"
                   : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
@@ -314,7 +315,7 @@ export function BadgesPanel({ endpoint }: { endpoint: string }) {
       ) : (
         <>
           {error && (
-            <div className="rounded-xl bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">{error}</div>
+            <div className="rounded bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">{error}</div>
           )}
 
           {!badges && !error && (

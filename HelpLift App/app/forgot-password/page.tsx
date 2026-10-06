@@ -129,7 +129,7 @@ export default function ForgotPasswordPage() {
         ) : (
           /* SUCCESS STATE */
           <div className="w-full text-center space-y-8 animate-in zoom-in-95 duration-500">
-            <div className="w-20 h-20 bg-primary/10 rounded-[2.5rem] flex items-center justify-center mx-auto border-2 border-primary/20">
+            <div className="w-20 h-20 bg-primary/10 rounded flex items-center justify-center mx-auto border-2 border-primary/20">
               <Send className="w-10 h-10 text-primary" />
             </div>
             

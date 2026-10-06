@@ -3,26 +3,43 @@
 import { useCallback, useEffect, useState } from "react"
 import { ArrowLeft, ArrowRight, Sparkles, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { logClientAction } from "@/components/activity-tracker"
 
 // First-time dashboard tour: a few dismissible step-by-step cards that spotlight
 // where things are. Shown once per account - to a giver on their first visit
-// after registering, and to an organization team member on their first visit
-// to the dashboard, which is only reachable once an admin has approved the
-// organization. Completion is saved in the user's own auth metadata, so it
+// after registering, to an organization team member on their first visit to
+// the dashboard (only reachable once an admin has approved the organization),
+// and to an administrator on their first visit after accepting their invite. Completion is saved in the user's own auth metadata, so it
 // follows them across devices without a database change.
 //
 // Accounts created before the tour existed never see it (they already know
 // their way around). Add ?tour=1 to a dashboard URL to replay it - handy for
 // demos and testing.
 
-export type TourRole = "giver" | "organization"
+export type TourRole = "giver" | "organization" | "admin"
 type TourStep = { target?: string; title: string; body: string }
 
 const TOUR_LAUNCH = "2026-10-05T00:00:00Z"
-const DONE_KEY: Record<TourRole, string> = { giver: "dashboard_tour_giver_done_at", organization: "dashboard_tour_organization_done_at" }
+const DONE_KEY: Record<TourRole, string> = { giver: "dashboard_tour_giver_done_at", organization: "dashboard_tour_organization_done_at", admin: "dashboard_tour_admin_done_at" }
 
 function stepsFor(role: TourRole, name?: string | null): TourStep[] {
   const hello = name ? `Welcome, ${name}!` : "Welcome to HelpLift!"
+  if (role === "admin") {
+    return [
+      { title: `${hello} 🛡️`, body: "This is the HelpLift admin dashboard, where you keep the platform safe and moving. Here's a quick tour - you can skip it any time." },
+      { target: '[data-tour="admin-stats"]', title: "What needs you right now", body: "These cards count everything waiting on an admin - approvals, needs to review, donations to confirm, withdrawals, stories and unread messages." },
+      { target: '[data-tour="tab-users"]', title: "Users and organization approvals", body: "Verify new organizations and check their documents here. Switch to Givers, Admins (where you invite other administrators) or All users." },
+      { target: '[data-tour="tab-needs"]', title: "Review needs", body: "Approve or reject needs before they go public, and decide on requests to reopen closed needs." },
+      { target: '[data-tour="tab-donations"]', title: "Confirm donations", body: "Check EFT proof of payment and confirm donations - the giver's receipt is emailed automatically. The Gift Library and Fulfillments tabs work the same way for pledges and deliveries." },
+      { target: '[data-tour="tab-withdrawals"]', title: "Pay out organizations", body: "Review withdrawal requests and attach proof of payment once the money is sent." },
+      { target: '[data-tour="tab-stories"]', title: "Approve impact stories", body: "Organizations' stories are published on their profiles and the homepage only after you approve them." },
+      { target: '[data-tour="tab-reports"]', title: "Reports", body: "All-time totals, site visits and charts for any date range - with CSV and image exports." },
+      { target: '[data-tour="live-activity"]', title: "Live activity", body: "See who's online right now and what signed-in users are doing - pages opened and actions taken - updated every 10 seconds." },
+      { target: '[data-tour="security"]', title: "Security", body: "Every sign-in attempt, successful or not - with IP address, location and device - plus warnings about repeated failures." },
+      { target: '[data-tour="dev-reports"]', title: "Feedback and dev reports", body: "Dev reports holds the anonymous bugs and ideas sent from the Developers page. Feedback, just beside it, has ratings from givers and organizations." },
+      { target: '[data-tour="settings"]', title: "Settings, announcements and more", body: "Settings covers your login and Platform settings (maintenance mode, bank accounts, need categories and limits). The megaphone sends announcements, and the bell lists what needs review." },
+    ]
+  }
   if (role === "giver") {
     return [
       { title: `${hello} 👋`, body: "Here's a quick tour of everything on your dashboard - about a minute. You can skip it any time." },
@@ -173,35 +190,35 @@ export function DashboardTour({ role, name }: { role: TourRole; name?: string | 
       {step.target && rect ? (
         // Spotlight: a ring around the element, with everything else dimmed by its shadow.
         <div
-          className="absolute rounded-lg ring-4 ring-blue-500 transition-all duration-300"
+          className="absolute rounded ring-2 ring-blue-500 transition-all duration-300"
           style={{
             top: rect.top - 6,
             left: rect.left - 6,
             width: rect.width + 12,
             height: rect.height + 12,
-            boxShadow: "0 0 0 9999px rgba(2, 6, 23, 0.55)",
+            boxShadow: "0 0 0 9999px rgba(11, 18, 32, 0.6)",
           }}
         />
       ) : (
-        <div className="absolute inset-0 bg-slate-950/55" />
+        <div className="absolute inset-0 bg-[#0B1220]/60" />
       )}
 
       <div
-        className="absolute pointer-events-auto rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+        className="absolute pointer-events-auto rounded border border-slate-200 dark:border-[#233350] border-t-2 border-t-blue-600 dark:border-t-blue-500 bg-white dark:bg-[#121B2E] p-5 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
         style={cardStyle}
       >
         <div className="flex items-start justify-between gap-3">
           <p className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
             <Sparkles className="h-3.5 w-3.5" /> Step {visibleNumber} of {visibleCount}
           </p>
-          <button type="button" onClick={finish} aria-label="Skip the tour" className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+          <button type="button" onClick={() => { logClientAction("Skipped the dashboard tour"); finish() }} aria-label="Skip the tour" className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
             <X className="h-4 w-4" />
           </button>
         </div>
         <h3 className="mt-2 text-base font-bold text-slate-900 dark:text-slate-100">{step.title}</h3>
         <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{step.body}</p>
         <div className="mt-4 flex items-center justify-between gap-2">
-          <button type="button" onClick={finish} className="text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+          <button type="button" onClick={() => { logClientAction("Skipped the dashboard tour"); finish() }} className="text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
             Skip tour
           </button>
           <div className="flex items-center gap-2">
@@ -209,16 +226,20 @@ export function DashboardTour({ role, name }: { role: TourRole; name?: string | 
               <button
                 type="button"
                 onClick={() => move(-1)}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                className="inline-flex items-center gap-1 rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
               >
                 <ArrowLeft className="h-3.5 w-3.5" /> Back
               </button>
             )}
             <button
               type="button"
-              onClick={() => (isLast ? finish() : move(1))}
+              onClick={() => {
+                if (!isLast) return move(1)
+                logClientAction("Completed the dashboard tour")
+                finish()
+              }}
               autoFocus
-              className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700"
+              className="inline-flex items-center gap-1 rounded bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
             >
               {isLast ? "Got it" : index === 0 ? "Show me around" : "Next"}
               {!isLast && <ArrowRight className="h-3.5 w-3.5" />}

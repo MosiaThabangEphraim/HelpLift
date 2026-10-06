@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server"
+import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/staged-uploads"
+import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
+import { logUserAction } from "@/lib/activity-log"
 import { createClient } from "@/lib/supabase/server"
 import { getActiveCategoryNames } from "@/lib/need-categories"
 import { getOrgContext, roleAtLeast, insufficientRoleMessage } from "@/lib/organization-access"
@@ -26,9 +29,10 @@ export async function POST(request: Request) {
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await request.formData()
-      attachmentFiles = formData.getAll("attachments").filter((f): f is File => f instanceof File && f.size > 0)
+      attachmentFiles = await readUploadedFiles(formData, "attachments")
+      { const uploadProblem = checkUploadLimits(attachmentFiles, UPLOAD_LIMITS.needAttachments); if (uploadProblem) return NextResponse.json({ message: uploadProblem }, { status: 400 }) }
       formData.forEach((value, key) => {
-        if (typeof value === "string") body[key] = value
+        if (typeof value === "string" && !isStagedReference(value)) body[key] = value
       })
     } else {
       body = await request.json()
@@ -95,6 +99,7 @@ export async function POST(request: Request) {
       }
     }
 
+    await logUserAction(supabase, "Posted a need", need?.title)
     return NextResponse.json({ need }, { status: 201 })
   } catch (error) {
     console.error("Need creation error:", error)

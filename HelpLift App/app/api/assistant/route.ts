@@ -264,6 +264,8 @@ Team roles:
   It goes to the administrators.
 - "Partner with us" contact form on the homepage.
 - Message an administrator from the Messages tab.
+- Developers page (/developers): anyone can anonymously report a bug, suggest an
+  improvement or report a security issue, with optional screenshots or files.
 
 ==================================================================
 15. ADMINISTRATORS (for context - users cannot do these)

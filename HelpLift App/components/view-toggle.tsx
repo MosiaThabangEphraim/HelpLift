@@ -9,7 +9,7 @@ export type ListView = "grid" | "list"
 // classes for each mode; this is just the two buttons.
 export function ViewToggle({ view, onChange }: { view: ListView; onChange: (view: ListView) => void }) {
   return (
-    <div className="flex items-center gap-1 rounded-full border border-slate-200 dark:border-[#233350] p-1 shrink-0">
+    <div className="flex items-center gap-1 rounded border border-slate-200 dark:border-[#233350] p-1 shrink-0">
       <button
         type="button"
         onClick={() => onChange("grid")}

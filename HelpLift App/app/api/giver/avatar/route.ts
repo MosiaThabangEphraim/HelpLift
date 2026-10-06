@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/staged-uploads"
+import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { createClient } from "@/lib/supabase/server"
 
 const BUCKET = "profile-pictures"
@@ -53,7 +55,7 @@ export async function POST(request: Request) {
     if (!giver) return NextResponse.json({ message: "Only givers have a profile picture here." }, { status: 403 })
 
     const formData = await request.formData()
-    const file = formData.get("avatar")
+    const file = await readUploadedFile(formData, "avatar")
     if (!(file instanceof File) || file.size === 0) return NextResponse.json({ message: "Choose an image to upload." }, { status: 400 })
     if (!ALLOWED_TYPES.includes(file.type) || !ALLOWED_EXTENSIONS.test(file.name)) {
       return NextResponse.json({ message: "Use a PNG, JPG or WebP image." }, { status: 400 })

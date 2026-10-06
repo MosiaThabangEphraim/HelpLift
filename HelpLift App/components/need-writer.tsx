@@ -60,7 +60,7 @@ export function NeedWriter({ onDraft }: { onDraft: (draft: NeedDraft) => void })
           onClick={() => setOpen(true)}
           aria-expanded={false}
           data-tip="Describe the need in a sentence - typed or spoken - and Lifty fills in the form"
-          className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 px-3 py-1 text-xs font-bold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 px-3 py-1 text-xs font-bold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
         >
           <Sparkles className="h-3.5 w-3.5" /> Let Lifty write it
           <ChevronDown className="h-3.5 w-3.5" />
@@ -70,7 +70,7 @@ export function NeedWriter({ onDraft }: { onDraft: (draft: NeedDraft) => void })
   }
 
   return (
-    <div data-tour="need-writer" className="rounded-lg border border-blue-200 dark:border-blue-900 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/30">
+    <div data-tour="need-writer" className="rounded border border-blue-200 dark:border-blue-900 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/30">
       <button
         type="button"
         onClick={() => setOpen(false)}

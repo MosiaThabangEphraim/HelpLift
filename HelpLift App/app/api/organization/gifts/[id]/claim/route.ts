@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server"
+import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/staged-uploads"
+import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
+import { logUserAction } from "@/lib/activity-log"
 import { createClient } from "@/lib/supabase/server"
 import { getOrgContext, roleAtLeast, insufficientRoleMessage } from "@/lib/organization-access"
 
@@ -33,7 +36,8 @@ export async function POST(
     if (contentType.includes("multipart/form-data")) {
       const formData = await request.formData()
       motivationRaw = String(formData.get("motivation") || "")
-      documentFiles = formData.getAll("documents").filter((f): f is File => f instanceof File && f.size > 0)
+      documentFiles = await readUploadedFiles(formData, "documents")
+      { const uploadProblem = checkUploadLimits(documentFiles, UPLOAD_LIMITS.giftClaimDocuments); if (uploadProblem) return NextResponse.json({ message: uploadProblem }, { status: 400 }) }
     } else {
       const body = await request.json().catch(() => ({}))
       motivationRaw = typeof body.motivation === "string" ? body.motivation : ""
@@ -128,6 +132,7 @@ export async function POST(
       console.warn("Notification error during gift claim:", notifErr)
     }
 
+    await logUserAction(supabase, "Claimed a Gift Library offering")
     return NextResponse.json({ success: true, claim, documentsUploaded }, { status: 201 })
   } catch (err: any) {
     console.error("Claim gift exception:", err)

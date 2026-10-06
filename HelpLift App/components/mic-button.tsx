@@ -46,7 +46,7 @@ export function MicButton({
         <Mic className="h-3.5 w-3.5" />
       </button>
       {error && (
-        <p role="alert" className="absolute right-0 top-8 w-44 rounded-lg bg-red-600 px-2 py-1.5 text-[10px] font-semibold leading-tight text-white shadow-lg">
+        <p role="alert" className="absolute right-0 top-8 w-44 rounded bg-red-600 px-2 py-1.5 text-[10px] font-semibold leading-tight text-white shadow-lg">
           {error}
         </p>
       )}

@@ -135,7 +135,7 @@ export function SiteTooltips() {
       id={TOOLTIP_ID}
       role="tooltip"
       style={{ position: "fixed", left: position?.left ?? 0, top: position?.top ?? 0, visibility: position ? "visible" : "hidden" }}
-      className="pointer-events-none z-[9999] max-w-[260px] rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-medium leading-snug text-white shadow-lg dark:bg-slate-100 dark:text-slate-900"
+      className="pointer-events-none z-[9999] max-w-[260px] rounded bg-slate-900 px-2.5 py-1.5 text-xs font-medium leading-snug text-white shadow-lg dark:bg-slate-100 dark:text-slate-900"
     >
       {tip.text}
     </div>

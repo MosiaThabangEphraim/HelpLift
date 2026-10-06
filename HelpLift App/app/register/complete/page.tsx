@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { stageFormFiles } from "@/lib/stage-uploads"
+import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { useRouter } from "next/navigation"
 import { AlertCircle, ArrowRight, Building2, CheckCircle2, FileText, HeartHandshake, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -122,7 +124,7 @@ export default function CompleteRegistrationPage() {
         const attached = documents.filter(d => d.file)
         attached.forEach(d => formData.append("documentFiles", d.file as File))
         formData.append("documentTypes", JSON.stringify(attached.map(d => d.type)))
-        res = await fetch("/api/register/complete", { method: "POST", body: formData })
+        res = await fetch("/api/register/complete", { method: "POST", body: await stageFormFiles(formData, UPLOAD_LIMITS.registrationDocuments) })
       } else {
         res = await fetch("/api/register/complete", {
           method: "POST",
@@ -366,6 +368,7 @@ export default function CompleteRegistrationPage() {
                         }}
                         className="sr-only"
                       />
+                        <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{describeUploadLimit(UPLOAD_LIMITS.registrationDocuments)}</span>
                     </label>
                     {documents.length > 1 && (
                       <button type="button" aria-label="Remove" onClick={() => setDocuments(docs => docs.filter((_, i) => i !== index))} className="text-slate-400 hover:text-red-600 font-bold shrink-0 px-1">✕</button>

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/staged-uploads"
+import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { createClient } from "@/lib/supabase/server"
 import { getOrgContext, roleAtLeast, insufficientRoleMessage } from "@/lib/organization-access"
 
@@ -29,7 +31,8 @@ export async function POST(request: Request) {
     if (!organization) return NextResponse.json({ message: "Organization profile not found." }, { status: 404 })
 
     const formData = await request.formData()
-    const file = formData.get("file")
+    const file = await readUploadedFile(formData, "file")
+    { const uploadProblem = checkUploadLimits(file ? [file] : [], UPLOAD_LIMITS.organizationDocument); if (uploadProblem) return NextResponse.json({ message: uploadProblem }, { status: 400 }) }
     const documentType = String(formData.get("document_type") || "supporting_document")
     if (!(file instanceof File) || file.size === 0) return NextResponse.json({ message: "Choose a document to upload." }, { status: 400 })
     if (file.size > 10 * 1024 * 1024) return NextResponse.json({ message: "Documents must be smaller than 10 MB." }, { status: 400 })

@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
+import { stageFormFiles } from "@/lib/stage-uploads"
+import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import Link from "next/link"
 import { RefreshButton } from "@/components/refresh-button"
 import { useRouter } from "next/navigation"
@@ -157,7 +159,7 @@ export default function PublicGiftLibraryPage() {
       documents.forEach(file => formData.append("documents", file))
       const res = await fetch(`/api/organization/gifts/${selectedGift.id}/claim`, {
         method: "POST",
-        body: formData,
+        body: await stageFormFiles(formData, UPLOAD_LIMITS.giftClaimDocuments),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || "Failed to claim offering.")

@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
+import { stageFormFiles } from "@/lib/stage-uploads"
+import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
@@ -315,7 +317,7 @@ export default function PublicNeedsPage() {
       interestPhotos.forEach(file => formData.append("photos", file))
       const res = await fetch("/api/giver/interests", {
         method: "POST",
-        body: formData,
+        body: await stageFormFiles(formData, UPLOAD_LIMITS.interestPhotos),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -757,6 +759,7 @@ export default function PublicNeedsPage() {
                       e.target.value = ""
                     }}
                   />
+                    <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{describeUploadLimit(UPLOAD_LIMITS.interestPhotos)}</span>
                 </label>
               </div>
 

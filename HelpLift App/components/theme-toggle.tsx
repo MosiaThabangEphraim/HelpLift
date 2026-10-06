@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useTheme } from "next-themes"
 import { Contrast, Moon, Palette, Sun } from "lucide-react"
+import { logClientAction } from "@/components/activity-tracker"
 
 type Mode = "light" | "dark" | "high-contrast" | "grayscale"
 
@@ -40,10 +41,13 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
   return (
     <button
       type="button"
-      onClick={() => setTheme(NEXT[current])}
+      onClick={() => {
+        setTheme(NEXT[current])
+        logClientAction("Changed the theme", `Switched to ${NEXT[current].replace("-", " ")} mode`)
+      }}
       aria-label={LABEL[current]}
       data-tip={LABEL[current]}
-      className={`inline-flex items-center justify-center rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${className}`}
+      className={`inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${className}`}
     >
       <Icon className="w-4 h-4" />
     </button>

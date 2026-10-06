@@ -111,7 +111,7 @@ export default function AdminLoginPage() {
           </p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-5 rounded-[28px] border border-slate-200 dark:border-[#233350] bg-white/90 dark:bg-[#121B2E]/90 p-6 shadow-2xl shadow-slate-200/50 dark:shadow-blue-950/30 backdrop-blur-xl">
+        <form onSubmit={handleLogin} className="space-y-5">
           {errorMsg && <div className="flex items-center gap-2 rounded border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/60 p-4 text-sm font-semibold text-red-700 dark:text-red-200"><AlertCircle className="h-5 w-5" />{errorMsg}</div>}
           {showUnlockedBanner && (
             <div className="flex items-center gap-2 rounded border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/60 p-4 text-sm font-semibold text-emerald-700 dark:text-emerald-200">

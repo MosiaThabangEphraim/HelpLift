@@ -23,7 +23,8 @@ import {
   Flame,
   ExternalLink,
   Loader2,
-  Heart
+  Heart,
+  Code2
 } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -43,6 +44,7 @@ import { CountUp } from "@/components/count-up"
 import { NeedsMap } from "@/components/needs-map"
 import { LiveActivityFeed } from "@/components/live-activity-feed"
 import { OrgLogo } from "@/components/org-logo"
+import { HomepageNotice } from "@/components/homepage-notice"
 
 // -------------------- Data (HelpLift Ecosystem) --------------------
 const faqs = [
@@ -266,11 +268,20 @@ export default function LandingPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Kept outside the section links (which hide on phones) so it's visible on every screen size. */}
+            <Link
+              href="/developers"
+              data-tip="Report a bug or suggest an improvement - anonymously"
+              className="inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+            >
+              <Code2 className="h-4 w-4" />
+              <span>Developers</span>
+            </Link>
             <ThemeToggle className="h-9 w-9" />
             <button
               onClick={() => router.push(dashboardPath || "/login")}
               data-tip={dashboardPath ? "You're signed in - go to your dashboard" : undefined}
-              className="hidden md:inline-flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-bold text-white transition-all duration-300 bg-slate-900 dark:bg-blue-600 border border-transparent rounded hover:bg-slate-800 dark:hover:bg-blue-700 hover:shadow-lg hover:shadow-slate-200 dark:hover:shadow-none hover:-translate-y-0.5"
+              className="hidden md:inline-flex items-center justify-center gap-2 whitespace-nowrap shrink-0 px-6 py-2.5 text-sm font-bold text-white transition-all duration-300 bg-slate-900 dark:bg-blue-600 border border-transparent rounded hover:bg-slate-800 dark:hover:bg-blue-700 hover:shadow-lg hover:shadow-slate-200 dark:hover:shadow-none hover:-translate-y-0.5"
             >
               {dashboardPath ? (
                 <>
@@ -288,6 +299,10 @@ export default function LandingPage() {
         {/* --- HERO SECTION --- */}
         <section id="home" className="relative pt-5 pb-5 md:pt-30 md:pb-10 overflow-hidden px-4">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-blue-300/20 rounded blur-[120px] -z-10 mix-blend-multiply opacity-60" />
+
+          {/* Admin's public notice (Send Announcement -> Homepage public notice). Extra
+              top margin on phones so the floating navbar doesn't cover it. */}
+          <HomepageNotice className="mt-16 md:mt-0 mb-8" />
           
           <div className="max-w-5xl mx-auto text-center space-y-4">
             <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 leading-[1.15]">
@@ -357,7 +372,7 @@ export default function LandingPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-[280px]">
-            <div className="md:col-span-2 relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[2.5rem] p-10 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] hover:border-slate-200 dark:border-slate-800 transition-all duration-500 group flex flex-col justify-between">
+            <div className="md:col-span-2 relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded p-10 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] hover:border-slate-200 dark:border-slate-800 transition-all duration-500 group flex flex-col justify-between">
               <div className="absolute top-0 right-0 p-8 opacity-[0.02] transition-opacity duration-500 group-hover:opacity-[0.04]">
                 <Gift className="w-64 h-64 text-purple-900" />
               </div>
@@ -372,7 +387,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[2.5rem] p-10 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] hover:border-slate-200 dark:border-slate-800 transition-all duration-500 group flex flex-col justify-between">
+            <div className="relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded p-10 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] hover:border-slate-200 dark:border-slate-800 transition-all duration-500 group flex flex-col justify-between">
               <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-950 rounded flex items-center justify-center border border-emerald-100 dark:border-emerald-900 mb-6 group-hover:scale-110 transition-transform duration-500">
                 <ShieldCheck className="w-6 h-6 text-emerald-600" />
               </div>
@@ -384,7 +399,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[2.5rem] p-10 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] hover:border-slate-200 dark:border-slate-800 transition-all duration-500 group flex flex-col justify-between">
+            <div className="relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded p-10 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] hover:border-slate-200 dark:border-slate-800 transition-all duration-500 group flex flex-col justify-between">
               <div className="w-14 h-14 bg-blue-50 dark:bg-blue-950 rounded flex items-center justify-center border border-blue-100 dark:border-blue-900 mb-6 group-hover:scale-110 transition-transform duration-500">
                 <LayoutDashboard className="w-6 h-6 text-blue-600" />
               </div>
@@ -396,7 +411,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="md:col-span-2 relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[2.5rem] p-10 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] hover:border-slate-200 dark:border-slate-800 transition-all duration-500 group flex flex-col justify-between">
+            <div className="md:col-span-2 relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded p-10 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] hover:border-slate-200 dark:border-slate-800 transition-all duration-500 group flex flex-col justify-between">
                <div className="absolute -bottom-10 -right-10 p-8 opacity-[0.02] transition-opacity duration-500 group-hover:opacity-[0.04]">
                 <Users className="w-72 h-72 text-orange-900" />
               </div>
@@ -539,7 +554,7 @@ export default function LandingPage() {
             </div>
 
             <div className="relative min-h-[500px]">
-              <div className="absolute right-0 top-0 w-full md:w-2/3 h-[400px] md:h-[500px] rounded-[2.5rem] bg-slate-100 dark:bg-slate-900 overflow-hidden shadow-lg border border-slate-200 dark:border-slate-800">
+              <div className="absolute right-0 top-0 w-full md:w-2/3 h-[400px] md:h-[500px] rounded bg-slate-100 dark:bg-slate-900 overflow-hidden shadow-lg border border-slate-200 dark:border-slate-800">
                 {currentStory?.imageUrl ? (
                   <img src={currentStory.imageUrl} alt={currentStory.title} className="absolute inset-0 w-full h-full object-cover" />
                 ) : (
@@ -554,7 +569,7 @@ export default function LandingPage() {
 
               {!isLoadingStories && !currentStory ? (
                 <div className="relative pt-32 md:pt-16 md:w-1/2 z-10">
-                  <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white dark:border-slate-800 p-10 md:p-14 rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] flex flex-col items-start gap-3">
+                  <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white dark:border-slate-800 p-10 md:p-14 rounded shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] flex flex-col items-start gap-3">
                     <Quote className="w-10 h-10 text-blue-200 dark:text-blue-900" />
                     <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100">No impact stories yet.</h3>
                     <p className="text-slate-500 dark:text-slate-400">Verified organizations will share real outcomes here as they publish updates.</p>
@@ -562,7 +577,7 @@ export default function LandingPage() {
                 </div>
               ) : currentStory ? (
                 <div className="relative pt-32 md:pt-16 md:w-1/2 z-10" key={`rev-${currentStory.id}`}>
-                  <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white dark:border-slate-800 p-10 md:p-14 rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] animate-in fade-in slide-in-from-left-8 duration-700">
+                  <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white dark:border-slate-800 p-10 md:p-14 rounded shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] animate-in fade-in slide-in-from-left-8 duration-700">
                       <Quote className="w-10 h-10 text-blue-200 dark:text-blue-900 mb-6" />
 
                       <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-400 text-xs font-bold uppercase tracking-wider mb-6">
@@ -785,7 +800,7 @@ export default function LandingPage() {
               </div>
 
               {/* Scam safety notice - sits under the FAQs (one of which covers the same topic). */}
-              <div className="mt-10 rounded-[2rem] border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-8">
+              <div className="mt-10 rounded border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-8">
                 <div className="flex items-start gap-4">
                   <div className="shrink-0 rounded bg-amber-100 dark:bg-amber-900/50 p-3 text-amber-700 dark:text-amber-400">
                     <ShieldCheck className="w-6 h-6" />
@@ -811,7 +826,7 @@ export default function LandingPage() {
 
             {/* Right column: contact form with the platform-support card under it. */}
             <div className="space-y-8">
-            <div id="contact" className="scroll-mt-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[2.5rem] p-10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] relative overflow-hidden">
+            <div id="contact" className="scroll-mt-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded p-10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] relative overflow-hidden">
                <div className="absolute -top-10 -right-10 w-40 h-40 bg-blue-50 dark:bg-blue-950 rounded blur-2xl -z-10" />
                <h3 className="text-2xl font-bold mb-2 text-slate-900 dark:text-slate-100">Partner with us or get in touch</h3>
                <p className="text-slate-500 dark:text-slate-400 mb-2">Need help registering your organization? Reach out. This is also where you can contact us with any other inquiry or question.</p>
@@ -868,7 +883,7 @@ export default function LandingPage() {
                </form>
             </div>
 
-            <div className="bg-pink-50 dark:bg-pink-950/30 border border-pink-100 dark:border-pink-900 rounded-[2.5rem] p-10 relative overflow-hidden">
+            <div className="bg-pink-50 dark:bg-pink-950/30 border border-pink-100 dark:border-pink-900 rounded p-10 relative overflow-hidden">
               <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-pink-100 dark:bg-pink-900/40 rounded blur-2xl -z-10" />
               <div className="flex items-center gap-2 mb-2">
                 <Heart className="w-5 h-5 text-pink-600" />
@@ -904,6 +919,7 @@ export default function LandingPage() {
             <div className="flex flex-wrap items-center justify-center gap-8 text-sm font-bold text-slate-500 dark:text-slate-400">
               <Link href="/privacy" className="hover:text-blue-600 transition-colors">Privacy Policy</Link>
               <Link href="/terms" className="hover:text-blue-600 transition-colors">Terms of Service</Link>
+              <Link href="/developers" className="hover:text-blue-600 transition-colors">Developers</Link>
             </div>
           </div>
           <div className="max-w-6xl mx-auto px-4 mt-12 pt-8 border-t border-slate-100 dark:border-slate-800 text-center text-sm font-medium text-slate-400">

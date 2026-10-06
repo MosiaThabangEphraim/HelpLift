@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/staged-uploads"
+import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { createClient } from "@/lib/supabase/server"
 import { getOrgContext, roleAtLeast, insufficientRoleMessage } from "@/lib/organization-access"
 
@@ -34,7 +36,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     }
 
     const formData = await request.formData()
-    const files = formData.getAll("proofs").filter((f): f is File => f instanceof File && f.size > 0)
+    const files = await readUploadedFiles(formData, "proofs")
     if (files.length === 0) return NextResponse.json({ message: "Choose at least one file." }, { status: 400 })
     if (files.length > MAX_FILES) return NextResponse.json({ message: `You can add up to ${MAX_FILES} files at a time.` }, { status: 400 })
 

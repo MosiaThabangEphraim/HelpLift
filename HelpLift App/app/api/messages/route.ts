@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server"
+import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/staged-uploads"
+import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
+import { logUserAction } from "@/lib/activity-log"
 import { createClient } from "@/lib/supabase/server"
 
 // Generic direct-messaging endpoint, backing three flows (all delivered as rows
@@ -32,10 +35,11 @@ export async function POST(request: Request) {
       target = formData.get("target")?.toString()
       recipientId = formData.get("recipientId")?.toString()
       replyTo = formData.get("replyTo")?.toString() || undefined
-      attachmentFiles = formData.getAll("attachments").filter((f): f is File => f instanceof File && f.size > 0)
+      attachmentFiles = await readUploadedFiles(formData, "attachments")
       // "attachment" (singular) kept for older callers; new clients send "attachments".
-      const legacyFile = formData.get("attachment")
+      const legacyFile = await readUploadedFile(formData, "attachment")
       if (legacyFile instanceof File && legacyFile.size > 0) attachmentFiles.unshift(legacyFile)
+      { const uploadProblem = checkUploadLimits(attachmentFiles, UPLOAD_LIMITS.messageAttachments); if (uploadProblem) return NextResponse.json({ message: uploadProblem }, { status: 400 }) }
     } else {
       const body = await request.json()
       message = typeof body.message === "string" ? body.message.trim() : ""
@@ -128,6 +132,7 @@ export async function POST(request: Request) {
       if (attachmentInsertError) console.warn("Notification attachment record warning:", attachmentInsertError.message)
     }
 
+    await logUserAction(supabase, "Sent a message")
     return NextResponse.json({ notification: { id: notificationId } }, { status: 201 })
   } catch (error) {
     console.error("Send message error:", error)

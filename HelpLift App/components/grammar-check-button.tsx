@@ -98,7 +98,7 @@ export function GrammarCheckButton({
           disabled={!text.trim()}
           aria-label="Check grammar and spelling"
           data-tip="Check grammar and spelling"
-          className={`inline-flex shrink-0 items-center gap-1 rounded-full bg-slate-100 dark:bg-[#1A2740] px-2 py-1 text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors disabled:opacity-40 ${className}`}
+          className={`inline-flex shrink-0 items-center gap-1 rounded bg-slate-100 dark:bg-[#1A2740] px-2 py-1 text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors disabled:opacity-40 ${className}`}
         >
           <SpellCheck2 className="h-3.5 w-3.5" />
           <span>Check grammar</span>
@@ -120,7 +120,7 @@ export function GrammarCheckButton({
         {!isLoading && issues && issues.length > 0 && (
           <div className="space-y-2.5">
             {issues.map((issue, i) => (
-              <div key={i} className="rounded-xl border border-slate-200 dark:border-[#233350] p-2.5 space-y-1.5">
+              <div key={i} className="rounded border border-slate-200 dark:border-[#233350] p-2.5 space-y-1.5">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">{issue.kind}</p>
                 <p className="text-xs text-slate-600 dark:text-slate-300">{issue.message}</p>
                 <p className="text-xs italic text-slate-400">"{issue.problemText}"</p>
@@ -131,7 +131,7 @@ export function GrammarCheckButton({
                         key={si}
                         type="button"
                         onClick={() => applySuggestion(issue, s)}
-                        className="rounded-full bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60"
+                        className="rounded bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60"
                       >
                         {s.kind === "Remove" ? "Remove" : `Use "${s.text}"`}
                       </button>

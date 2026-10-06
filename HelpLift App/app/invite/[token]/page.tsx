@@ -24,7 +24,7 @@ const ROLE_BLURBS: Record<OrgRole, string> = {
 }
 
 const inputClass =
-  "w-full px-4 py-3 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded-2xl text-sm outline-none focus:border-blue-500 transition-colors"
+  "w-full px-4 py-3 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded text-sm outline-none focus:border-blue-500 transition-colors"
 
 export default function InvitePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params)
@@ -135,13 +135,13 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100 pt-28 pb-20 px-4 flex justify-center">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-3">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900 text-blue-600 dark:text-blue-400 text-xs font-bold uppercase tracking-wider">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900 text-blue-600 dark:text-blue-400 text-xs font-bold uppercase tracking-wider">
             <HeartHandshake className="w-4 h-4" />
             <span>Team invitation</span>
           </div>
         </div>
 
-        <div className="rounded-3xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E]/80 p-8 shadow-sm space-y-6">
+        <div className="rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E]/80 p-8 shadow-sm space-y-6">
           {isLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="w-8 h-8 text-blue-600 animate-spin" /></div>
           ) : loadError || !invite ? (
@@ -167,7 +167,7 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
               </div>
 
               {error && (
-                <div className="p-3 rounded-2xl bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-sm font-semibold flex items-start gap-2">
+                <div className="p-3 rounded bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-sm font-semibold flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                   <span>{error}</span>
                 </div>
@@ -177,7 +177,7 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
                 <button
                   onClick={handleJoinSignedIn}
                   disabled={isWorking}
-                  className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold disabled:opacity-60"
+                  className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold disabled:opacity-60"
                 >
                   {isWorking ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                   Accept invitation
@@ -187,7 +187,7 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
                   <p className="text-slate-600 dark:text-slate-300">
                     You're signed in as <strong>{signedInEmail}</strong>, but this invitation is for <strong>{invite.email}</strong>.
                   </p>
-                  <button onClick={signOut} className="px-5 py-2.5 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold">
+                  <button onClick={signOut} className="px-5 py-2.5 rounded bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold">
                     Sign out and continue
                   </button>
                 </div>
@@ -200,7 +200,7 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
                 <form onSubmit={handleSignInAndJoin} className="space-y-4">
                   <p className="text-sm text-slate-600 dark:text-slate-300">Sign in as <strong>{invite.email}</strong> to accept.</p>
                   <input type="password" required placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className={inputClass} />
-                  <button type="submit" disabled={isWorking} className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold disabled:opacity-60">
+                  <button type="submit" disabled={isWorking} className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold disabled:opacity-60">
                     {isWorking && <Loader2 className="w-4 h-4 animate-spin" />}
                     Sign in and join
                   </button>
@@ -214,7 +214,7 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
                     <input type="password" required placeholder="Choose a password" value={password} onChange={e => setPassword(e.target.value)} className={inputClass} />
                     <PasswordRequirements password={password} />
                   </div>
-                  <button type="submit" disabled={isWorking} className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold disabled:opacity-60">
+                  <button type="submit" disabled={isWorking} className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold disabled:opacity-60">
                     {isWorking && <Loader2 className="w-4 h-4 animate-spin" />}
                     Create account and join
                   </button>

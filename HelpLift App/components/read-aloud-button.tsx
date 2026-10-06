@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Volume2, VolumeX } from "lucide-react"
 import { isTextToSpeechSupported, useTextToSpeech } from "@/lib/text-to-speech"
+import { logClientAction } from "@/components/activity-tracker"
 
 // "Read aloud" - the mirror image of MicButton/speech-to-text: turns text
 // INTO speech instead of speech into text. Runs entirely via the browser's
@@ -35,6 +36,12 @@ export function ReadAloudButton({
 
   useEffect(() => setSupported(isTextToSpeechSupported()), [])
 
+  const toggle = () => {
+    if (speaking) return stop()
+    logClientAction("Used Read aloud", label)
+    speak(text)
+  }
+
   if (!supported || !text.trim()) return null
 
   if (iconOnly) {
@@ -42,10 +49,10 @@ export function ReadAloudButton({
       <span className={`inline-flex items-center ${className}`}>
         <button
           type="button"
-          onClick={() => (speaking ? stop() : speak(text))}
+          onClick={toggle}
           aria-label={speaking ? "Stop reading aloud" : `${label} - read aloud`}
           data-tip={speaking ? "Stop reading" : "Read this aloud"}
-          className={`inline-flex shrink-0 items-center justify-center rounded-full p-1 transition-colors ${
+          className={`inline-flex shrink-0 items-center justify-center rounded p-1 transition-colors ${
             speaking
               ? "bg-blue-600 text-white hover:bg-blue-700"
               : "text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"
@@ -61,10 +68,10 @@ export function ReadAloudButton({
     <span className={`inline-flex items-center gap-1.5 ${className}`}>
       <button
         type="button"
-        onClick={() => (speaking ? stop() : speak(text))}
+        onClick={toggle}
         aria-label={speaking ? "Stop reading aloud" : `${label} - read aloud`}
         data-tip={speaking ? "Stop reading" : "Read this aloud"}
-        className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold transition-colors ${
+        className={`inline-flex shrink-0 items-center gap-1 rounded px-2 py-1 text-[11px] font-bold transition-colors ${
           speaking
             ? "bg-blue-600 text-white hover:bg-blue-700"
             : "bg-slate-100 dark:bg-[#1A2740] text-slate-500 dark:text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"

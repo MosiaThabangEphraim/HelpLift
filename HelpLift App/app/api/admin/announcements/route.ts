@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/staged-uploads"
+import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 
@@ -41,11 +43,22 @@ export async function POST(request: Request) {
     const target = formData.get("target")?.toString()
     const title = formData.get("title")?.toString() || ""
     const message = formData.get("message")?.toString() || ""
-    const attachmentFiles = formData.getAll("attachments").filter((f): f is File => f instanceof File && f.size > 0)
+    const attachmentFiles = await readUploadedFiles(formData, "attachments")
+    { const uploadProblem = checkUploadLimits(attachmentFiles, UPLOAD_LIMITS.announcementAttachments); if (uploadProblem) return NextResponse.json({ message: uploadProblem }, { status: 400 }) }
 
-    const type: "notification" | "banner" | "both" = ["notification", "banner", "both"].includes(deliveryType || "") ? (deliveryType as any) : "notification"
-    const includesNotification = type !== "banner"
-    const includesBanner = type !== "notification"
+    // Channels: any combination of "notification", "banner" (login page) and
+    // "homepage" (public notice on the homepage). Older callers send a single
+    // deliveryType of notification / banner / both instead.
+    const channelsRaw = formData.get("channels")?.toString()
+    const channels = new Set(
+      channelsRaw
+        ? channelsRaw.split(",").map(c => c.trim()).filter(c => ["notification", "banner", "homepage"].includes(c))
+        : deliveryType === "banner" ? ["banner"] : deliveryType === "both" ? ["notification", "banner"] : ["notification"]
+    )
+    if (channels.size === 0) return NextResponse.json({ message: "Choose at least one way to deliver the announcement." }, { status: 400 })
+    const includesNotification = channels.has("notification")
+    const includesBanner = channels.has("banner")
+    const includesHomepage = channels.has("homepage")
 
     const trimmedTitle = title.trim()
     const trimmedMessage = message.trim()
@@ -156,7 +169,27 @@ export async function POST(request: Request) {
       if (bannerError) return NextResponse.json({ message: bannerError.message }, { status: 400 })
     }
 
-    return NextResponse.json({ success: true, recipientCount, bannerUpdated: includesBanner }, { status: 201 })
+    // Public notice on the homepage - everyone who opens the site sees it.
+    // Attachments use the same public bucket as the login banner.
+    if (includesHomepage) {
+      let noticeAttachments: UploadedFile[] = []
+      try {
+        noticeAttachments = await uploadAllTo("login-banner-attachments")
+      } catch (e: any) {
+        return NextResponse.json({ message: e.message }, { status: 400 })
+      }
+      const { error: noticeError } = await supabase
+        .from("platform_settings")
+        .upsert({
+          key: "homepage_notice",
+          value: { enabled: true, title: trimmedTitle, message: trimmedMessage, attachments: noticeAttachments },
+          updated_at: new Date().toISOString(),
+          updated_by: user.id,
+        }, { onConflict: "key" })
+      if (noticeError) return NextResponse.json({ message: noticeError.message }, { status: 400 })
+    }
+
+    return NextResponse.json({ success: true, recipientCount, bannerUpdated: includesBanner, homepageUpdated: includesHomepage }, { status: 201 })
   } catch (error) {
     console.error("Send announcement error:", error)
     return NextResponse.json({ message: "Unable to send announcement right now." }, { status: 503 })

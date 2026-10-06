@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { logClientAction } from "@/components/activity-tracker"
 import { RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -26,6 +27,7 @@ export function RefreshButton({
     const started = Date.now()
     try {
       await onRefresh()
+      logClientAction("Refreshed the page")
       toast.success("Up to date", { duration: 1500 })
     } catch {
       toast.error("Couldn't refresh - check your connection and try again.")
@@ -46,7 +48,7 @@ export function RefreshButton({
         aria-label="Refresh"
         data-tip="Load the latest updates"
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-70 transition-colors",
+          "inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-70 transition-colors",
           className
         )}
       >

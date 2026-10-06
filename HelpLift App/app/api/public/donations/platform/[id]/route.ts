@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/staged-uploads"
+import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 // Lets a guest (no account, no session) attach proof of an EFT payment to
@@ -46,7 +48,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const formData = await request.formData()
     const email = String(formData.get("email") || "")
     const payerNotes = String(formData.get("payer_notes") || "")
-    const proofFiles = formData.getAll("proofs").filter((f): f is File => f instanceof File && f.size > 0)
+    const proofFiles = await readUploadedFiles(formData, "proofs")
+    { const uploadProblem = checkUploadLimits(proofFiles, UPLOAD_LIMITS.donationProofs); if (uploadProblem) return NextResponse.json({ message: uploadProblem }, { status: 400 }) }
     if (!email) return NextResponse.json({ message: "Email required." }, { status: 400 })
     if (proofFiles.length === 0) {
       return NextResponse.json({ message: "Upload your proof of payment to continue." }, { status: 400 })

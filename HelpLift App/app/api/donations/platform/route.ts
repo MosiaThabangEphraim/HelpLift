@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { logUserAction } from "@/lib/activity-log"
 import { createClient } from "@/lib/supabase/server"
 import { getActiveBankAccounts } from "@/lib/bank-accounts"
 import { getPlatformDonationLimits } from "@/lib/platform-settings"
@@ -116,6 +117,7 @@ export async function POST(request: Request) {
       } catch (configError: any) {
         return NextResponse.json({ message: configError.message || "PayFast is not configured." }, { status: 503 })
       }
+      await logUserAction(supabase, "Started a donation to HelpLift", "PayFast")
       return NextResponse.json({ donation, payfast }, { status: 201 })
     }
 
@@ -132,9 +134,11 @@ export async function POST(request: Request) {
       } catch (configError: any) {
         return NextResponse.json({ message: configError.message || "PayPal is not configured." }, { status: 503 })
       }
+      await logUserAction(supabase, "Started a donation to HelpLift", "PayPal")
       return NextResponse.json({ donation, paypal }, { status: 201 })
     }
 
+    await logUserAction(supabase, "Started a donation to HelpLift", "EFT")
     return NextResponse.json({ donation, bank: bankAccount }, { status: 201 })
   } catch (error) {
     console.error("Platform donation creation error:", error)

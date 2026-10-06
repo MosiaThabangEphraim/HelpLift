@@ -53,7 +53,7 @@ export function InlineFeedback() {
       role="status"
       aria-live="polite"
       style={{ position: "fixed", left: position?.left ?? -9999, top: position?.top ?? -9999, visibility: position ? "visible" : "hidden" }}
-      className={`z-[9999] flex max-w-[280px] items-start gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold shadow-lg animate-in fade-in slide-in-from-bottom-1 duration-200 ${
+      className={`z-[9999] flex max-w-[280px] items-start gap-1.5 rounded px-3 py-2 text-xs font-semibold shadow-lg animate-in fade-in slide-in-from-bottom-1 duration-200 ${
         isError ? "bg-red-600 text-white" : "bg-emerald-600 text-white"
       }`}
     >

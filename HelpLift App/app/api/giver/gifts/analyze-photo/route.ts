@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/staged-uploads"
+import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { createClient } from "@/lib/supabase/server"
 import { getActiveCategoryNames } from "@/lib/need-categories"
 import { needSimilarity } from "@/lib/need-similarity"
@@ -57,7 +59,7 @@ export async function POST(request: Request) {
     if (profile?.role !== "giver") return NextResponse.json({ message: "Only givers can pledge offerings." }, { status: 403 })
 
     const formData = await request.formData()
-    const photo = formData.get("photo")
+    const photo = await readUploadedFile(formData, "photo")
     if (!(photo instanceof File) || photo.size === 0) return NextResponse.json({ message: "Take or choose a photo first." }, { status: 400 })
     if (!ALLOWED_TYPES.includes(photo.type) || !(await hasImageSignature(photo))) {
       return NextResponse.json({ message: "Use a JPG, PNG or WebP photo." }, { status: 400 })

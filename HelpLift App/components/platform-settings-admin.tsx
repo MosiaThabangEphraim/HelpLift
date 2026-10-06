@@ -47,10 +47,6 @@ export function PlatformSettingsAdmin() {
   const [donationMin, setDonationMin] = useState("0")
   const [donationMax, setDonationMax] = useState("")
   const [isSavingDonationLimits, setIsSavingDonationLimits] = useState(false)
-  const [loginBannerEnabled, setLoginBannerEnabled] = useState(false)
-  const [loginBannerMessage, setLoginBannerMessage] = useState("")
-  const [loginBannerAttachments, setLoginBannerAttachments] = useState<{ path: string; name: string }[]>([])
-  const [isSavingLoginBanner, setIsSavingLoginBanner] = useState(false)
 
   // --- Badge thresholds --- (all kept as strings for the number inputs,
   // parsed to numbers only when saving)
@@ -106,9 +102,6 @@ export function PlatformSettingsAdmin() {
       setWithdrawalMax(settings.withdrawalLimits?.max === null || settings.withdrawalLimits?.max === undefined ? "" : String(settings.withdrawalLimits.max))
       setDonationMin(String(settings.platformDonationLimits?.min ?? 0))
       setDonationMax(settings.platformDonationLimits?.max === null || settings.platformDonationLimits?.max === undefined ? "" : String(settings.platformDonationLimits.max))
-      setLoginBannerEnabled(!!settings.loginBanner?.enabled)
-      setLoginBannerMessage(settings.loginBanner?.message || "")
-      setLoginBannerAttachments(Array.isArray(settings.loginBanner?.attachments) ? settings.loginBanner.attachments : [])
       const g = settings.badgeThresholds?.giver
       const o = settings.badgeThresholds?.organization
       if (g) {
@@ -219,24 +212,6 @@ export function PlatformSettingsAdmin() {
     const data = await res.json().catch(() => ({}))
     setFeedback(res.ok ? { type: "success", text: "Platform donation limits saved." } : { type: "error", text: data.message || "Could not save." })
     setIsSavingDonationLimits(false)
-  }
-
-  // Setting/replacing the banner's text now happens via "Send Announcement"
-  // (deliver as "Login page banner" or "Both") - this just turns an already-
-  // live one back off, keeping its last message around in case it's turned
-  // back on the same way later.
-  const turnOffLoginBanner = async () => {
-    setIsSavingLoginBanner(true)
-    setFeedback(null)
-    const res = await fetch("/api/admin/settings", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key: "login_banner", value: { enabled: false, message: loginBannerMessage, attachments: loginBannerAttachments } }),
-    })
-    const data = await res.json().catch(() => ({}))
-    if (res.ok) setLoginBannerEnabled(false)
-    setFeedback(res.ok ? { type: "success", text: "Login banner turned off." } : { type: "error", text: data.message || "Could not save." })
-    setIsSavingLoginBanner(false)
   }
 
   const saveBadgeThresholds = async () => {
@@ -380,7 +355,7 @@ export function PlatformSettingsAdmin() {
     setBusyCategoryId(null)
   }
 
-  const inputClass = "w-full rounded-xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+  const inputClass = "w-full rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
 
   if (isLoading) {
     return <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-blue-600" /></div>
@@ -390,7 +365,7 @@ export function PlatformSettingsAdmin() {
     <div className="space-y-6">
 
       {/* --- Maintenance mode --- */}
-      <section className="rounded-2xl border border-slate-200 dark:border-[#233350] p-5 space-y-3">
+      <section className="rounded border border-slate-200 dark:border-[#233350] p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Wrench className="w-4 h-4 text-amber-600" />
           <h3 className="text-sm font-bold">Maintenance mode</h3>
@@ -426,35 +401,8 @@ export function PlatformSettingsAdmin() {
         </Button>
       </section>
 
-      {/* --- Login page banner --- */}
-      <section className="rounded-2xl border border-slate-200 dark:border-[#233350] p-5 space-y-3">
-        <div className="flex items-center gap-2">
-          <Megaphone className="w-4 h-4 text-blue-600" />
-          <h3 className="text-sm font-bold">Login page banner</h3>
-        </div>
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          A dismissible note shown to everyone who lands on the login page - set (or replaced) from "Send Announcement" (deliver as "Login page banner" or "Both"), not here.
-          This just shows its current status and lets you turn an already-live one off.
-        </p>
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-[#233350] p-3">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold">{loginBannerEnabled ? "On - shown on the login page" : "Off - nothing shown"}</p>
-            {loginBannerEnabled && loginBannerMessage && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">"{loginBannerMessage}"</p>}
-            {loginBannerEnabled && loginBannerAttachments.length > 0 && (
-              <p className="text-xs text-slate-400 mt-0.5">{loginBannerAttachments.length} attachment{loginBannerAttachments.length === 1 ? "" : "s"}</p>
-            )}
-          </div>
-          {loginBannerEnabled && (
-            <Button type="button" variant="outline" size="sm" onClick={turnOffLoginBanner} disabled={isSavingLoginBanner} className="shrink-0">
-              {isSavingLoginBanner ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              Turn off
-            </Button>
-          )}
-        </div>
-      </section>
-
       {/* --- Withdrawal limits --- */}
-      <section className="rounded-2xl border border-slate-200 dark:border-[#233350] p-5 space-y-3">
+      <section className="rounded border border-slate-200 dark:border-[#233350] p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Banknote className="w-4 h-4 text-blue-600" />
           <h3 className="text-sm font-bold">Withdrawal amounts</h3>
@@ -477,7 +425,7 @@ export function PlatformSettingsAdmin() {
       </section>
 
       {/* --- Support The Platform donation limits --- */}
-      <section className="rounded-2xl border border-slate-200 dark:border-[#233350] p-5 space-y-3">
+      <section className="rounded border border-slate-200 dark:border-[#233350] p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Heart className="w-4 h-4 text-pink-600" />
           <h3 className="text-sm font-bold">Support The Platform donation amounts</h3>
@@ -500,7 +448,7 @@ export function PlatformSettingsAdmin() {
       </section>
 
       {/* --- Badge thresholds --- */}
-      <section className="rounded-2xl border border-slate-200 dark:border-[#233350] p-5 space-y-4">
+      <section className="rounded border border-slate-200 dark:border-[#233350] p-5 space-y-4">
         <div className="flex items-center gap-2">
           <Award className="w-4 h-4 text-amber-600" />
           <h3 className="text-sm font-bold">Badge thresholds</h3>
@@ -550,7 +498,7 @@ export function PlatformSettingsAdmin() {
       </section>
 
       {/* --- Monthly spotlight override --- */}
-      <section className="rounded-2xl border border-slate-200 dark:border-[#233350] p-5 space-y-4">
+      <section className="rounded border border-slate-200 dark:border-[#233350] p-5 space-y-4">
         <div className="flex items-center gap-2">
           <Trophy className="w-4 h-4 text-amber-600" />
           <h3 className="text-sm font-bold">Giver / Organization of the Month</h3>
@@ -569,7 +517,7 @@ export function PlatformSettingsAdmin() {
                 type="button"
                 onClick={() => loadSpotlight(shiftPeriod(spotlightData.period, -1))}
                 data-tip="Previous month"
-                className="p-1.5 rounded-lg border border-slate-200 dark:border-[#233350] hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                className="p-1.5 rounded border border-slate-200 dark:border-[#233350] hover:bg-slate-50 dark:hover:bg-[#1A2740]"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -578,7 +526,7 @@ export function PlatformSettingsAdmin() {
                 type="button"
                 onClick={() => loadSpotlight(shiftPeriod(spotlightData.period, 1))}
                 data-tip="Next month"
-                className="p-1.5 rounded-lg border border-slate-200 dark:border-[#233350] hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                className="p-1.5 rounded border border-slate-200 dark:border-[#233350] hover:bg-slate-50 dark:hover:bg-[#1A2740]"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -588,12 +536,12 @@ export function PlatformSettingsAdmin() {
               {(["giver", "organization"] as const).map((subjectType) => {
                 const section = spotlightData[subjectType]
                 return (
-                  <div key={subjectType} className="rounded-xl border border-slate-200 dark:border-[#233350] p-3 space-y-2">
+                  <div key={subjectType} className="rounded border border-slate-200 dark:border-[#233350] p-3 space-y-2">
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
                       {subjectType === "giver" ? "Giver of the Month" : "Organization of the Month"}
                     </p>
                     {section.current ? (
-                      <div className="flex items-center justify-between gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 px-3 py-2">
+                      <div className="flex items-center justify-between gap-2 rounded bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 px-3 py-2">
                         <div className="min-w-0">
                           <p className="text-sm font-bold truncate">{section.current.name}</p>
                           <p className="text-[11px] text-slate-500 dark:text-slate-400">
@@ -617,7 +565,7 @@ export function PlatformSettingsAdmin() {
                               type="button"
                               onClick={() => selectSpotlightCandidate(subjectType, c.subjectId)}
                               disabled={busySpotlightKey === `${subjectType}:${c.subjectId}`}
-                              className="w-full flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-xs hover:bg-slate-50 dark:hover:bg-[#1A2740] disabled:opacity-50"
+                              className="w-full flex items-center justify-between gap-2 rounded px-2.5 py-1.5 text-xs hover:bg-slate-50 dark:hover:bg-[#1A2740] disabled:opacity-50"
                             >
                               <span className="truncate font-semibold">{c.name}</span>
                               <span className="text-slate-400 shrink-0">
@@ -638,7 +586,7 @@ export function PlatformSettingsAdmin() {
       </section>
 
       {/* --- Bank accounts --- */}
-      <section className="rounded-2xl border border-slate-200 dark:border-[#233350] p-5 space-y-4">
+      <section className="rounded border border-slate-200 dark:border-[#233350] p-5 space-y-4">
         <div className="flex items-center gap-2">
           <Banknote className="w-4 h-4 text-emerald-600" />
           <h3 className="text-sm font-bold">HelpLift's bank accounts</h3>
@@ -648,7 +596,7 @@ export function PlatformSettingsAdmin() {
         <div className="space-y-2">
           {bankAccounts.length === 0 && <p className="text-xs text-slate-400">No bank accounts yet.</p>}
           {bankAccounts.map(account => (
-            <div key={account.id} className={`rounded-xl border p-3 flex flex-wrap items-center justify-between gap-3 ${account.is_active ? "border-slate-200 dark:border-[#233350]" : "border-slate-200 dark:border-[#233350] opacity-60"}`}>
+            <div key={account.id} className={`rounded border p-3 flex flex-wrap items-center justify-between gap-3 ${account.is_active ? "border-slate-200 dark:border-[#233350]" : "border-slate-200 dark:border-[#233350] opacity-60"}`}>
               <div className="text-xs">
                 <p className="font-bold text-sm">{account.bank_name}{!account.is_active && <span className="ml-2 font-normal text-slate-400">(retired)</span>}</p>
                 <p className="text-slate-500 dark:text-slate-400">{account.account_name} · {account.account_number} · Branch {account.branch_code} · {account.account_type}{account.swift_code ? ` · ${account.swift_code}` : ""}</p>
@@ -659,7 +607,7 @@ export function PlatformSettingsAdmin() {
                   onClick={() => toggleBankActive(account)}
                   disabled={busyBankId === account.id}
                   data-tip={account.is_active ? "Hide this account from new donations, without affecting past ones" : "Offer this account to donors again"}
-                  className="rounded-full border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold hover:bg-slate-50 dark:hover:bg-[#1A2740] disabled:opacity-50"
+                  className="rounded border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold hover:bg-slate-50 dark:hover:bg-[#1A2740] disabled:opacity-50"
                 >
                   {busyBankId === account.id ? <Loader2 className="w-3 h-3 animate-spin" /> : account.is_active ? "Retire" : "Reactivate"}
                 </button>
@@ -669,7 +617,7 @@ export function PlatformSettingsAdmin() {
                   disabled={busyBankId === account.id}
                   aria-label="Delete"
                   data-tip="Permanently delete this account - only works if no donation has ever used it"
-                  className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-50"
+                  className="p-1.5 rounded text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-50"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -693,7 +641,7 @@ export function PlatformSettingsAdmin() {
       </section>
 
       {/* --- Need categories --- */}
-      <section className="rounded-2xl border border-slate-200 dark:border-[#233350] p-5 space-y-4">
+      <section className="rounded border border-slate-200 dark:border-[#233350] p-5 space-y-4">
         <div className="flex items-center gap-2">
           <Tag className="w-4 h-4 text-purple-600" />
           <h3 className="text-sm font-bold">Need categories</h3>
@@ -703,7 +651,7 @@ export function PlatformSettingsAdmin() {
         <div className="space-y-2">
           {categories.length === 0 && <p className="text-xs text-slate-400">No categories yet.</p>}
           {categories.map(category => (
-            <div key={category.id} className={`rounded-xl border p-3 flex flex-wrap items-center justify-between gap-3 ${category.is_active ? "border-slate-200 dark:border-[#233350]" : "border-slate-200 dark:border-[#233350] opacity-60"}`}>
+            <div key={category.id} className={`rounded border p-3 flex flex-wrap items-center justify-between gap-3 ${category.is_active ? "border-slate-200 dark:border-[#233350]" : "border-slate-200 dark:border-[#233350] opacity-60"}`}>
               {renamingId === category.id ? (
                 <input
                   autoFocus
@@ -718,24 +666,24 @@ export function PlatformSettingsAdmin() {
               <div className="flex items-center gap-2 shrink-0">
                 {renamingId === category.id ? (
                   <>
-                    <button type="button" onClick={() => saveRename(category)} disabled={busyCategoryId === category.id} data-tip="Save this name - needs already using the old name are updated too" className="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50">
+                    <button type="button" onClick={() => saveRename(category)} disabled={busyCategoryId === category.id} data-tip="Save this name - needs already using the old name are updated too" className="rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50">
                       {busyCategoryId === category.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
                     </button>
                     <button type="button" onClick={() => setRenamingId(null)} data-tip="Discard this rename" className="text-xs font-bold text-slate-500">Cancel</button>
                   </>
                 ) : (
                   <>
-                    <button type="button" onClick={() => { setRenamingId(category.id); setRenameValue(category.name) }} data-tip="Rename this category" className="rounded-full border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold hover:bg-slate-50 dark:hover:bg-[#1A2740]">Rename</button>
+                    <button type="button" onClick={() => { setRenamingId(category.id); setRenameValue(category.name) }} data-tip="Rename this category" className="rounded border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold hover:bg-slate-50 dark:hover:bg-[#1A2740]">Rename</button>
                     <button
                       type="button"
                       onClick={() => toggleCategoryActive(category)}
                       disabled={busyCategoryId === category.id}
                       data-tip={category.is_active ? "Hide this category from new needs, without affecting needs that already use it" : "Offer this category again"}
-                      className="rounded-full border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold hover:bg-slate-50 dark:hover:bg-[#1A2740] disabled:opacity-50"
+                      className="rounded border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold hover:bg-slate-50 dark:hover:bg-[#1A2740] disabled:opacity-50"
                     >
                       {busyCategoryId === category.id ? <Loader2 className="w-3 h-3 animate-spin" /> : category.is_active ? "Retire" : "Reactivate"}
                     </button>
-                    <button type="button" onClick={() => deleteCategory(category)} disabled={busyCategoryId === category.id} aria-label="Delete" data-tip="Permanently delete this category - only works if no need uses it" className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-50">
+                    <button type="button" onClick={() => deleteCategory(category)} disabled={busyCategoryId === category.id} aria-label="Delete" data-tip="Permanently delete this category - only works if no need uses it" className="p-1.5 rounded text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-50">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </>

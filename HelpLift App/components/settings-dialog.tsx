@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { AtSign, Bell, Bot, KeyRound, Mail, ShieldCheck, SlidersHorizontal, Star, Trash2, Type, UserRound } from "lucide-react"
+import { AtSign, Bell, Bot, Clock, KeyRound, Mail, MousePointerClick, ShieldCheck, SlidersHorizontal, Sparkles, Star, Trash2, Type, UserRound } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -24,6 +24,10 @@ import {
 } from "@/lib/notification-sound"
 import { getFontSizeLevel, setFontSizeLevel, type FontSizeLevel } from "@/lib/font-size"
 import { isAssistantEnabled, setAssistantEnabled } from "@/lib/assistant-preference"
+import { getReduceMotion, setReduceMotion } from "@/lib/reduce-motion"
+import { isClickSoundEnabled, playClickSound, setClickSoundEnabled } from "@/lib/click-sounds"
+import { isClockShown, setClockShown } from "@/lib/clock-preference"
+import { logClientAction } from "@/components/activity-tracker"
 
 const FONT_SIZE_OPTIONS: { value: FontSizeLevel; label: string; size: string }[] = [
   { value: "normal", label: "Normal text", size: "13px" },
@@ -45,8 +49,8 @@ function SettingRow({
   danger?: boolean
 }) {
   return (
-    <div className={`flex items-center gap-4 rounded-2xl border p-4 ${danger ? "border-red-200 dark:border-red-900/60" : "border-slate-200 dark:border-[#233350]"}`}>
-      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${danger ? "bg-red-50 dark:bg-red-950/40 text-red-600" : "bg-slate-100 dark:bg-[#1A2740] text-slate-600 dark:text-slate-300"}`}>
+    <div className={`flex items-center gap-4 rounded border p-4 ${danger ? "border-red-200 dark:border-red-900/60" : "border-slate-200 dark:border-[#233350]"}`}>
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded ${danger ? "bg-red-50 dark:bg-red-950/40 text-red-600" : "bg-slate-100 dark:bg-[#1A2740] text-slate-600 dark:text-slate-300"}`}>
         {icon}
       </div>
       <div className="min-w-0 flex-1">
@@ -103,6 +107,9 @@ export function SettingsDialog({
   const [soundChoice, setSoundChoice] = useState<NotificationSoundId>("chime")
   const [fontSize, setFontSize] = useState<FontSizeLevel>("normal")
   const [assistantOn, setAssistantOn] = useState(true)
+  const [reduceMotion, setReduceMotionState] = useState(false)
+  const [clickSounds, setClickSounds] = useState(false)
+  const [clockOn, setClockOn] = useState(true)
 
   useEffect(() => {
     if (open) {
@@ -110,22 +117,47 @@ export function SettingsDialog({
       setSoundChoice(getNotificationSoundChoice())
       setFontSize(getFontSizeLevel())
       setAssistantOn(isAssistantEnabled())
+      setReduceMotionState(getReduceMotion())
+      setClickSounds(isClickSoundEnabled())
+      setClockOn(isClockShown())
     }
   }, [open])
 
   const changeFontSize = (level: FontSizeLevel) => {
     setFontSize(level)
     setFontSizeLevel(level)
+    logClientAction("Changed settings", `Font size: ${level}`)
+  }
+
+  const changeClock = (next: boolean) => {
+    setClockOn(next)
+    setClockShown(next)
+    logClientAction("Changed settings", `Clock & date turned ${next ? "on" : "off"}`)
+  }
+
+  const changeClickSounds = (next: boolean) => {
+    setClickSounds(next)
+    setClickSoundEnabled(next)
+    logClientAction("Changed settings", `Click sounds turned ${next ? "on" : "off"}`)
+    if (next) playClickSound("toggle-on") // a sample, so people hear what they've turned on
+  }
+
+  const changeReduceMotion = (next: boolean) => {
+    setReduceMotionState(next)
+    setReduceMotion(next)
+    logClientAction("Changed settings", `Reduce motion turned ${next ? "on" : "off"}`)
   }
 
   const changeAssistant = (next: boolean) => {
     setAssistantOn(next)
     setAssistantEnabled(next)
+    logClientAction("Changed settings", `Lifty assistant turned ${next ? "on" : "off"}`)
   }
 
   const changeSound = (next: boolean) => {
     setSoundOn(next)
     setNotificationSoundEnabled(next)
+    logClientAction("Changed settings", `Notification sounds turned ${next ? "on" : "off"}`)
     if (next) {
       // The click is the interaction browsers need before allowing sound; play a
       // sample so people hear what they've turned on.
@@ -137,6 +169,7 @@ export function SettingsDialog({
   const changeSoundChoice = (id: NotificationSoundId) => {
     setSoundChoice(id)
     setNotificationSoundChoice(id)
+    logClientAction("Changed settings", `Notification sound: ${NOTIFICATION_SOUNDS.find(sound => sound.id === id)?.label || id}`)
     unlockNotificationSound()
     playNotificationSound(id)
   }
@@ -200,7 +233,7 @@ export function SettingsDialog({
           </SettingRow>
 
           {soundOn && (
-            <div className="rounded-2xl border border-slate-200 dark:border-[#233350] p-4 -mt-1">
+            <div className="rounded border border-slate-200 dark:border-[#233350] p-4 -mt-1">
               <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-2">Choose a sound</p>
               <div className="flex flex-wrap gap-1.5">
                 {NOTIFICATION_SOUNDS.map(option => (
@@ -210,7 +243,7 @@ export function SettingsDialog({
                     onClick={() => changeSoundChoice(option.id)}
                     aria-pressed={soundChoice === option.id}
                     data-tip={`Preview and use the "${option.label}" notification sound`}
-                    className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
+                    className={`rounded px-3 py-1.5 text-xs font-bold transition-colors ${
                       soundChoice === option.id
                         ? "bg-blue-600 text-white"
                         : "border border-slate-200 dark:border-[#233350] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
@@ -255,8 +288,47 @@ export function SettingsDialog({
             />
           </SettingRow>
 
+          <SettingRow
+            icon={<Clock className="h-5 w-5" />}
+            title="Clock & date"
+            description={clockOn ? "Shown at the top of your dashboard, on this device." : "Hidden on this device. Turn on to show the clock and date again."}
+          >
+            <Switch
+              checked={clockOn}
+              onCheckedChange={changeClock}
+              aria-label="Show clock and date"
+              data-tip={clockOn ? "Hide the clock and date" : "Show the clock and date"}
+            />
+          </SettingRow>
+
+          <SettingRow
+            icon={<MousePointerClick className="h-5 w-5" />}
+            title="Click sounds"
+            description={clickSounds ? "On - a soft click plays when you press buttons, links and tabs, on this device." : "Off - turn on to hear a soft click when you press buttons, links and tabs."}
+          >
+            <Switch
+              checked={clickSounds}
+              onCheckedChange={changeClickSounds}
+              aria-label="Click sounds"
+              data-tip={clickSounds ? "Turn click sounds off" : "Play a soft click on every press"}
+            />
+          </SettingRow>
+
+          <SettingRow
+            icon={<Sparkles className="h-5 w-5" />}
+            title="Reduce motion"
+            description={reduceMotion ? "On - animations and transitions are switched off, on this device." : "Off - tabs and panels animate smoothly. Turn on if motion is distracting or uncomfortable."}
+          >
+            <Switch
+              checked={reduceMotion}
+              onCheckedChange={changeReduceMotion}
+              aria-label="Reduce motion"
+              data-tip={reduceMotion ? "Turn animations back on" : "Switch off animations and transitions"}
+            />
+          </SettingRow>
+
           <SettingRow icon={<Type className="h-5 w-5" />} title="Font size" description="Makes text larger across the whole site, on this device.">
-            <div className="flex items-center gap-1 rounded-full border border-slate-200 dark:border-[#233350] p-1">
+            <div className="flex items-center gap-1 rounded border border-slate-200 dark:border-[#233350] p-1">
               {FONT_SIZE_OPTIONS.map((option) => (
                 <button
                   key={option.value}

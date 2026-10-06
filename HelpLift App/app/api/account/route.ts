@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { logUserAction } from "@/lib/activity-log"
 import { createClient } from "@/lib/supabase/server"
 import { createServerClient } from "@supabase/ssr"
 import { getOrgContext } from "@/lib/organization-access"
@@ -50,6 +51,7 @@ export async function PATCH(request: Request) {
     const { error } = await supabase.from("profiles").update(update).eq("id", user.id)
     if (error) return NextResponse.json({ message: error.message }, { status: 400 })
 
+    await logUserAction(supabase, "Changed settings", Object.entries(update).map(([key, on]) => `${key.replace(/_/g, " ")}: ${on ? "on" : "off"}`).join(", "))
     return NextResponse.json(update)
   } catch (error) {
     console.error("Account settings update error:", error)

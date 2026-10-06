@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { hashUnlockCode } from "@/lib/login-lockout"
+import { recordLoginAttempt } from "@/lib/login-audit"
 
 // Verifies the code emailed by lockAccountAndSendCode() and, if it matches
 // an unconsumed, unexpired one for this email, clears the lockout. No
@@ -30,12 +31,14 @@ export async function POST(req: Request) {
       .maybeSingle()
 
     if (!match) {
+      await recordLoginAttempt(req, { email, profileId: profile.id, outcome: "unlock_failed", detail: "Incorrect or expired unlock code" })
       return NextResponse.json({ success: false, message: "That code is incorrect or has expired. Request a new one." }, { status: 400 })
     }
 
     await admin.from("login_lockout_codes").update({ consumed_at: new Date().toISOString() }).eq("id", match.id)
     await admin.from("profiles").update({ failed_login_attempts: 0, locked_until: null }).eq("id", profile.id)
 
+    await recordLoginAttempt(req, { email, profileId: profile.id, outcome: "unlocked", detail: "Account unlocked with the emailed code" })
     return NextResponse.json({ success: true, message: "Account unlocked. You can now sign in." })
   } catch (error) {
     console.error("Login unlock error:", error)

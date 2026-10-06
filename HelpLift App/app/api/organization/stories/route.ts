@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server"
+import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/staged-uploads"
+import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
+import { logUserAction } from "@/lib/activity-log"
 import { createClient } from "@/lib/supabase/server"
 import { getOrgContext, roleAtLeast, insufficientRoleMessage } from "@/lib/organization-access"
 
@@ -71,10 +74,11 @@ export async function POST(request: Request) {
       authorRole = String(formData.get("author_role") || "")
       needId = (formData.get("need_id") as string) || null
       videoUrls = formData.getAll("video_urls").map((v) => String(v).trim()).filter(Boolean)
-      imageFiles = formData.getAll("images").filter((f): f is File => f instanceof File && f.size > 0)
+      imageFiles = await readUploadedFiles(formData, "images")
       // Singular fields kept for older callers; new clients send "images"/"video_urls".
-      const legacyFile = formData.get("image")
+      const legacyFile = await readUploadedFile(formData, "image")
       if (legacyFile instanceof File && legacyFile.size > 0) imageFiles.unshift(legacyFile)
+      { const uploadProblem = checkUploadLimits(imageFiles, UPLOAD_LIMITS.storyImages); if (uploadProblem) return NextResponse.json({ message: uploadProblem }, { status: 400 }) }
       const legacyVideoUrl = String(formData.get("video_url") || "").trim()
       if (legacyVideoUrl) videoUrls.unshift(legacyVideoUrl)
     } else {
@@ -157,6 +161,7 @@ export async function POST(request: Request) {
       if (mediaError) console.warn("Story media record warning:", mediaError.message)
     }
 
+    await logUserAction(supabase, "Shared an impact story", story?.title)
     return NextResponse.json({ success: true, story }, { status: 201 })
   } catch (err: any) {
     console.error("Post story exception:", err)

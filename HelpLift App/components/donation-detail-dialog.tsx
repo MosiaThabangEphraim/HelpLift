@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { stageFormFiles } from "@/lib/stage-uploads"
+import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { Banknote, CheckCircle2, Clock, Eye, FileText, Loader2, Mail, ThumbsDown, ThumbsUp, Trash2, UploadCloud, XCircle } from "lucide-react"
 import {
   Dialog,
@@ -142,7 +144,7 @@ export function DonationDetailDialog({ open, onOpenChange, donation, role, onCha
       const formData = new FormData()
       proofFiles.forEach((file) => formData.append("proofs", file))
       formData.append("payer_notes", payerNotes)
-      const res = await fetch(`/api/giver/donations/${donation.id}`, { method: "PATCH", body: formData })
+      const res = await fetch(`/api/giver/donations/${donation.id}`, { method: "PATCH", body: await stageFormFiles(formData, UPLOAD_LIMITS.donationProofs) })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.message || "Unable to submit proof of payment.")
       setProofFiles([])
@@ -244,15 +246,15 @@ export function DonationDetailDialog({ open, onOpenChange, donation, role, onCha
 
         <div className="space-y-4 pt-1">
           {error && (
-            <div className="rounded-xl bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">
+            <div className="rounded bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">
               {error}
             </div>
           )}
 
-          <div className="rounded-2xl border border-slate-200 dark:border-[#233350] p-4 space-y-2.5">
+          <div className="rounded border border-slate-200 dark:border-[#233350] p-4 space-y-2.5">
             <div className="flex items-center justify-between">
               <h3 className="font-bold text-base">{donation.needTitle}</h3>
-              <span className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${statusBadgeClasses(donation.status)}`}>
+              <span className={`rounded px-3 py-1 text-xs font-bold capitalize ${statusBadgeClasses(donation.status)}`}>
                 {donation.status === "pending" ? (donation.proof_storage_path ? "Pending Verification" : "Awaiting Payment") : donation.status}
               </span>
             </div>
@@ -284,7 +286,7 @@ export function DonationDetailDialog({ open, onOpenChange, donation, role, onCha
           </div>
 
           {bankAccount && (
-            <div className="rounded-2xl border border-slate-200 dark:border-[#233350] p-4 space-y-1.5">
+            <div className="rounded border border-slate-200 dark:border-[#233350] p-4 space-y-1.5">
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{bankAccount.bankName}</p>
               <p className="text-xs text-slate-500 dark:text-slate-400">Acc: {bankAccount.accountName} · {bankAccount.accountNumber} · Branch {bankAccount.branchCode}</p>
             </div>
@@ -325,9 +327,9 @@ export function DonationDetailDialog({ open, onOpenChange, donation, role, onCha
                     <div key={proof.id} className="relative">
                       <a href={proof.url || "#"} target="_blank" rel="noreferrer" className="block">
                         {proof.url && /\.pdf($|\?)/i.test(proof.url) ? (
-                          <span className="flex h-24 items-center justify-center rounded-xl border border-slate-200 dark:border-[#233350] text-xs font-bold text-blue-600 hover:underline text-center px-2">📄 {proof.file_name || "View PDF"}</span>
+                          <span className="flex h-24 items-center justify-center rounded border border-slate-200 dark:border-[#233350] text-xs font-bold text-blue-600 hover:underline text-center px-2">📄 {proof.file_name || "View PDF"}</span>
                         ) : (
-                          <img src={proof.url || undefined} alt={proof.file_name || "Proof of payment"} className="rounded-xl h-24 w-full object-cover border border-slate-200 dark:border-[#233350]" />
+                          <img src={proof.url || undefined} alt={proof.file_name || "Proof of payment"} className="rounded h-24 w-full object-cover border border-slate-200 dark:border-[#233350]" />
                         )}
                       </a>
                       {canManageProof && (
@@ -349,7 +351,7 @@ export function DonationDetailDialog({ open, onOpenChange, donation, role, onCha
                   {/\.pdf($|\?)/i.test(proofSignedUrl) ? (
                     <span className="inline-flex items-center gap-2 text-xs font-bold text-blue-600 hover:underline">📄 View uploaded PDF</span>
                   ) : (
-                    <img src={proofSignedUrl} alt="Proof of payment" className="rounded-xl max-h-64 w-full object-cover border border-slate-200 dark:border-[#233350]" />
+                    <img src={proofSignedUrl} alt="Proof of payment" className="rounded max-h-64 w-full object-cover border border-slate-200 dark:border-[#233350]" />
                   )}
                 </a>
               ) : (
@@ -363,13 +365,13 @@ export function DonationDetailDialog({ open, onOpenChange, donation, role, onCha
               first time, or add to / replace what's there while this
               donation still sits with admin for review. */}
           {isOwnPayer && (awaitingProof || canManageProof) && (
-            <div className="space-y-3 rounded-2xl border-2 border-dashed border-blue-200 dark:border-blue-900 p-4">
+            <div className="space-y-3 rounded border-2 border-dashed border-blue-200 dark:border-blue-900 p-4">
               <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">
                 {awaitingProof
                   ? "Made the transfer? Upload your proof of payment to send this for verification."
                   : "Still awaiting review - remove a file above, or add more proof of payment below."}
               </p>
-              <label className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 dark:border-[#233350] p-5 text-center cursor-pointer hover:border-blue-400 transition-colors">
+              <label className="flex flex-col items-center justify-center gap-2 rounded border-2 border-dashed border-slate-300 dark:border-[#233350] p-5 text-center cursor-pointer hover:border-blue-400 transition-colors">
                 <UploadCloud className="w-5 h-5 text-slate-400" />
                 <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                   {proofFiles.length === 0
@@ -379,6 +381,7 @@ export function DonationDetailDialog({ open, onOpenChange, donation, role, onCha
                     : `${proofFiles.length} files selected`}
                 </span>
                 <input type="file" multiple accept="image/*,application/pdf" className="hidden" onChange={(e) => setProofFiles(Array.from(e.target.files || []))} />
+                <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{describeUploadLimit(UPLOAD_LIMITS.donationProofs)}</span>
               </label>
               <div className="flex justify-end mb-1">
                 <GrammarCheckButton text={payerNotes} onTextChange={setPayerNotes} />
@@ -388,7 +391,7 @@ export function DonationDetailDialog({ open, onOpenChange, donation, role, onCha
                   value={payerNotes}
                   onChange={(e) => setPayerNotes(e.target.value)}
                   placeholder="Notes (optional)"
-                  className="w-full min-h-16 p-3 pr-11 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded-2xl text-sm outline-none focus:border-blue-500"
+                  className="w-full min-h-16 p-3 pr-11 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded text-sm outline-none focus:border-blue-500"
                 />
                 <MicButton className="top-2 right-2" onText={text => setPayerNotes(n => appendSpeech(n, text))} />
               </div>
@@ -404,7 +407,7 @@ export function DonationDetailDialog({ open, onOpenChange, donation, role, onCha
               was cancelled, failed, or abandoned, so without this it would
               sit as "pending" forever. */}
           {isOwnPayer && awaitingAutoConfirm && (
-            <div className="space-y-2 rounded-2xl border-2 border-dashed border-amber-200 dark:border-amber-900 p-4">
+            <div className="space-y-2 rounded border-2 border-dashed border-amber-200 dark:border-amber-900 p-4">
               <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">
                 This {donation.payment_method === "paypal" ? "PayPal" : "PayFast"} payment hasn't been completed. If the checkout didn't go through, cancel this attempt and try again.
               </p>
@@ -422,7 +425,7 @@ export function DonationDetailDialog({ open, onOpenChange, donation, role, onCha
               it failed, was cancelled, or was abandoned before checkout completed,
               never something with evidence for an admin to verify. */}
           {role === "admin" && donation.status === "pending" && isAutoConfirmMethod && (
-            <div className="space-y-3 rounded-2xl border-2 border-dashed border-amber-200 dark:border-amber-900 p-4">
+            <div className="space-y-3 rounded border-2 border-dashed border-amber-200 dark:border-amber-900 p-4">
               <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">
                 This {donation.payment_method === "paypal" ? "PayPal" : "PayFast"} payment never confirmed - {donation.payment_method === "paypal" ? "PayPal" : "PayFast"} notifies HelpLift automatically the moment a payment actually succeeds, so this means it failed, was cancelled, or was abandoned before checkout completed. There's nothing to verify here, only whether to close it out.
               </p>
@@ -435,7 +438,7 @@ export function DonationDetailDialog({ open, onOpenChange, donation, role, onCha
 
           {role === "admin" && donation.status === "pending" && !isAutoConfirmMethod && (
             <div className="space-y-3 pt-1">
-              <div className="space-y-1.5 rounded-2xl border border-slate-200 dark:border-[#233350] p-3">
+              <div className="space-y-1.5 rounded border border-slate-200 dark:border-[#233350] p-3">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Confirmed amount (edit if the proof of payment shows a different value)
                 </label>
@@ -447,7 +450,7 @@ export function DonationDetailDialog({ open, onOpenChange, donation, role, onCha
                     step="0.01"
                     value={reviewAmount}
                     onChange={(e) => setReviewAmount(e.target.value)}
-                    className="w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded-xl text-sm font-semibold outline-none focus:border-blue-500 transition-colors"
+                    className="w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded text-sm font-semibold outline-none focus:border-blue-500 transition-colors"
                   />
                 </div>
               </div>
@@ -461,7 +464,7 @@ export function DonationDetailDialog({ open, onOpenChange, donation, role, onCha
                     value={rejectNotes}
                     onChange={(e) => setRejectNotes(e.target.value)}
                     placeholder="Reason for rejection (optional, shared with the donor)..."
-                    className="w-full min-h-16 p-3 pr-11 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded-2xl text-sm outline-none focus:border-red-500"
+                    className="w-full min-h-16 p-3 pr-11 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded text-sm outline-none focus:border-red-500"
                   />
                   <MicButton className="top-2 right-2" onText={text => setRejectNotes(n => appendSpeech(n, text))} />
                   </div>
@@ -499,7 +502,7 @@ export function DonationDetailDialog({ open, onOpenChange, donation, role, onCha
           )}
 
           {donation.status !== "pending" && (
-            <div className={`flex items-center gap-2 rounded-xl p-3 text-sm font-semibold ${statusBadgeClasses(donation.status)}`}>
+            <div className={`flex items-center gap-2 rounded p-3 text-sm font-semibold ${statusBadgeClasses(donation.status)}`}>
               {donation.status === "successful" ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <XCircle className="w-4 h-4 shrink-0" />}
               This donation has been {donation.status === "successful" ? "confirmed as successful" : "marked unsuccessful"}.
             </div>
@@ -553,7 +556,7 @@ export function DonationDetailDialog({ open, onOpenChange, donation, role, onCha
           )}
 
           {isOwnPayer && donation.status === "pending" && donation.proof_storage_path && (
-            <div className="flex items-center gap-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 p-3 text-sm font-semibold text-amber-700 dark:text-amber-300">
+            <div className="flex items-center gap-2 rounded bg-amber-50 dark:bg-amber-950/40 p-3 text-sm font-semibold text-amber-700 dark:text-amber-300">
               <Clock className="w-4 h-4 shrink-0" />
               Awaiting admin verification.
             </div>

@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { logUserAction } from "@/lib/activity-log"
 
 const ALLOWED_STATUSES = new Set(["pending", "approved", "rejected", "more_info_requested"])
+// Banking details are deliberately NOT here: payouts go to them, so only the
+// organization's own owner may change them.
 const ALLOWED_FIELDS = new Set([
   "name",
   "type",
+  "registration_number",
+  "contact_name",
+  "contact_role",
+  "mission",
   "contact_email",
   "phone",
   "address",
@@ -87,6 +94,9 @@ export async function PATCH(
         console.error("Organization verification notification insert failed:", e)
       }
     }
+
+    const verdict = update.verification_status !== undefined ? ` - marked ${update.verification_status}` : ""
+    await logUserAction(supabase, "Edited an organization", `${organization?.name || organizationOwner?.name || "Organization"}${verdict}`)
 
     return NextResponse.json({ organization })
   } catch (error) {

@@ -1,5 +1,9 @@
 "use client"
 import { FormEvent, useEffect, useMemo, useState } from "react"
+import { useTabTransition } from "@/lib/use-tab-transition"
+import { CountUp } from "@/components/count-up"
+import { stageFormFiles } from "@/lib/stage-uploads"
+import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { showFeedback } from "@/lib/inline-feedback"
@@ -79,7 +83,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { FeedbackButton } from "@/components/feedback-button"
 import { SupportPlatformDialog } from "@/components/support-platform-dialog"
 import { SettingsDialog } from "@/components/settings-dialog"
-import { LiveClock } from "@/components/live-clock"
+import { AnalogClock } from "@/components/analog-clock"
 import { PasskeyPrompt } from "@/components/passkey-prompt"
 import { useNotificationAlerts } from "@/hooks/use-notification-alerts"
 import { GiverAnalytics } from "@/components/analytics/giver-analytics"
@@ -87,6 +91,7 @@ import { UserAvatar } from "@/components/user-avatar"
 import { OrgLogo } from "@/components/org-logo"
 import { SnapToPledge } from "@/components/snap-to-pledge"
 import { DashboardTour } from "@/components/dashboard-tour"
+import { recordSignOut } from "@/components/activity-tracker"
 import { RefreshButton } from "@/components/refresh-button"
 import { MessageViewToggle, SentMessages } from "@/components/sent-messages"
 import { optimizeAndValidateFile } from "@/lib/media-optimizer";
@@ -219,6 +224,8 @@ export default function GiverDashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSending, setIsSending] = useState(false)
   const [activeTab, setActiveTab] = useState("needs")
+  // Smooth tab transitions (lib/use-tab-transition.ts), in tab-bar order.
+  const { changeTab, tabMotion } = useTabTransition(["needs", "interests", "gifts", "fulfillments", "donations", "messages", "analytics"], activeTab, setActiveTab)
   const [payfastBanner, setPayfastBanner] = useState<"success" | "cancelled" | null>(null)
   const [paypalBanner, setPaypalBanner] = useState<"success" | "cancelled" | null>(null)
   // Which donation the PayFast/PayPal return banner is about, once its id is
@@ -284,6 +291,14 @@ export default function GiverDashboardPage() {
   const [needsView, setNeedsView] = useState<ListView>("grid")
   const [myGiftsView, setMyGiftsView] = useState<ListView>("grid")
   const [detailNeed, setDetailNeed] = useState<Need | null>(null)
+
+  // Bumped by the header's refresh button: sections that load their own data
+  // (given it as refreshKey below) re-fetch too - in place, keeping their filters.
+  const [refreshKey, setRefreshKey] = useState(0)
+  const refreshAll = async () => {
+    setRefreshKey(key => key + 1)
+    await loadData()
+  }
 
   const loadData = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -469,10 +484,15 @@ export default function GiverDashboardPage() {
     formData.set("need_id", selectedNeed.id)
     formData.set("message", message)
     interestPhotos.forEach(file => formData.append("photos", file))
-    const response = await fetch("/api/giver/interests", {
-      method: "POST",
-      body: formData,
-    })
+    let body: FormData
+    try {
+      body = await stageFormFiles(formData, UPLOAD_LIMITS.interestPhotos)
+    } catch (err: any) {
+      setError(err.message)
+      setIsSending(false)
+      return
+    }
+    const response = await fetch("/api/giver/interests", { method: "POST", body })
 
     if (!response.ok) {
       setError((await response.json()).message || "Interest submission failed.")
@@ -496,7 +516,7 @@ export default function GiverDashboardPage() {
       giftPhotos.forEach(file => formData.append("photos", file))
       const res = await fetch("/api/giver/gifts", {
         method: "POST",
-        body: formData,
+        body: await stageFormFiles(formData, UPLOAD_LIMITS.giftPhotos),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || "Failed to pledge gift.")
@@ -582,6 +602,7 @@ export default function GiverDashboardPage() {
   }
 
   const logout = async () => {
+    await recordSignOut()
     await supabase.auth.signOut()
     router.replace("/login")
   }
@@ -643,7 +664,7 @@ export default function GiverDashboardPage() {
       const formData = new FormData()
       formData.append("avatar", optimizedFile)
 
-      const res = await fetch("/api/giver/avatar", { method: "POST", body: formData })
+      const res = await fetch("/api/giver/avatar", { method: "POST", body: await stageFormFiles(formData, UPLOAD_LIMITS.avatar) })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.message || "Could not upload the picture.")
       setGiver(current => (current ? { ...current, avatar_url: data.avatar_url } : current))
@@ -818,7 +839,7 @@ export default function GiverDashboardPage() {
       <div className="mx-auto max-w-[2400px] px-4 md:px-10 py-10 md:py-14 space-y-6">
 
         <div className="flex justify-end">
-          <LiveClock />
+          <AnalogClock />
         </div>
 
         {/* --- HEADER --- */}
@@ -838,7 +859,7 @@ export default function GiverDashboardPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <RefreshButton onRefresh={loadData} />
+            <RefreshButton onRefresh={refreshAll} />
             <Link
               href="/"
               aria-label="Home"
@@ -954,7 +975,7 @@ export default function GiverDashboardPage() {
         </header>
 
         {/* --- STATS ROW --- */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
           <StatCard icon={ClipboardList} label="Needs For You" value={stats.openNeeds} accent="blue" />
           <StatCard icon={Users} label="Pending Interests" value={stats.myInterests} accent="emerald" />
           <StatCard icon={Gift} label="Active Gift Pledges" value={stats.myGifts} accent="purple" />
@@ -962,7 +983,7 @@ export default function GiverDashboardPage() {
         </div>
 
         {/* --- TABS --- */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-6">
+        <Tabs value={activeTab} onValueChange={changeTab} className="gap-6">
           <TabsList className="w-full flex-nowrap justify-start overflow-x-auto">
             <TabsTrigger value="needs" data-tour="tab-needs" className="shrink-0 gap-1.5"><ClipboardList className="w-4 h-4" />Browse Needs</TabsTrigger>
             <TabsTrigger value="interests" data-tour="tab-interests" className="shrink-0 gap-1.5"><Users className="w-4 h-4" />My Interests</TabsTrigger>
@@ -974,7 +995,7 @@ export default function GiverDashboardPage() {
           </TabsList>
 
           {/* --- BROWSE NEEDS TAB --- */}
-          <TabsContent value="needs">
+          <TabsContent value="needs" className={tabMotion}>
             <Card>
               <CardHeader className="flex-row items-center justify-between space-y-0">
                 <div>
@@ -1147,7 +1168,7 @@ export default function GiverDashboardPage() {
           </TabsContent>
 
           {/* --- MY INTERESTS TAB --- */}
-          <TabsContent value="interests">
+          <TabsContent value="interests" className={tabMotion}>
             <Card>
               <CardHeader>
                 <CardTitle>My interests</CardTitle>
@@ -1185,7 +1206,7 @@ export default function GiverDashboardPage() {
                               target="_blank"
                               rel="noreferrer"
                               data-tip="Open this photo full-size in a new tab"
-                              className="block w-12 h-12 rounded-lg overflow-hidden border border-slate-200 dark:border-[#233350] shrink-0"
+                              className="block w-12 h-12 rounded overflow-hidden border border-slate-200 dark:border-[#233350] shrink-0"
                             >
                               {photo.url && <img src={photo.url} alt={photo.file_name || "Attached photo"} className="w-full h-full object-cover" />}
                             </a>
@@ -1200,7 +1221,7 @@ export default function GiverDashboardPage() {
           </TabsContent>
 
           {/* --- GIFT LIBRARY TAB --- */}
-          <TabsContent value="gifts">
+          <TabsContent value="gifts" className={tabMotion}>
             <Card>
               <CardHeader className="flex-row items-center justify-between space-y-0">
                 <div>
@@ -1267,7 +1288,7 @@ export default function GiverDashboardPage() {
           </TabsContent>
 
           {/* --- FULFILLMENTS TAB --- */}
-          <TabsContent value="fulfillments">
+          <TabsContent value="fulfillments" className={tabMotion}>
             <Card>
               <CardHeader>
                 <CardTitle>Fulfillment tracking</CardTitle>
@@ -1311,7 +1332,7 @@ export default function GiverDashboardPage() {
           </TabsContent>
 
           {/* --- MY DONATIONS TAB --- */}
-          <TabsContent value="donations">
+          <TabsContent value="donations" className={tabMotion}>
             <Card>
               <CardHeader>
                 <CardTitle>My monetary donations</CardTitle>
@@ -1398,7 +1419,7 @@ export default function GiverDashboardPage() {
           </TabsContent>
 
           {/* --- MESSAGES TAB --- */}
-          <TabsContent value="messages">
+          <TabsContent value="messages" className={tabMotion}>
             <Card>
               <CardHeader>
                 <CardTitle>Messages</CardTitle>
@@ -1432,11 +1453,11 @@ export default function GiverDashboardPage() {
                     </div>
                   ))
                 ))}
-                {messageView === "sent" && <SentMessages canReply={true} />}
+                {messageView === "sent" && <SentMessages refreshKey={refreshKey} canReply={true} />}
               </CardContent>
             </Card>
           </TabsContent>
-          <TabsContent value="analytics">
+          <TabsContent value="analytics" className={tabMotion}>
             <GiverAnalytics donations={donations as any} interests={interests as any} fulfillments={fulfillments as any} gifts={myGifts} />
           </TabsContent>
         </Tabs>
@@ -1445,7 +1466,7 @@ export default function GiverDashboardPage() {
         <Dialog open={showBadges} onOpenChange={setShowBadges}>
           <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
             <DialogTitle className="sr-only">Badges</DialogTitle>
-            <BadgesPanel endpoint="/api/giver/badges" />
+            <BadgesPanel refreshKey={refreshKey} endpoint="/api/giver/badges" />
           </DialogContent>
         </Dialog>
 
@@ -1587,6 +1608,7 @@ export default function GiverDashboardPage() {
                       e.target.value = ""
                     }}
                   />
+                    <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{describeUploadLimit(UPLOAD_LIMITS.interestPhotos)}</span>
                 </label>
               </div>
 
@@ -1747,6 +1769,7 @@ export default function GiverDashboardPage() {
                         e.target.value = ""
                       }}
                     />
+                      <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{describeUploadLimit(UPLOAD_LIMITS.giftPhotos)}</span>
                   </label>
                 </div>
 
@@ -1792,7 +1815,7 @@ export default function GiverDashboardPage() {
       />
 
       <Dialog open={isEditingProfile} onOpenChange={open => !open && closeProfileDialog()}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent showCloseButton={false} className="sm:max-w-lg">
           <DialogHeader className="flex flex-row items-center justify-between">
             <DialogTitle>
               {profileDialogMode === "email" ? "Change Email" : profileDialogMode === "password" ? "Change Password" : profileDialogMode === "delete" ? "Delete Account" : "Edit Your Profile"}
@@ -1847,6 +1870,7 @@ export default function GiverDashboardPage() {
                         disabled={isUpdatingAvatar}
                         onChange={event => { changeAvatar(event.target.files?.[0]); event.target.value = "" }}
                       />
+                        <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{describeUploadLimit(UPLOAD_LIMITS.avatar)}</span>
                     </label>
                     {giver.avatar_url && (
                       <button type="button" onClick={removeAvatar} disabled={isUpdatingAvatar} className="text-xs font-bold text-red-600 hover:underline disabled:opacity-60">
@@ -2050,10 +2074,10 @@ export default function GiverDashboardPage() {
                 </div>
                 {display.description && <p className="text-sm text-slate-600 dark:text-slate-300">{display.description}</p>}
                 <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  {display.location && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded-lg">📍 {display.location}</span>}
-                  {display.quantity && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded-lg">Qty: {display.quantity}</span>}
-                  {display.dueDate && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded-lg">Due {display.dueDate}</span>}
-                  {display.conditions && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded-lg">Terms: {display.conditions}</span>}
+                  {display.location && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded">📍 {display.location}</span>}
+                  {display.quantity && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded">Qty: {display.quantity}</span>}
+                  {display.dueDate && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded">Due {display.dueDate}</span>}
+                  {display.conditions && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded">Terms: {display.conditions}</span>}
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
@@ -2198,21 +2222,23 @@ export default function GiverDashboardPage() {
   )
 }
 
-function StatCard({ icon: Icon, label, value, accent }: { icon: React.ComponentType<{ className?: string }>; label: string; value: number; accent: "blue" | "emerald" | "amber" | "purple" }) {
+function StatCard({ icon: Icon, label, value, accent }: { icon: React.ComponentType<{ className?: string }>; label: string; value: number; accent: "blue" | "emerald" | "amber" | "purple" | "pink" }) {
   const accentClasses = {
-    blue: "bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400",
-    emerald: "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400",
-    amber: "bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400",
-    purple: "bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400",
+    blue: "text-blue-600 dark:text-blue-400",
+    emerald: "text-emerald-600 dark:text-emerald-400",
+    amber: "text-amber-600 dark:text-amber-400",
+    purple: "text-purple-600 dark:text-purple-400",
+    pink: "text-pink-600 dark:text-pink-400",
   }[accent]
 
+  // Same flat design as the admin dashboard's tiles: no box or fill, just a rule above and below.
   return (
-    <div className="rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] p-4 flex items-center gap-3 shadow-sm">
-      <div className={`rounded p-2.5 ${accentClasses}`}>
-        <Icon className="w-5 h-5" />
-      </div>
+    <div className="flex items-center gap-3 border-y border-slate-200 dark:border-[#233350] py-3">
+      <Icon className={`h-5 w-5 shrink-0 ${accentClasses}`} />
       <div>
-        <p className="text-2xl font-extrabold leading-none">{value}</p>
+        <p className="text-2xl font-extrabold leading-none">
+          <CountUp value={value} />
+        </p>
         <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">{label}</p>
       </div>
     </div>

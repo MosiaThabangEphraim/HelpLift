@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/staged-uploads"
+import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { createClient } from "@/lib/supabase/server"
 
 export async function GET(
@@ -57,10 +59,11 @@ export async function PATCH(
     const { id } = await context.params
     const formData = await request.formData()
     const payerNotes = String(formData.get("payer_notes") || "")
-    const proofFiles = formData.getAll("proofs").filter((f): f is File => f instanceof File && f.size > 0)
+    const proofFiles = await readUploadedFiles(formData, "proofs")
     // "proof" (singular) kept for older callers; new clients send "proofs".
-    const legacyFile = formData.get("proof")
+    const legacyFile = await readUploadedFile(formData, "proof")
     if (legacyFile instanceof File && legacyFile.size > 0) proofFiles.unshift(legacyFile)
+    { const uploadProblem = checkUploadLimits(proofFiles, UPLOAD_LIMITS.donationProofs); if (uploadProblem) return NextResponse.json({ message: uploadProblem }, { status: 400 }) }
     if (proofFiles.length === 0) {
       return NextResponse.json({ message: "Upload your proof of payment to continue." }, { status: 400 })
     }

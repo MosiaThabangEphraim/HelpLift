@@ -99,7 +99,7 @@ export function FeedbackButton({ className = "" }: { className?: string }) {
           ) : (
             <form onSubmit={submit} className="space-y-4 pt-1">
               {error && (
-                <div className="rounded-xl bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">{error}</div>
+                <div className="rounded bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">{error}</div>
               )}
 
               <div className="space-y-2">
@@ -137,7 +137,7 @@ export function FeedbackButton({ className = "" }: { className?: string }) {
                     onChange={e => setMessage(e.target.value)}
                     maxLength={2000}
                     placeholder="What's working well? What's confusing, missing or could be better?"
-                    className="w-full min-h-32 rounded-xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-3 py-2 pr-11 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    className="w-full min-h-32 rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-3 py-2 pr-11 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   />
                   <MicButton className="top-2 right-2" onText={text => setMessage(m => appendSpeech(m, text))} />
                 </div>

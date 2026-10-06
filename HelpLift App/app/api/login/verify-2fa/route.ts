@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { hashTwoFactorCode } from "@/lib/two-factor"
+import { recordLoginAttempt } from "@/lib/login-audit"
+import { logActivity } from "@/lib/activity-log"
 
 // Completes a sign-in that api/login paused for two-factor. The attempt
 // token (not the email) is what proves a correct password was already
@@ -27,6 +29,10 @@ export async function POST(request: Request) {
       .maybeSingle()
 
     if (!match) {
+      // Whose sign-in this was, from the attempt token alone (for the log).
+      const { data: attempt } = await admin.from("two_factor_codes").select("profile_id").eq("attempt_token", attemptToken).limit(1).maybeSingle()
+      const { data: who } = attempt ? await admin.from("profiles").select("email").eq("id", attempt.profile_id).maybeSingle() : { data: null }
+      await recordLoginAttempt(request, { email: who?.email, profileId: attempt?.profile_id, outcome: "two_factor_failed", portal: adminPortal ? "admin" : "user", detail: "Incorrect or expired two-factor code" })
       return NextResponse.json({ success: false, message: "That code is incorrect or has expired. Request a new one." }, { status: 400 })
     }
     await admin.from("two_factor_codes").update({ consumed_at: new Date().toISOString() }).eq("id", match.id)
@@ -64,6 +70,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: "This account does not have administrator access." }, { status: 403 })
     }
 
+    await recordLoginAttempt(request, { email: profile.email, profileId: profile.id, outcome: "two_factor_passed", portal: adminPortal ? "admin" : "user", detail: "Signed in with password + two-factor code" })
+    await logActivity({ profileId: profile.id, role: profile.role, action: "Signed in", detail: "Email, password and two-factor code" })
     return NextResponse.json({
       success: true,
       message: "Login successful",

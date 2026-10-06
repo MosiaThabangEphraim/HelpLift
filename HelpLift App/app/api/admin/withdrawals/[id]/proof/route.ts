@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/staged-uploads"
+import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { createClient } from "@/lib/supabase/server"
 import { formatCurrency } from "@/lib/banking"
 import { sendEmail } from "@/lib/mailer"
@@ -26,7 +28,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     }
 
     const formData = await request.formData()
-    const file = formData.get("file")
+    const file = await readUploadedFile(formData, "file")
+    { const uploadProblem = checkUploadLimits(file ? [file] : [], UPLOAD_LIMITS.withdrawalProof); if (uploadProblem) return NextResponse.json({ message: uploadProblem }, { status: 400 }) }
     if (!(file instanceof File) || file.size === 0) {
       return NextResponse.json({ message: "Attach a proof of payment file." }, { status: 400 })
     }

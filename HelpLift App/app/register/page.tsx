@@ -1,6 +1,8 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { stageFormFiles } from "@/lib/stage-uploads"
+import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -135,7 +137,7 @@ export default function RegisterPage() {
 
       const response = await fetch("/api/register", {
         method: "POST",
-        body: formData,
+        body: await stageFormFiles(formData, UPLOAD_LIMITS.registrationDocuments),
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.message || "Registration failed.")
@@ -351,6 +353,7 @@ export default function RegisterPage() {
                           }}
                           className="sr-only"
                         />
+                          <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{describeUploadLimit(UPLOAD_LIMITS.registrationDocuments)}</span>
                       </label>
                       {documents.length > 1 && (
                         <button

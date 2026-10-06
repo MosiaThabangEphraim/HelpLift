@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/staged-uploads"
+import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { isPasswordValid } from "@/lib/password"
@@ -35,8 +37,9 @@ export async function POST(request: Request) {
     let documentTypes: string[] = []
     if ((request.headers.get("content-type") || "").includes("multipart/form-data")) {
       const formData = await request.formData()
-      formData.forEach((value, key) => { if (typeof value === "string") body[key] = value })
-      documentFiles = formData.getAll("documentFiles").filter((f): f is File => f instanceof File && f.size > 0)
+      formData.forEach((value, key) => { if (typeof value === "string" && !isStagedReference(value)) body[key] = value })
+      documentFiles = await readUploadedFiles(formData, "documentFiles")
+      { const uploadProblem = checkUploadLimits(documentFiles, UPLOAD_LIMITS.registrationDocuments); if (uploadProblem) return NextResponse.json({ message: uploadProblem }, { status: 400 }) }
       try {
         const parsed = JSON.parse(String(formData.get("documentTypes") || "[]"))
         if (Array.isArray(parsed)) documentTypes = parsed

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { logUserAction } from "@/lib/activity-log"
 import { createClient } from "@/lib/supabase/server"
 import { getOrgContext, roleAtLeast, insufficientRoleMessage } from "@/lib/organization-access"
 
@@ -48,6 +49,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       console.warn("Interest decision notification warning:", notifyErr)
     }
 
+    await logUserAction(supabase, status === "accepted" ? "Accepted an offer to help" : "Declined an offer to help")
     return NextResponse.json({ interest: updated })
   } catch (error) {
     console.error("Organization interest update error:", error)

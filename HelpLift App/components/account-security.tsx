@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { createClient } from "@/lib/supabase/client"
 
-const fieldClass = "w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+const fieldClass = "w-full rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
 
 /**
  * Two-step email change: request (calls updateUser({ email }), which makes
@@ -65,7 +65,7 @@ export function ChangeEmailFlow({ currentEmail, onBack, onUpdated }: { currentEm
       <button type="button" onClick={onBack} className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
         <ArrowLeft className="w-3.5 h-3.5" /> Back to profile
       </button>
-      {error && <div className="rounded-xl bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">{error}</div>}
+      {error && <div className="rounded bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">{error}</div>}
 
       {step === "request" ? (
         <form onSubmit={handleRequest} className="space-y-3">
@@ -157,7 +157,7 @@ export function ChangePasswordFlow({ onBack, onUpdated }: { onBack: () => void; 
       <button type="button" onClick={onBack} className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
         <ArrowLeft className="w-3.5 h-3.5" /> Back to profile
       </button>
-      {error && <div className="rounded-xl bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">{error}</div>}
+      {error && <div className="rounded bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">{error}</div>}
 
       {step === "request" ? (
         <div className="space-y-3">
@@ -246,11 +246,11 @@ export function DeleteAccountFlow({ onBack }: { onBack: () => void }) {
       <button type="button" onClick={onBack} className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
         <ArrowLeft className="w-3.5 h-3.5" /> Back to profile
       </button>
-      <div className="flex items-start gap-2 rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 p-3 text-sm font-semibold text-red-700 dark:text-red-300">
+      <div className="flex items-start gap-2 rounded border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 p-3 text-sm font-semibold text-red-700 dark:text-red-300">
         <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
         <span>This permanently deletes your account and all associated data - needs, donations, messages, everything. This cannot be undone.</span>
       </div>
-      {error && <div className="rounded-xl bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">{error}</div>}
+      {error && <div className="rounded bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">{error}</div>}
       <form onSubmit={handleSubmit} className="space-y-3">
         <div className="space-y-1">
           <Label htmlFor="delete-account-password">Current password</Label>

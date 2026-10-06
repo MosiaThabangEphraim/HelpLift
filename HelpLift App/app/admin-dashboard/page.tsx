@@ -1,9 +1,15 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState, FormEvent } from "react"
+import { useTabTransition } from "@/lib/use-tab-transition"
+import { AdminDeleteButton } from "@/components/admin-delete-button"
+import { stageFormFiles } from "@/lib/stage-uploads"
+import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { RefreshButton } from "@/components/refresh-button"
+import { DashboardTour } from "@/components/dashboard-tour"
+import { recordSignOut } from "@/components/activity-tracker"
 import { showFeedback } from "@/lib/inline-feedback"
 import {
   Building2,
@@ -41,6 +47,8 @@ import {
   Heart,
   Globe,
   Home,
+  Activity,
+  Code2,
 } from "lucide-react"
 import {
   Area,
@@ -82,7 +90,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { SettingsDialog } from "@/components/settings-dialog"
-import { LiveClock } from "@/components/live-clock"
+import { AnalogClock } from "@/components/analog-clock"
 import { ChangeEmailFlow, ChangePasswordFlow } from "@/components/account-security"
 import { MicButton } from "@/components/mic-button"
 import { GrammarCheckButton } from "@/components/grammar-check-button"
@@ -95,6 +103,9 @@ import { MessageComposeDialog } from "@/components/message-compose-dialog"
 import { RejectReasonDialog } from "@/components/reject-reason-dialog"
 import { MessageViewToggle, SentMessages } from "@/components/sent-messages"
 import { AdminFeedback } from "@/components/admin-feedback"
+import { AdminLoginActivity } from "@/components/admin-login-activity"
+import { AdminLiveActivity } from "@/components/admin-live-activity"
+import { AdminDeveloperReports } from "@/components/admin-developer-reports"
 import { AdminFulfillmentsView, type AdminFulfillment } from "@/components/admin-fulfillments"
 import { PlatformSettingsAdmin } from "@/components/platform-settings-admin"
 import { MessageDetailDialog } from "@/components/message-detail-dialog"
@@ -254,7 +265,17 @@ export default function AdminDashboardPage() {
   const [selectedNeedDetail, setSelectedNeedDetail] = useState<Need | null>(null)
   const [withdrawals, setWithdrawals] = useState<AdminWithdrawal[]>([])
   const [selectedUserDetail, setSelectedUserDetail] = useState<Profile | null>(null)
-  const [activeTab, setActiveTab] = useState<"organizations" | "needs" | "users" | "gifts" | "messages" | "donations" | "withdrawals" | "stories" | "fulfillments" | "reports">("organizations")
+  const [activeTab, setActiveTab] = useState<"needs" | "users" | "gifts" | "messages" | "donations" | "withdrawals" | "stories" | "fulfillments" | "reports" | "feedback" | "security" | "activity" | "dev-reports">("users")
+  // The Users tab has four views: organizations (verification), givers,
+  // administrators (with the invite form) and every account.
+  const [usersView, setUsersView] = useState<"organizations" | "givers" | "admins" | "people">("organizations")
+  // Smooth tab transitions (lib/use-tab-transition.ts): tab bar first, then the header's buttons.
+  const { changeTab, tabMotion } = useTabTransition(
+    ["needs", "gifts", "donations", "withdrawals", "stories", "fulfillments", "users", "messages", "reports", "activity", "security", "feedback", "dev-reports"],
+    activeTab,
+    setActiveTab
+  )
+  const openOrganizations = () => { setUsersView("organizations"); changeTab("users") }
   const [isLoading, setIsLoading] = useState(true)
   // Distinct from the setError(...) alias below - this one gates the whole
   // page (loadData() failing outright, e.g. "not actually an admin"), so it
@@ -282,6 +303,14 @@ export default function AdminDashboardPage() {
   const [settingsMode, setSettingsMode] = useState<"menu" | "email" | "password" | "platform">("menu")
   const [ownEmail, setOwnEmail] = useState("")
   const [settingsMessage, setSettingsMessage] = useState("")
+
+  // Bumped by the header's refresh button: sections that load their own data
+  // (given it as refreshKey below) re-fetch too - in place, keeping their filters.
+  const [refreshKey, setRefreshKey] = useState(0)
+  const refreshAll = async () => {
+    setRefreshKey(key => key + 1)
+    await loadData()
+  }
 
   const loadData = async () => {
     let firstError = ""
@@ -485,7 +514,7 @@ export default function AdminDashboardPage() {
           const { data, error: err } = await supabase
             .from("notifications")
             .select("id, type, title, message, sender_id, sender_name, sender_role, reply_to_snippet, read_at, delivered_at, created_at, attachment_storage_path, attachment_file_name")
-            .in("type", ["message_to_admin", "contact_inquiry", "platform_feedback"])
+            .in("type", ["message_to_admin", "contact_inquiry", "platform_feedback", "developer_report"])
             .order("created_at", { ascending: false })
           if (err) throw err
 
@@ -603,10 +632,15 @@ export default function AdminDashboardPage() {
   // Housekeeping only - a fulfilled/closed need is a permanent record until
   // an admin explicitly clears it out; see api/admin/needs/[id]/route.ts for
   // why it's admin-only and only ever on those two end states.
-  const deleteNeedRecord = async (id: string) => {
-    const response = await fetch(`/api/admin/needs/${id}`, { method: "DELETE" })
-    if (!response.ok) setError((await response.json()).message || "Need deletion failed.")
-    else { showFeedback("Need deleted."); await loadData() }
+  const deleteNeedRecord = async (_id: string) => {
+    showFeedback("Need deleted.")
+    await loadData()
+  }
+
+  // After any record is deleted with AdminDeleteButton (lib/admin-delete.ts).
+  const afterDelete = async () => {
+    showFeedback("Deleted.")
+    await loadData()
   }
 
   // Initial listing moderation only (pending -> approved/rejected). Reviewing
@@ -657,9 +691,7 @@ export default function AdminDashboardPage() {
 
   // Housekeeping only - see api/admin/gifts/claims/[claimId]/route.ts for why
   // this is admin-only and blocked while a claim is still pending.
-  const deleteGiftClaim = async (claimId: string) => {
-    const response = await fetch(`/api/admin/gifts/claims/${claimId}`, { method: "DELETE" })
-    if (!response.ok) { setError((await response.json()).message || "Could not delete this claim."); return }
+  const deleteGiftClaim = async (_claimId: string) => {
     showFeedback("Claim deleted.")
     const giftsRes = await fetch("/api/admin/gifts")
     if (giftsRes.ok) setGifts((await giftsRes.json()).gifts || [])
@@ -667,9 +699,7 @@ export default function AdminDashboardPage() {
 
   // Housekeeping only - see api/admin/fulfillments/[id]/route.ts for why this
   // is admin-only and blocked until the fulfillment is completed or cancelled.
-  const deleteFulfillmentRecord = async (id: string) => {
-    const response = await fetch(`/api/admin/fulfillments/${id}`, { method: "DELETE" })
-    if (!response.ok) { setError((await response.json()).message || "Could not delete this fulfillment."); return }
+  const deleteFulfillmentRecord = async (_id: string) => {
     showFeedback("Fulfillment deleted.")
     const fulfillmentsRes = await fetch("/api/admin/fulfillments")
     if (fulfillmentsRes.ok) setFulfillments((await fulfillmentsRes.json()).fulfillments || [])
@@ -696,7 +726,14 @@ export default function AdminDashboardPage() {
   const uploadWithdrawalProof = async (id: string, file: File) => {
     const formData = new FormData()
     formData.set("file", file)
-    const response = await fetch(`/api/admin/withdrawals/${id}/proof`, { method: "POST", body: formData })
+    let body: FormData
+    try {
+      body = await stageFormFiles(formData, UPLOAD_LIMITS.withdrawalProof)
+    } catch (err: any) {
+      setError(err.message)
+      return false
+    }
+    const response = await fetch(`/api/admin/withdrawals/${id}/proof`, { method: "POST", body })
     if (!response.ok) {
       setError((await response.json()).message || "Could not attach proof of payment.")
       return false
@@ -723,7 +760,7 @@ export default function AdminDashboardPage() {
     else await loadData()
   }
 
-  const logout = async () => { await supabase.auth.signOut(); router.replace("/admin-login") }
+  const logout = async () => { await recordSignOut(); await supabase.auth.signOut(); router.replace("/admin-login") }
 
   const markMessageRead = async (id: string) => {
     await fetch(`/api/notifications/${id}`, { method: "PATCH" }).catch(() => {})
@@ -793,6 +830,10 @@ export default function AdminDashboardPage() {
       address: (formData.get("address") as string)?.trim() || null,
       city: (formData.get("city") as string)?.trim() || null,
       province: (formData.get("province") as string)?.trim() || null,
+      registration_number: (formData.get("registration_number") as string)?.trim() || null,
+      contact_name: (formData.get("contact_name") as string)?.trim() || null,
+      contact_role: (formData.get("contact_role") as string)?.trim() || null,
+      mission: (formData.get("mission") as string)?.trim() || null,
       verification_status: formData.get("verification_status") as Organization["verification_status"],
     }
     const res = await fetch(`/api/admin/organizations/${editingOrganization.id}`, {
@@ -822,6 +863,9 @@ export default function AdminDashboardPage() {
       suspended: formData.get("suspended") === "on",
       suspended_reason: (formData.get("suspended_reason") as string)?.trim() || "",
     }
+    // Giver details (only on the form for givers).
+    if (formData.has("giver_phone")) payload.phone = ((formData.get("giver_phone") as string) || "").trim()
+    if (formData.has("giver_account_type")) payload.account_type = formData.get("giver_account_type") as string
     const password = formData.get("password") as string
     if (password && password.length >= 8) payload.password = password
     if (password && password.length < 8) {
@@ -897,7 +941,7 @@ export default function AdminDashboardPage() {
   }[] = [
     ...messages.map(m => ({
       id: `message-${m.id}`,
-      icon: Mail,
+      icon: (m as { type?: string }).type === "developer_report" ? Code2 : Mail,
       title: m.title,
       subtitle: m.message,
       created_at: m.created_at,
@@ -911,7 +955,7 @@ export default function AdminDashboardPage() {
       subtitle: o.name,
       created_at: o.created_at,
       read: false,
-      onOpen: () => setActiveTab("organizations"),
+      onOpen: openOrganizations,
     })),
     ...needs.filter(n => n.status === "draft" || n.status === "rejected" || n.status === "reopen_pending").map(n => ({
       id: `need-${n.id}`,
@@ -958,7 +1002,7 @@ export default function AdminDashboardPage() {
       <div className="mx-auto max-w-[2400px] px-4 md:px-10 py-10 md:py-14 space-y-6">
 
         <div className="flex justify-end">
-          <LiveClock />
+          <AnalogClock />
         </div>
 
         {/* --- HEADER --- */}
@@ -976,23 +1020,57 @@ export default function AdminDashboardPage() {
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => setIsAnnouncing(true)}
-              className="inline-flex items-center gap-2 rounded border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 px-4 py-2 text-sm font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950/70"
+              aria-label="Send an announcement"
+              data-tip="Send an announcement to users or show a banner on the login page"
+              className="inline-flex h-9 w-9 items-center justify-center rounded border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950/70"
             >
-              <Megaphone className="h-4 w-4" /> Announcement
+              <Megaphone className="h-4 w-4" />
             </button>
             <button
-              data-tip="Review and verify organization accounts"
-              onClick={() => setActiveTab("organizations")}
-              className="inline-flex items-center gap-2 rounded border border-slate-200 dark:border-[#233350] px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
+              data-tour="live-activity"
+              data-tip="See who's online and what everyone is doing right now"
+              onClick={() => changeTab("activity")}
+              aria-pressed={activeTab === "activity"}
+              className={`inline-flex items-center gap-2 rounded border px-4 py-2 text-sm font-semibold transition-colors ${
+                activeTab === "activity"
+                  ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                  : "border-slate-200 dark:border-[#233350] text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
+              }`}
             >
-              <Building2 className="h-4 w-4" /> Organizations<CountBadge value={pendingApprovals} />
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+              </span>
+              Live activity
             </button>
+            {([
+              { tab: "security", icon: ShieldCheck, name: "Security", tip: "Every sign-in attempt, successful or not" },
+              { tab: "feedback", icon: Star, name: "Feedback", tip: "Ratings and ideas from givers and organizations" },
+              { tab: "dev-reports", icon: Code2, name: "Dev reports", tip: "Bugs and ideas sent from the Developers page" },
+            ] as const).map(({ tab, icon: Icon, name, tip }) => (
+              <button
+                key={tab}
+                data-tour={tab}
+                onClick={() => changeTab(tab)}
+                aria-pressed={activeTab === tab}
+                data-tip={tip}
+                className={`inline-flex items-center gap-2 rounded border px-4 py-2 text-sm font-semibold transition-colors ${
+                  activeTab === tab
+                    ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
+                    : "border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                }`}
+              >
+                <Icon className="h-4 w-4" /> {name}
+              </button>
+            ))}
             <button
-              data-tip="Change your login email or password"
+              data-tour="settings"
+              aria-label="Settings"
+              data-tip="Settings - your login email and password, and platform settings"
               onClick={() => { setSettingsMode("menu"); setSettingsMessage(""); setIsSettingsOpen(true) }}
-              className="inline-flex items-center gap-2 rounded border border-slate-200 dark:border-[#233350] px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
+              className="inline-flex h-9 w-9 items-center justify-center rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
             >
-              <Settings className="h-4 w-4" /> Settings
+              <Settings className="h-4 w-4" />
             </button>
 
             <DropdownMenu>
@@ -1046,7 +1124,7 @@ export default function AdminDashboardPage() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <RefreshButton onRefresh={loadData} />
+            <RefreshButton onRefresh={refreshAll} />
             <Link
               href="/"
               aria-label="Home"
@@ -1064,7 +1142,7 @@ export default function AdminDashboardPage() {
 
         {/* --- STATS ROW: what needs an admin's attention right now, nothing
              that's just a total (those live in the Reports tab instead) --- */}
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
+        <div data-tour="admin-stats" className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-x-6 gap-y-4">
           <StatCard icon={AlertTriangle} label="Pending Approvals" value={pendingApprovals} accent="amber" />
           <StatCard icon={ClipboardList} label="Needs Awaiting Review" value={needsAwaitingReview} accent="emerald" />
           <StatCard icon={Gift} label="Pending Gifts" value={pendingGifts} accent="blue" />
@@ -1075,48 +1153,72 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* --- TABS --- */}
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="gap-6">
+        <Tabs value={activeTab} onValueChange={changeTab} className="gap-6">
           <TabsList className="w-full flex-nowrap justify-start overflow-x-auto">
-            <TabsTrigger value="needs" className="shrink-0 gap-1.5 px-2.5"><ClipboardList className="w-4 h-4" />Needs<CountBadge value={needsAwaitingReview} /></TabsTrigger>
+            <TabsTrigger value="needs" data-tour="tab-needs" className="shrink-0 gap-1.5 px-2.5"><ClipboardList className="w-4 h-4" />Needs<CountBadge value={needsAwaitingReview} /></TabsTrigger>
             <TabsTrigger value="gifts" className="shrink-0 gap-1.5 px-2.5"><Gift className="w-4 h-4" />Gift Library<CountBadge value={pendingGifts} /></TabsTrigger>
-            <TabsTrigger value="donations" className="shrink-0 gap-1.5 px-2.5"><Banknote className="w-4 h-4" />Donations<CountBadge value={pendingDonations} /></TabsTrigger>
-            <TabsTrigger value="withdrawals" className="shrink-0 gap-1.5 px-2.5"><Wallet className="w-4 h-4" />Withdrawals<CountBadge value={pendingWithdrawals} /></TabsTrigger>
-            <TabsTrigger value="stories" className="shrink-0 gap-1.5 px-2.5"><FileText className="w-4 h-4" />Impact Stories<CountBadge value={pendingStories} /></TabsTrigger>
-            <TabsTrigger value="feedback" className="shrink-0 gap-1.5 px-2.5"><Star className="w-4 h-4" />Feedback</TabsTrigger>
+            <TabsTrigger value="donations" data-tour="tab-donations" className="shrink-0 gap-1.5 px-2.5"><Banknote className="w-4 h-4" />Donations<CountBadge value={pendingDonations} /></TabsTrigger>
+            <TabsTrigger value="withdrawals" data-tour="tab-withdrawals" className="shrink-0 gap-1.5 px-2.5"><Wallet className="w-4 h-4" />Withdrawals<CountBadge value={pendingWithdrawals} /></TabsTrigger>
+            <TabsTrigger value="stories" data-tour="tab-stories" className="shrink-0 gap-1.5 px-2.5"><FileText className="w-4 h-4" />Impact Stories<CountBadge value={pendingStories} /></TabsTrigger>
             <TabsTrigger value="fulfillments" className="shrink-0 gap-1.5 px-2.5"><PackageCheck className="w-4 h-4" />Fulfillments</TabsTrigger>
-            <TabsTrigger value="users" className="shrink-0 gap-1.5 px-2.5"><Users className="w-4 h-4" />Users<CountBadge value={profiles.length} /></TabsTrigger>
+            <TabsTrigger value="users" data-tour="tab-users" className="shrink-0 gap-1.5 px-2.5"><Users className="w-4 h-4" />Users<CountBadge value={pendingApprovals} /></TabsTrigger>
             <TabsTrigger value="messages" className="shrink-0 gap-1.5 px-2.5"><Mail className="w-4 h-4" />Messages<CountBadge value={unreadMessages} /></TabsTrigger>
-            <TabsTrigger value="reports" className="shrink-0 gap-1.5 px-2.5"><BarChart3 className="w-4 h-4" />Reports</TabsTrigger>
+            <TabsTrigger value="reports" data-tour="tab-reports" className="shrink-0 gap-1.5 px-2.5"><BarChart3 className="w-4 h-4" />Reports</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="organizations">
-            <OrganizationsView organizations={organizations} documents={documents} onUpdate={updateOrganization} onEdit={setEditingOrganization} onMessage={(org) => setMessagingRecipient({ id: org.profile_id, label: org.name })} onSelect={setSelectedOrgDetail} />
-          </TabsContent>
-          <TabsContent value="needs">
+          <TabsContent value="needs" className={tabMotion}>
             <NeedsView needs={needs} onUpdate={updateNeed} onDelete={deleteNeedRecord} onSelect={setSelectedNeedDetail} />
           </TabsContent>
-          <TabsContent value="gifts">
-            <GiftsView gifts={gifts} onUpdate={updateGift} onSelect={gift => setSelectedGift(toGiftDetailSummary(gift))} />
+          <TabsContent value="gifts" className={tabMotion}>
+            <GiftsView gifts={gifts} onUpdate={updateGift} onSelect={gift => setSelectedGift(toGiftDetailSummary(gift))} onDeleted={afterDelete} />
           </TabsContent>
-          <TabsContent value="donations">
-            <DonationsView donations={donations} onSelect={setSelectedDonation} />
+          <TabsContent value="donations" className={tabMotion}>
+            <DonationsView donations={donations} onSelect={setSelectedDonation} onDeleted={afterDelete} />
           </TabsContent>
-          <TabsContent value="withdrawals">
-            <WithdrawalsView withdrawals={withdrawals} onReview={reviewWithdrawal} onUploadProof={uploadWithdrawalProof} />
+          <TabsContent value="withdrawals" className={tabMotion}>
+            <WithdrawalsView withdrawals={withdrawals} onReview={reviewWithdrawal} onUploadProof={uploadWithdrawalProof} onDeleted={afterDelete} />
           </TabsContent>
-          <TabsContent value="feedback">
-            <AdminFeedback />
+          <TabsContent value="feedback" className={tabMotion}>
+            <AdminFeedback refreshKey={refreshKey} />
           </TabsContent>
-          <TabsContent value="fulfillments">
+          <TabsContent value="fulfillments" className={tabMotion}>
             <AdminFulfillmentsView fulfillments={fulfillments} onDelete={deleteFulfillmentRecord} />
           </TabsContent>
-          <TabsContent value="stories">
-            <StoriesView stories={stories} onReview={reviewStory} />
+          <TabsContent value="stories" className={tabMotion}>
+            <StoriesView stories={stories} onReview={reviewStory} onDeleted={afterDelete} />
           </TabsContent>
-          <TabsContent value="messages">
-            <MessagesView messages={messages} onOpen={openMessage} />
+          <TabsContent value="messages" className={tabMotion}>
+            <MessagesView refreshKey={refreshKey} messages={messages} onOpen={openMessage} onDeleted={afterDelete} />
           </TabsContent>
-          <TabsContent value="users" className="space-y-6">
+          <TabsContent value="users" className={`space-y-6 ${tabMotion}`}>
+            <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Users view">
+              {([
+                { value: "organizations", label: "Organizations", icon: Building2, count: organizations.length },
+                { value: "givers", label: "Givers", icon: Heart, count: profiles.filter(p => p.role === "giver").length },
+                { value: "admins", label: "Admins", icon: ShieldCheck, count: profiles.filter(p => p.role === "admin").length },
+                { value: "people", label: "All users", icon: Users, count: profiles.length },
+              ] as const).map(option => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setUsersView(option.value)}
+                  aria-pressed={usersView === option.value}
+                  className={`inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-sm font-semibold transition-colors ${
+                    usersView === option.value ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-[#1A2740] text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350]"
+                  }`}
+                >
+                  <option.icon className="h-4 w-4" /> {option.label}
+                  <span className="text-xs opacity-80">({option.count})</span>
+                  {option.value === "organizations" && <CountBadge value={pendingApprovals} />}
+                </button>
+              ))}
+            </div>
+
+            {usersView === "organizations" ? (
+              <OrganizationsView organizations={organizations} documents={documents} onUpdate={updateOrganization} onEdit={setEditingOrganization} onMessage={(org) => setMessagingRecipient({ id: org.profile_id, label: org.name })} onSelect={setSelectedOrgDetail} onDeleted={afterDelete} />
+            ) : (
+            <>
+            {usersView === "admins" && (
             <Card>
               <CardHeader>
                 <CardTitle>Invite administrator</CardTitle>
@@ -1153,8 +1255,10 @@ export default function AdminDashboardPage() {
                 )}
               </CardContent>
             </Card>
+            )}
             <UsersView
-              profiles={profiles}
+              key={usersView}
+              profiles={usersView === "givers" ? profiles.filter(p => p.role === "giver") : usersView === "admins" ? profiles.filter(p => p.role === "admin") : profiles}
               onEdit={setEditingProfile}
               onMessage={(profile) => setMessagingRecipient({ id: profile.id, label: profile.full_name })}
               onSelect={(profile) => {
@@ -1165,16 +1269,29 @@ export default function AdminDashboardPage() {
                 setSelectedUserDetail(profile)
               }}
             />
+            </>
+            )}
           </TabsContent>
-          <TabsContent value="reports">
-            <ReportsView organizations={organizations} needs={needs} donations={donations} profiles={profiles} gifts={gifts} withdrawals={withdrawals} />
+          <TabsContent value="reports" className={tabMotion}>
+            <ReportsView refreshKey={refreshKey} organizations={organizations} needs={needs} donations={donations} profiles={profiles} gifts={gifts} withdrawals={withdrawals} />
+          </TabsContent>
+          <TabsContent value="security" className={tabMotion}>
+            <AdminLoginActivity refreshKey={refreshKey} />
+          </TabsContent>
+          <TabsContent value="activity" className={tabMotion}>
+            <AdminLiveActivity refreshKey={refreshKey} />
+          </TabsContent>
+          <TabsContent value="dev-reports" className={tabMotion}>
+            <AdminDeveloperReports refreshKey={refreshKey} />
           </TabsContent>
         </Tabs>
       </div>
 
+      {ownEmail && <DashboardTour role="admin" name={profiles.find(p => p.email === ownEmail)?.full_name} />}
+
       {/* --- Edit Organization Dialog --- */}
       <Dialog open={!!editingOrganization} onOpenChange={open => !open && setEditingOrganization(null)}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent showCloseButton={false} className="sm:max-w-lg">
           <DialogHeader className="flex flex-row items-center justify-between">
             <DialogTitle>Edit Organization</DialogTitle>
             <button aria-label="Close"
@@ -1216,6 +1333,25 @@ export default function AdminDashboardPage() {
                   <Label htmlFor="edit-org-address">Street address</Label>
                   <Input id="edit-org-address" name="address" defaultValue={editingOrganization.address ?? undefined} />
                 </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-org-reg">Registration number</Label>
+                  <Input id="edit-org-reg" name="registration_number" defaultValue={editingOrganization.registration_number ?? undefined} placeholder="NPO / company number" />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-org-contact-name">Contact person</Label>
+                  <Input id="edit-org-contact-name" name="contact_name" defaultValue={editingOrganization.contact_name ?? undefined} />
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <Label htmlFor="edit-org-contact-role">Contact person&apos;s role</Label>
+                  <Input id="edit-org-contact-role" name="contact_role" defaultValue={editingOrganization.contact_role ?? undefined} placeholder="e.g. Director" />
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <Label htmlFor="edit-org-mission">Mission</Label>
+                  <textarea id="edit-org-mission" name="mission" defaultValue={editingOrganization.mission ?? undefined} rows={3} className="field" />
+                </div>
+                <p className="sm:col-span-2 text-[11px] text-slate-500 dark:text-slate-400">
+                  Banking details can only be changed by the organization&apos;s owner, since withdrawals are paid to them.
+                </p>
                 <div className="space-y-1 sm:col-span-2">
                   <Label htmlFor="edit-org-status">Verification status</Label>
                   <select
@@ -1254,7 +1390,7 @@ export default function AdminDashboardPage() {
         onPlatformSettings={() => { setSettingsMessage(""); setSettingsMode("platform") }}
       />
       <Dialog open={isSettingsOpen && settingsMode !== "menu"} onOpenChange={open => !open && setSettingsMode("menu")}>
-        <DialogContent className={settingsMode === "platform" ? "sm:max-w-3xl max-h-[85vh] overflow-y-auto" : "sm:max-w-lg"}>
+        <DialogContent showCloseButton={false} className={settingsMode === "platform" ? "sm:max-w-3xl max-h-[85vh] overflow-y-auto" : "sm:max-w-lg"}>
           <DialogHeader className="flex flex-row items-center justify-between">
             <DialogTitle>
               {settingsMode === "email" ? "Change Login Email" : settingsMode === "password" ? "Change Password" : "Platform Settings"}
@@ -1292,7 +1428,7 @@ export default function AdminDashboardPage() {
 
       {/* --- Edit Profile Dialog --- */}
       <Dialog open={!!editingProfile} onOpenChange={open => !open && setEditingProfile(null)}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent showCloseButton={false} className="sm:max-w-lg">
           <DialogHeader className="flex flex-row items-center justify-between">
             <DialogTitle>Edit User Profile</DialogTitle>
             <button aria-label="Close"
@@ -1314,6 +1450,22 @@ export default function AdminDashboardPage() {
                   <Label htmlFor="edit-profile-email">Email (read-only, used for login)</Label>
                   <Input id="edit-profile-email" name="email" defaultValue={editingProfile.email} readOnly className="bg-slate-100 dark:bg-[#1A2740] text-slate-500 dark:text-slate-400" />
                 </div>
+                {editingProfile.role === "giver" && (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label htmlFor="edit-profile-phone">Phone</Label>
+                      <Input id="edit-profile-phone" name="giver_phone" type="tel" defaultValue={editingProfile.phone ?? undefined} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="edit-profile-account-type">Account type</Label>
+                      <select id="edit-profile-account-type" name="giver_account_type" defaultValue={editingProfile.account_type || "individual"} className="field">
+                        <option value="individual">Individual</option>
+                        <option value="business">Business</option>
+                        <option value="group">Group</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
                 <RoleFields key={`role-${editingProfile.id}`} profile={editingProfile} />
                 <div className="space-y-1">
                   <Label htmlFor="edit-profile-password">Reset password (optional, 8+ chars)</Label>
@@ -1530,7 +1682,7 @@ function UserDetailDialog({
   )
 }
 
-function OrganizationsView({ organizations, documents, onUpdate, onEdit, onMessage, onSelect }: { organizations: Organization[]; documents: OrganizationDocument[]; onUpdate: (id: string, status: Organization["verification_status"], verification_notes?: string) => void | Promise<void>; onEdit: (org: Organization) => void; onMessage: (org: Organization) => void; onSelect: (org: Organization) => void }) {
+function OrganizationsView({ organizations, documents, onUpdate, onEdit, onMessage, onSelect, onDeleted }: { onDeleted: () => void | Promise<void>; organizations: Organization[]; documents: OrganizationDocument[]; onUpdate: (id: string, status: Organization["verification_status"], verification_notes?: string) => void | Promise<void>; onEdit: (org: Organization) => void; onMessage: (org: Organization) => void; onSelect: (org: Organization) => void }) {
   const [query, setQuery] = useState("")
   const [sort, setSort] = useState("newest")
   const [requestingInfoId, setRequestingInfoId] = useState<string | null>(null)
@@ -1604,7 +1756,7 @@ function OrganizationsView({ organizations, documents, onUpdate, onEdit, onMessa
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setViewingDocsOrg(org) }}
-                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:underline bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 rounded-lg"
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:underline bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 rounded"
                 >
                   <FileText className="w-3.5 h-3.5" /> View Documents ({orgDocuments.length})
                 </button>
@@ -1693,13 +1845,16 @@ function OrganizationsView({ organizations, documents, onUpdate, onEdit, onMessa
                     <p className="text-[11px] text-slate-400 capitalize">{document.document_type.replace(/_/g, " ")}</p>
                   </div>
                 </div>
-                {document.signed_url ? (
-                  <a href={document.signed_url} target="_blank" rel="noreferrer" className="shrink-0 text-xs font-bold text-blue-600 hover:underline">
-                    View
-                  </a>
-                ) : (
-                  <span className="shrink-0 text-xs text-slate-400">Unavailable</span>
-                )}
+                <div className="flex shrink-0 items-center gap-3">
+                  {document.signed_url ? (
+                    <a href={document.signed_url} target="_blank" rel="noreferrer" className="text-xs font-bold text-blue-600 hover:underline">
+                      View
+                    </a>
+                  ) : (
+                    <span className="text-xs text-slate-400">Unavailable</span>
+                  )}
+                  <AdminDeleteButton kind="organization-document" id={document.id} onDeleted={onDeleted} iconOnly />
+                </div>
               </div>
             ))
           )}
@@ -1743,7 +1898,7 @@ function OrganizationDetailDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             {organization.logo_url ? (
-              <img src={organization.logo_url} alt="" className="w-8 h-8 rounded-lg object-cover" />
+              <img src={organization.logo_url} alt="" className="w-8 h-8 rounded object-cover" />
             ) : (
               <Building2 className="w-5 h-5 text-blue-600" />
             )}
@@ -1826,11 +1981,11 @@ function OrganizationDetailDialog({
             ) : (
               <div className="flex flex-wrap gap-2">
                 {orgDocuments.map(document => document.signed_url ? (
-                  <a key={document.id} href={document.signed_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:underline bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1.5 rounded-lg">
+                  <a key={document.id} href={document.signed_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:underline bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1.5 rounded">
                     <FileText className="w-3.5 h-3.5" /> {document.file_name} <span className="font-normal text-slate-400 capitalize">({document.document_type.replace(/_/g, " ")})</span>
                   </a>
                 ) : (
-                  <span key={document.id} className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1.5 rounded-lg">
+                  <span key={document.id} className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1.5 rounded">
                     <FileText className="w-3.5 h-3.5" /> {document.file_name}
                   </span>
                 ))}
@@ -2044,17 +2199,7 @@ function NeedsView({ needs, onUpdate, onDelete, onSelect }: { needs: Need[]; onU
                 <button onClick={() => setRejectingId(need.id)} disabled={busy?.id === need.id} className="rounded border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 px-3 py-1.5 text-xs font-bold hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-60">{isReopenRequest ? "Decline" : "Reject"}</button>
               )
             )}
-            {(need.status === "fulfilled" || need.status === "closed") && (
-              <button
-                onClick={() => run(need.id, "delete", () => onDelete(need.id))}
-                disabled={busy?.id === need.id}
-                data-tip="Permanently delete this old need record - it's fulfilled/closed, so nothing else references it going forward"
-                className="inline-flex items-center gap-1.5 rounded border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 px-3 py-1.5 text-xs font-bold hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-60"
-              >
-                {busy?.id === need.id && busy.action === "delete" && <Loader2 className="w-3 h-3 animate-spin" />}
-                Delete
-              </button>
-            )}
+            <AdminDeleteButton kind="need" id={need.id} onDeleted={() => onDelete(need.id)} />
           </div>
         </article>
         )
@@ -2063,7 +2208,7 @@ function NeedsView({ needs, onUpdate, onDelete, onSelect }: { needs: Need[]; onU
   )
 }
 
-function GiftsView({ gifts, onUpdate, onSelect }: { gifts: AdminGift[]; onUpdate: (id: string, status: "approved" | "rejected") => void | Promise<void>; onSelect: (gift: AdminGift) => void }) {
+function GiftsView({ gifts, onUpdate, onSelect, onDeleted }: { gifts: AdminGift[]; onUpdate: (id: string, status: "approved" | "rejected") => void | Promise<void>; onSelect: (gift: AdminGift) => void; onDeleted: () => void | Promise<void> }) {
   const [query, setQuery] = useState("")
   const [sort, setSort] = useState("newest")
   const [busy, setBusy] = useState<{ id: string; action: string } | null>(null)
@@ -2180,6 +2325,7 @@ function GiftsView({ gifts, onUpdate, onSelect }: { gifts: AdminGift[]; onUpdate
                 <button onClick={() => onUpdate(gift.id, "rejected")} disabled={busy?.id === gift.id} className="rounded bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-60">Reject</button>
               </>
             )}
+            <AdminDeleteButton kind="gift" id={gift.id} onDeleted={onDeleted} />
           </div>
         </article>
         )
@@ -2188,7 +2334,7 @@ function GiftsView({ gifts, onUpdate, onSelect }: { gifts: AdminGift[]; onUpdate
   )
 }
 
-function DonationsView({ donations, onSelect }: { donations: AdminDonation[]; onSelect: (donation: DonationSummary) => void }) {
+function DonationsView({ donations, onSelect, onDeleted }: { donations: AdminDonation[]; onSelect: (donation: DonationSummary) => void; onDeleted: () => void | Promise<void> }) {
   const [query, setQuery] = useState("")
   const [sort, setSort] = useState("pending_first")
 
@@ -2248,8 +2394,8 @@ function DonationsView({ donations, onSelect }: { donations: AdminDonation[]; on
         const orgName = firstOf(need?.organizations)?.name
         const displayTitle = item.is_platform_donation ? "Support The Platform" : need?.title || gift?.title || "Gift Library Pledge"
         return (
+        <div key={item.id} className="flex items-center gap-2">
         <button
-          key={item.id}
           type="button"
           onClick={() => onSelect({
             id: item.id,
@@ -2268,7 +2414,7 @@ function DonationsView({ donations, onSelect }: { donations: AdminDonation[]; on
             giverName: donorName,
             giverEmail: donorEmail,
           })}
-          className="row w-full text-left"
+          className="row w-full min-w-0 flex-1 text-left"
         >
           <div>
             <h3 className="flex items-center gap-2 font-bold">
@@ -2286,6 +2432,7 @@ function DonationsView({ donations, onSelect }: { donations: AdminDonation[]; on
             </span>
           </div>
         </button>
+        </div>
         )
       })}
     </Panel>
@@ -2327,6 +2474,7 @@ function WithdrawalProofUpload({ withdrawal, onUploadProof }: { withdrawal: Admi
         onChange={e => setFile(e.target.files?.[0] || null)}
         className="text-xs file:mr-2 file:rounded file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-blue-700"
       />
+        <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{describeUploadLimit(UPLOAD_LIMITS.withdrawalProof)}</span>
       <button
         type="button"
         onClick={submit}
@@ -2344,10 +2492,12 @@ function WithdrawalsView({
   withdrawals,
   onReview,
   onUploadProof,
+  onDeleted,
 }: {
   withdrawals: AdminWithdrawal[]
   onReview: (id: string, status: "approved" | "rejected", rejection_reason?: string) => void | Promise<void>
   onUploadProof: (id: string, file: File) => Promise<boolean>
+  onDeleted: () => void | Promise<void>
 }) {
   const [query, setQuery] = useState("")
   const [sort, setSort] = useState("pending_first")
@@ -2628,12 +2778,12 @@ function UsersView({ profiles, onEdit, onMessage, onSelect }: { profiles: Profil
   )
 }
 
-function MessagesView({ messages, onOpen }: { messages: AdminMessage[]; onOpen: (item: AdminMessage) => void }) {
+function MessagesView({ messages, onOpen, onDeleted, refreshKey = 0 }: { refreshKey?: number; messages: AdminMessage[]; onOpen: (item: AdminMessage) => void; onDeleted: () => void | Promise<void> }) {
   const [view, setView] = useState<"inbox" | "sent">("inbox")
   return (
     <Panel title="Messages sent to admin" toolbar={<MessageViewToggle value={view} onChange={setView} />}>
       {view === "sent" ? (
-        <SentMessages />
+        <SentMessages refreshKey={refreshKey} />
       ) : messages.length === 0 ? (
         <Empty text="No messages from users or organizations yet." />
       ) : messages.map(item => (
@@ -2647,7 +2797,10 @@ function MessagesView({ messages, onOpen }: { messages: AdminMessage[]; onOpen: 
         >
           <div className="flex items-center justify-between gap-3">
             <p className="font-bold text-sm">{item.sender_name || "Unknown sender"}</p>
-            <span className="text-[11px] text-slate-400 shrink-0">{new Date(item.created_at).toLocaleString()}</span>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[11px] text-slate-400">{new Date(item.created_at).toLocaleString()}</span>
+              <AdminDeleteButton kind="message" id={item.id} onDeleted={onDeleted} iconOnly />
+            </div>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400">{item.title}</p>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300 truncate">{item.message}</p>
@@ -2787,7 +2940,7 @@ function quickVisitRange(days: number) {
 // folded into the report-wide date range above, since it comes from a
 // completely different source (site_visits, recorded by
 // components/site-visit-tracker.tsx) than everything else on this tab.
-function SiteVisitsPanel() {
+function SiteVisitsPanel({ refreshKey = 0 }: { refreshKey?: number }) {
   const [range, setRange] = useState(() => quickVisitRange(30))
   const [stats, setStats] = useState<SiteVisitStats | null>(null)
   const [error, setError] = useState("")
@@ -2809,7 +2962,7 @@ function SiteVisitsPanel() {
     }
     load()
     return () => { cancelled = true }
-  }, [range.from, range.to])
+  }, [range.from, range.to, refreshKey])
 
   const dailyData = (stats?.daily || []).map(row => ({
     label: new Date(row.day).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
@@ -2913,7 +3066,7 @@ function SiteVisitsPanel() {
   )
 }
 
-function ReportsView({ organizations, needs, donations, profiles, gifts, withdrawals }: { organizations: Organization[]; needs: Need[]; donations: AdminDonation[]; profiles: Profile[]; gifts: AdminGift[]; withdrawals: AdminWithdrawal[] }) {
+function ReportsView({ organizations, needs, donations, profiles, gifts, withdrawals, refreshKey = 0 }: { refreshKey?: number; organizations: Organization[]; needs: Need[]; donations: AdminDonation[]; profiles: Profile[]; gifts: AdminGift[]; withdrawals: AdminWithdrawal[] }) {
   const [from, setFrom] = useState("")
   const [to, setTo] = useState("")
 
@@ -3079,26 +3232,43 @@ function ReportsView({ organizations, needs, donations, profiles, gifts, withdra
 
   return (
     <div className="space-y-6">
-      <SiteVisitsPanel />
+      <SiteVisitsPanel refreshKey={refreshKey} />
 
       {/* All-time totals - the platform's overall state, unaffected by the
           date filter below. A status breakdown (approved/rejected/pending/
           etc.) for claims, gifts, orgs and withdrawals already has its own
           chart further down, so it isn't repeated as a tile too. */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard icon={Building2} label="Organizations" value={organizations.length} accent="blue" />
-        <StatCard icon={CheckCircle2} label="Approved Orgs" value={totalApprovedOrgs} accent="emerald" />
-        <StatCard icon={Users} label="Users" value={profiles.length} accent="purple" />
-        <StatCard icon={ClipboardList} label="Needs" value={needs.length} accent="emerald" />
-        <StatCard icon={PackageCheck} label="Fulfilled Needs" value={totalFulfilledNeeds} accent="emerald" />
-        <StatCard icon={Banknote} label="Successful Donations" value={allSuccessfulDonations.length} accent="amber" />
-        <StatCard icon={Banknote} label="Total Donated" value={totalDonatedAllTime} prefix="R" decimals={2} accent="purple" />
-        <StatCard icon={Heart} label="Platform Support" value={totalPlatformSupportAllTime} prefix="R" decimals={2} accent="pink" />
-        <StatCard icon={Gift} label="Claims" value={allClaims.length} accent="blue" />
-        <StatCard icon={Gift} label="Gift Offerings" value={gifts.length} accent="purple" />
-        <StatCard icon={Wallet} label="Withdrawal Requests" value={withdrawals.length} accent="blue" />
-        <StatCard icon={Banknote} label="Paid Out" value={totalPaidOutAllTime} prefix="R" decimals={2} accent="emerald" />
-      </div>
+      <TotalsSummary
+        groups={[
+          {
+            title: "People",
+            items: [
+              { label: "Organizations", value: organizations.length },
+              { label: "Approved organizations", value: totalApprovedOrgs },
+              { label: "Users", value: profiles.length },
+            ],
+          },
+          {
+            title: "Needs & gifts",
+            items: [
+              { label: "Needs", value: needs.length },
+              { label: "Fulfilled needs", value: totalFulfilledNeeds },
+              { label: "Gift offerings", value: gifts.length },
+              { label: "Claims", value: allClaims.length },
+            ],
+          },
+          {
+            title: "Money",
+            items: [
+              { label: "Successful donations", value: allSuccessfulDonations.length },
+              { label: "Total donated", value: totalDonatedAllTime, money: true },
+              { label: "Platform support", value: totalPlatformSupportAllTime, money: true },
+              { label: "Withdrawal requests", value: withdrawals.length },
+              { label: "Paid out", value: totalPaidOutAllTime, money: true },
+            ],
+          },
+        ]}
+      />
 
       <Panel title="Report date range">
         <div className="flex flex-wrap items-end gap-3">
@@ -3431,7 +3601,7 @@ type AdminStory = {
 }
 
 // Impact stories are only public once an administrator approves them.
-function StoriesView({ stories, onReview }: { stories: AdminStory[]; onReview: (id: string, status: "approved" | "rejected", reason?: string) => void | Promise<void> }) {
+function StoriesView({ stories, onReview, onDeleted }: { onDeleted: () => void | Promise<void>; stories: AdminStory[]; onReview: (id: string, status: "approved" | "rejected", reason?: string) => void | Promise<void> }) {
   const [filter, setFilter] = useState<"pending" | "all">("pending")
   const visible = filter === "pending" ? stories.filter(s => s.status === "pending") : stories
   const [busy, setBusy] = useState<{ id: string; action: string } | null>(null)
@@ -3489,6 +3659,7 @@ function StoriesView({ stories, onReview }: { stories: AdminStory[]; onReview: (
                     {story.status === "approved" ? "Unpublish" : "Reject"}
                   </button>
                 )}
+                <AdminDeleteButton kind="story" id={story.id} onDeleted={onDeleted} />
               </div>
             </div>
             <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed">{story.content}</p>
@@ -3497,13 +3668,13 @@ function StoriesView({ stories, onReview }: { stories: AdminStory[]; onReview: (
             )}
             {(story.media.length > 0 || story.image_url || story.video_url) && (
               <div className="flex flex-wrap gap-2">
-                {story.image_url && <a href={story.image_url} target="_blank" rel="noreferrer"><img src={story.image_url} alt="" className="h-20 w-20 rounded-lg object-cover" /></a>}
+                {story.image_url && <a href={story.image_url} target="_blank" rel="noreferrer"><img src={story.image_url} alt="" className="h-20 w-20 rounded object-cover" /></a>}
                 {story.media.map(m => m.media_type === "image" ? (
-                  <a key={m.id} href={m.url} target="_blank" rel="noreferrer"><img src={m.url} alt="" className="h-20 w-20 rounded-lg object-cover" /></a>
+                  <a key={m.id} href={m.url} target="_blank" rel="noreferrer"><img src={m.url} alt="" className="h-20 w-20 rounded object-cover" /></a>
                 ) : (
-                  <a key={m.id} href={m.url} target="_blank" rel="noreferrer" className="inline-flex h-20 items-center rounded-lg bg-purple-50 px-3 text-xs font-bold text-purple-700">🎥 Video</a>
+                  <a key={m.id} href={m.url} target="_blank" rel="noreferrer" className="inline-flex h-20 items-center rounded bg-purple-50 px-3 text-xs font-bold text-purple-700">🎥 Video</a>
                 ))}
-                {story.video_url && <a href={story.video_url} target="_blank" rel="noreferrer" className="inline-flex h-20 items-center rounded-lg bg-purple-50 px-3 text-xs font-bold text-purple-700">🎥 Video link</a>}
+                {story.video_url && <a href={story.video_url} target="_blank" rel="noreferrer" className="inline-flex h-20 items-center rounded bg-purple-50 px-3 text-xs font-bold text-purple-700">🎥 Video link</a>}
               </div>
             )}
           </article>
@@ -3626,20 +3797,43 @@ function Empty({ text }: { text: string }) {
   return <div className="rounded border border-dashed border-slate-300 dark:border-[#233350] p-8 text-center text-sm text-slate-500 dark:text-slate-400">{text}</div>
 }
 
+// All-time totals in the Reports tab: a few short labelled columns (no boxes
+// or icons), so related numbers read together at a glance.
+function TotalsSummary({ groups }: { groups: { title: string; items: { label: string; value: number; money?: boolean }[] }[] }) {
+  return (
+    <section className="grid gap-x-10 gap-y-6 border-t border-slate-200 dark:border-[#233350] pt-4 md:grid-cols-3" aria-label="All-time totals">
+      {groups.map(group => (
+        <div key={group.title}>
+          <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">{group.title}</h3>
+          <dl className="divide-y divide-slate-100 dark:divide-[#233350]">
+            {group.items.map(item => (
+              <div key={item.label} className="flex items-baseline justify-between gap-4 py-1.5">
+                <dt className="text-sm text-slate-600 dark:text-slate-400">{item.label}</dt>
+                <dd className="text-sm font-bold tabular-nums text-slate-900 dark:text-slate-100">
+                  <CountUp value={item.value} prefix={item.money ? "R" : ""} decimals={item.money ? 2 : 0} />
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      ))}
+    </section>
+  )
+}
+
 function StatCard({ icon: Icon, label, value, accent, prefix = "", decimals = 0 }: { icon: React.ComponentType<{ className?: string }>; label: string; value: number | string; accent: "blue" | "emerald" | "amber" | "purple" | "pink"; prefix?: string; decimals?: number }) {
   const accentClasses = {
-    blue: "bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400",
-    emerald: "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400",
-    amber: "bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400",
-    purple: "bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400",
-    pink: "bg-pink-50 dark:bg-pink-950/50 text-pink-600 dark:text-pink-400",
+    blue: "text-blue-600 dark:text-blue-400",
+    emerald: "text-emerald-600 dark:text-emerald-400",
+    amber: "text-amber-600 dark:text-amber-400",
+    purple: "text-purple-600 dark:text-purple-400",
+    pink: "text-pink-600 dark:text-pink-400",
   }[accent]
 
+  // Flat, like the rest of the dashboard: no box or fill, just a rule above and below.
   return (
-    <div className="rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] p-4 flex items-center gap-3 shadow-sm">
-      <div className={`rounded p-2.5 ${accentClasses}`}>
-        <Icon className="w-5 h-5" />
-      </div>
+    <div className="flex items-center gap-3 border-y border-slate-200 dark:border-[#233350] py-3">
+      <Icon className={`h-5 w-5 shrink-0 ${accentClasses}`} />
       <div>
         <p className="text-2xl font-extrabold leading-none">
           {typeof value === "number" ? <CountUp value={value} prefix={prefix} decimals={decimals} /> : value}

@@ -52,7 +52,8 @@ const STATUS_ICON: Record<Withdrawal["status"], typeof Clock> = {
 // The organization's wallet: money HelpLift has received on their behalf,
 // available to withdraw via EFT to their own bank account on file. Any team
 // member can view it; requesting or cancelling a withdrawal needs manager+.
-export function OrganizationWallet({ memberRole }: { memberRole: OrgRole | null }) {
+export function OrganizationWallet({ memberRole, refreshKey = 0 }: { memberRole: OrgRole | null; refreshKey?: number }) {
+  // refreshKey: bumped by the dashboard's refresh button to re-fetch in place (filters are kept).
   const [data, setData] = useState<WalletData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [amount, setAmount] = useState("")
@@ -81,7 +82,8 @@ export function OrganizationWallet({ memberRole }: { memberRole: OrgRole | null 
     }
   }
 
-  useEffect(() => { load() }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load() }, [refreshKey])
 
   const requestWithdrawal = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -136,22 +138,22 @@ export function OrganizationWallet({ memberRole }: { memberRole: OrgRole | null 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="rounded-2xl border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/30 p-4">
+        <div className="rounded border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/30 p-4">
           <p className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 flex items-center gap-1.5"><Wallet className="w-3.5 h-3.5" /> Available balance</p>
           <p className="mt-1 text-2xl font-black text-slate-900 dark:text-slate-100">{formatCurrency(summary.availableBalance)}</p>
         </div>
-        <div className="rounded-2xl border border-slate-200 dark:border-[#233350] p-4">
+        <div className="rounded border border-slate-200 dark:border-[#233350] p-4">
           <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Received to date</p>
           <p className="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100">{formatCurrency(summary.totalReceived)}</p>
         </div>
-        <div className="rounded-2xl border border-slate-200 dark:border-[#233350] p-4">
+        <div className="rounded border border-slate-200 dark:border-[#233350] p-4">
           <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Paid out to date</p>
           <p className="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100">{formatCurrency(summary.totalPaidOut)}</p>
         </div>
       </div>
 
       {!organization_approved && (
-        <div className="flex items-start gap-2 rounded-2xl border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-4 text-sm text-amber-800 dark:text-amber-300">
+        <div className="flex items-start gap-2 rounded border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-4 text-sm text-amber-800 dark:text-amber-300">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           <span>Your organization must be approved by an administrator before you can request a withdrawal.</span>
         </div>
@@ -162,7 +164,7 @@ export function OrganizationWallet({ memberRole }: { memberRole: OrgRole | null 
       )}
 
       {canRequest && organization_approved && (
-        <form onSubmit={requestWithdrawal} className="rounded-2xl border border-slate-200 dark:border-[#233350] p-4 space-y-3">
+        <form onSubmit={requestWithdrawal} className="rounded border border-slate-200 dark:border-[#233350] p-4 space-y-3">
           <p className="text-sm font-bold">Request a withdrawal</p>
           <p className="text-xs text-slate-500 dark:text-slate-400">
             Funds are transferred by EFT to your organization's bank account on file. Bank transfers can take up to 7 working days to reflect once sent.
@@ -180,7 +182,7 @@ export function OrganizationWallet({ memberRole }: { memberRole: OrgRole | null 
                 placeholder="0.00"
                 value={amount}
                 onChange={e => setAmount(e.target.value)}
-                className="w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded-xl text-sm font-semibold outline-none focus:border-blue-500 transition-colors"
+                className="w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded text-sm font-semibold outline-none focus:border-blue-500 transition-colors"
               />
             </div>
             <Button type="submit" disabled={isSubmitting || summary.availableBalance < limits.min} className="bg-blue-600 hover:bg-blue-700 text-white">
@@ -194,17 +196,17 @@ export function OrganizationWallet({ memberRole }: { memberRole: OrgRole | null 
       <div className="space-y-3">
         <p className="text-sm font-bold">Withdrawal history</p>
         {withdrawals.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-slate-300 dark:border-[#233350] p-6 text-center text-sm text-slate-500 dark:text-slate-400">
+          <p className="rounded border border-dashed border-slate-300 dark:border-[#233350] p-6 text-center text-sm text-slate-500 dark:text-slate-400">
             No withdrawal requests yet.
           </p>
         ) : (
           withdrawals.map(w => {
             const Icon = STATUS_ICON[w.status]
             return (
-              <div key={w.id} className="rounded-2xl border border-slate-200 dark:border-[#233350] p-4 space-y-2">
+              <div key={w.id} className="rounded border border-slate-200 dark:border-[#233350] p-4 space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-bold text-base">{formatCurrency(Number(w.amount))}</span>
-                  <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${STATUS_CLASSES[w.status]}`}>
+                  <span className={`inline-flex items-center gap-1.5 rounded px-3 py-1 text-xs font-bold ${STATUS_CLASSES[w.status]}`}>
                     <Icon className="w-3.5 h-3.5" /> {STATUS_LABEL[w.status]}
                   </span>
                 </div>

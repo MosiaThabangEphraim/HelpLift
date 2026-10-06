@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server"
+import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/staged-uploads"
+import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
+import { logUserAction } from "@/lib/activity-log"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 
@@ -21,7 +24,8 @@ export async function POST(request: Request) {
       const formData = await request.formData()
       need_id = String(formData.get("need_id") || "")
       message = String(formData.get("message") || "")
-      photoFiles = formData.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0)
+      photoFiles = await readUploadedFiles(formData, "photos")
+      { const uploadProblem = checkUploadLimits(photoFiles, UPLOAD_LIMITS.interestPhotos); if (uploadProblem) return NextResponse.json({ message: uploadProblem }, { status: 400 }) }
     } else {
       const body = await request.json()
       need_id = body.need_id || ""
@@ -92,6 +96,7 @@ export async function POST(request: Request) {
       console.warn("Interest submission notification warning:", notifyErr)
     }
 
+    await logUserAction(supabase, "Offered to help with a need")
     return NextResponse.json({ interest, photosUploaded }, { status: 201 })
   } catch (error) {
     console.error("Interest submission error:", error)

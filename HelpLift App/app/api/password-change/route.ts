@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { logUserAction } from "@/lib/activity-log"
 import { createClient } from "@/lib/supabase/server"
 
 /**
@@ -26,6 +27,7 @@ export async function POST(req: Request) {
       if (!body.password || body.password.length < 8) return NextResponse.json({ success: false, message: "Password must be at least 8 characters." }, { status: 400 })
       const { error } = await supabase.auth.updateUser({ password: body.password })
       if (error) return NextResponse.json({ success: false, message: error.message }, { status: 400 })
+      await logUserAction(supabase, "Changed password")
       return NextResponse.json({ success: true, message: "Password updated successfully." })
     }
 

@@ -19,7 +19,8 @@ type SentItem = {
 // "Sent" view of the Messages tab: the conversations the user has sent messages
 // in. Opening one shows the whole conversation and lets them keep replying.
 // Used by the giver, organization and admin dashboards.
-export function SentMessages({ canReply = true }: { canReply?: boolean }) {
+export function SentMessages({ canReply = true, refreshKey = 0 }: { canReply?: boolean; refreshKey?: number }) {
+  // refreshKey: bumped by the dashboard's refresh button to re-fetch in place (filters are kept).
   const [items, setItems] = useState<SentItem[] | null>(null)
   const [error, setError] = useState("")
   const [open, setOpen] = useState<MessageDetail | null>(null)
@@ -37,7 +38,7 @@ export function SentMessages({ canReply = true }: { canReply?: boolean }) {
     }
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load() }, [load, refreshKey])
 
   if (items === null) {
     return <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-blue-600" /></div>
@@ -45,9 +46,9 @@ export function SentMessages({ canReply = true }: { canReply?: boolean }) {
 
   return (
     <div className="space-y-3">
-      {error && <p className="rounded-xl bg-red-50 dark:bg-red-950/40 p-3 text-xs font-semibold text-red-700 dark:text-red-300">{error}</p>}
+      {error && <p className="rounded bg-red-50 dark:bg-red-950/40 p-3 text-xs font-semibold text-red-700 dark:text-red-300">{error}</p>}
       {items.length === 0 && !error ? (
-        <p className="rounded-2xl border border-dashed border-slate-300 dark:border-[#233350] p-6 text-center text-sm text-slate-500 dark:text-slate-400">
+        <p className="rounded border border-dashed border-slate-300 dark:border-[#233350] p-6 text-center text-sm text-slate-500 dark:text-slate-400">
           You haven't sent any messages yet.
         </p>
       ) : (
@@ -68,7 +69,7 @@ export function SentMessages({ canReply = true }: { canReply?: boolean }) {
               created_at: item.created_at,
             })}
             onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.currentTarget.click() } }}
-            className="w-full cursor-pointer rounded-2xl border border-slate-200 dark:border-[#233350] p-4 text-left hover:border-blue-300 dark:hover:border-blue-800"
+            className="w-full cursor-pointer rounded border border-slate-200 dark:border-[#233350] p-4 text-left hover:border-blue-300 dark:hover:border-blue-800"
           >
             <div className="flex items-center justify-between gap-3">
               <p className="font-bold text-sm">To: {item.recipient_name}</p>
@@ -76,7 +77,7 @@ export function SentMessages({ canReply = true }: { canReply?: boolean }) {
             </div>
             <p className="mt-1 truncate text-sm text-slate-600 dark:text-slate-300">You: {item.message}</p>
             <div className="mt-2 flex items-center gap-2 flex-wrap">
-              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+              <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold ${
                 item.replied
                   ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
                   : "bg-slate-100 dark:bg-[#1A2740] text-slate-500 dark:text-slate-400"
@@ -111,7 +112,7 @@ export function MessageViewToggle({ value, onChange }: { value: "inbox" | "sent"
           type="button"
           onClick={() => onChange(option)}
           aria-pressed={value === option}
-          className={`rounded-full px-4 py-1.5 text-xs font-bold capitalize transition-colors ${
+          className={`rounded px-4 py-1.5 text-xs font-bold capitalize transition-colors ${
             value === option
               ? "bg-blue-600 text-white"
               : "bg-slate-100 dark:bg-[#1A2740] text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350]"

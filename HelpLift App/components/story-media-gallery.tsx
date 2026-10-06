@@ -83,16 +83,16 @@ export function StoryMediaGallery({
       <div
         ref={scrollerRef}
         onScroll={handleScroll}
-        className="flex overflow-x-auto snap-x snap-mandatory rounded-2xl"
+        className="flex overflow-x-auto snap-x snap-mandatory rounded"
         style={{ scrollbarWidth: "thin" }}
       >
         {media.map((item) => (
           <div key={item.id} className="w-full shrink-0 snap-center">
             {item.media_type === "video" ? (
               isDirectVideoFile(item.url) ? (
-                <video src={item.url} controls className={`w-full ${heightClassName} object-cover rounded-2xl`} />
+                <video src={item.url} controls className={`w-full ${heightClassName} object-cover rounded`} />
               ) : toEmbeddableVideoUrl(item.url) ? (
-                <div className={`w-full ${heightClassName} rounded-2xl overflow-hidden`}>
+                <div className={`w-full ${heightClassName} rounded overflow-hidden`}>
                   <iframe
                     src={toEmbeddableVideoUrl(item.url)!}
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -101,7 +101,7 @@ export function StoryMediaGallery({
                   />
                 </div>
               ) : (
-                <a href={item.url} target="_blank" rel="noreferrer" className={`flex ${heightClassName} items-center justify-center rounded-2xl bg-slate-100 dark:bg-slate-800 text-sm font-bold text-blue-600 hover:underline`}>
+                <a href={item.url} target="_blank" rel="noreferrer" className={`flex ${heightClassName} items-center justify-center rounded bg-slate-100 dark:bg-slate-800 text-sm font-bold text-blue-600 hover:underline`}>
                   Watch video ↗
                 </a>
               )
@@ -112,7 +112,7 @@ export function StoryMediaGallery({
                 className={`w-full ${heightClassName} block cursor-zoom-in`}
                 aria-label="View full-size photo"
               >
-                <img src={item.url} alt={title} className={`w-full ${heightClassName} object-cover rounded-2xl`} />
+                <img src={item.url} alt={title} className={`w-full ${heightClassName} object-cover rounded`} />
               </button>
             )}
           </div>
@@ -126,7 +126,7 @@ export function StoryMediaGallery({
               type="button"
               onClick={() => scrollToIndex(index)}
               aria-label={`Show photo/video ${index + 1}`}
-              className={`h-1.5 rounded-full transition-all ${index === activeIndex ? "w-5 bg-blue-600" : "w-1.5 bg-slate-300 dark:bg-slate-700"}`}
+              className={`h-1.5 rounded transition-all ${index === activeIndex ? "w-5 bg-blue-600" : "w-1.5 bg-slate-300 dark:bg-slate-700"}`}
             />
           ))}
         </div>
@@ -141,7 +141,7 @@ export function StoryMediaGallery({
           <button
             type="button"
             onClick={() => setLightboxIndex(null)}
-            className="absolute top-4 right-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+            className="absolute top-4 right-4 rounded bg-white/10 p-2 text-white hover:bg-white/20"
             aria-label="Close"
           >
             <X className="w-5 h-5" />
@@ -151,7 +151,7 @@ export function StoryMediaGallery({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => (i === null ? i : (i - 1 + images.length) % images.length)) }}
-                className="absolute left-2 md:left-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+                className="absolute left-2 md:left-4 rounded bg-white/10 p-2 text-white hover:bg-white/20"
                 aria-label="Previous photo"
               >
                 <ChevronLeft className="w-6 h-6" />
@@ -159,7 +159,7 @@ export function StoryMediaGallery({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => (i === null ? i : (i + 1) % images.length)) }}
-                className="absolute right-2 md:right-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+                className="absolute right-2 md:right-4 rounded bg-white/10 p-2 text-white hover:bg-white/20"
                 aria-label="Next photo"
               >
                 <ChevronRight className="w-6 h-6" />
@@ -170,10 +170,10 @@ export function StoryMediaGallery({
             src={images[lightboxIndex].url}
             alt={title}
             onClick={(e) => e.stopPropagation()}
-            className="max-h-[90vh] max-w-[90vw] object-contain rounded-lg"
+            className="max-h-[90vh] max-w-[90vw] object-contain rounded"
           />
           {images.length > 1 && (
-            <span className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-xs font-bold text-white">
+            <span className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded bg-black/50 px-3 py-1 text-xs font-bold text-white">
               {lightboxIndex + 1} / {images.length}
             </span>
           )}

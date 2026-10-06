@@ -73,7 +73,7 @@ function OutcomeContent({ variant, message, onDismiss, detail }: OutcomeBannerPr
       >
         <h3 className="text-xl font-extrabold text-slate-900 dark:text-slate-100">{v.heading}</h3>
         {v.pill && (
-          <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${v.pill}`}>
+          <span className={`inline-flex items-center gap-1.5 rounded px-3 py-1 text-xs font-bold ${v.pill}`}>
             <Check className="h-3.5 w-3.5" /> {v.pillText}
           </span>
         )}
@@ -94,7 +94,7 @@ function OutcomeContent({ variant, message, onDismiss, detail }: OutcomeBannerPr
 
       {detail && (
         <div
-          className="rounded-2xl border border-slate-200 dark:border-[#233350] p-4 text-left text-sm space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-500"
+          className="rounded border border-slate-200 dark:border-[#233350] p-4 text-left text-sm space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-500"
           style={{ animationDelay: "600ms", animationFillMode: "backwards" }}
         >
           <div className="flex items-center justify-between">
@@ -114,7 +114,7 @@ function OutcomeContent({ variant, message, onDismiss, detail }: OutcomeBannerPr
 
       {variant === "unsuccessful" && (
         <div
-          className="rounded-2xl border border-red-100 dark:border-red-900/60 bg-red-50/60 dark:bg-red-950/20 p-4 text-left space-y-1.5 animate-in fade-in slide-in-from-bottom-2 duration-500"
+          className="rounded border border-red-100 dark:border-red-900/60 bg-red-50/60 dark:bg-red-950/20 p-4 text-left space-y-1.5 animate-in fade-in slide-in-from-bottom-2 duration-500"
           style={{ animationDelay: "600ms", animationFillMode: "backwards" }}
         >
           <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-red-700 dark:text-red-400">

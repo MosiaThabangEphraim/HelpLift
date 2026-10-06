@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { logUserAction } from "@/lib/activity-log"
 import { createClient } from "@/lib/supabase/server"
 import { getActiveBankAccounts } from "@/lib/bank-accounts"
 import { buildPaymentFields } from "@/lib/payfast"
@@ -86,6 +87,7 @@ export async function POST(request: Request) {
       } catch (configError: any) {
         return NextResponse.json({ message: configError.message || "PayFast is not configured." }, { status: 503 })
       }
+      await logUserAction(supabase, "Pledged funds to the Gift Library", "PayFast")
       return NextResponse.json({ gift, donation, payfast }, { status: 201 })
     }
 
@@ -103,9 +105,11 @@ export async function POST(request: Request) {
       } catch (configError: any) {
         return NextResponse.json({ message: configError.message || "PayPal is not configured." }, { status: 503 })
       }
+      await logUserAction(supabase, "Pledged funds to the Gift Library", "PayPal")
       return NextResponse.json({ gift, donation, paypal }, { status: 201 })
     }
 
+    await logUserAction(supabase, "Pledged funds to the Gift Library", "EFT")
     return NextResponse.json({ gift, donation, bank: bankAccount }, { status: 201 })
   } catch (error) {
     console.error("Financial pledge creation error:", error)

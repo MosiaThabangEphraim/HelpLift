@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server"
+import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/staged-uploads"
+import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
+import { logUserAction } from "@/lib/activity-log"
 import { createClient } from "@/lib/supabase/server"
 import { getOrgContext, roleAtLeast, insufficientRoleMessage } from "@/lib/organization-access"
 import { getActiveCategoryNames } from "@/lib/need-categories"
@@ -32,9 +35,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await request.formData()
-      attachmentFiles = formData.getAll("attachments").filter((f): f is File => f instanceof File && f.size > 0)
+      attachmentFiles = await readUploadedFiles(formData, "attachments")
+      { const uploadProblem = checkUploadLimits(attachmentFiles, UPLOAD_LIMITS.needAttachments); if (uploadProblem) return NextResponse.json({ message: uploadProblem }, { status: 400 }) }
       formData.forEach((value, key) => {
-        if (typeof value === "string") body[key] = value
+        if (typeof value === "string" && !isStagedReference(value)) body[key] = value
       })
     } else {
       body = await request.json()
@@ -180,6 +184,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     const { error } = await supabase.from("needs").delete().eq("id", id).eq("organization_id", organization.id)
     if (error) return NextResponse.json({ message: error.message }, { status: 400 })
 
+    await logUserAction(supabase, "Deleted a need")
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Need delete error:", error)

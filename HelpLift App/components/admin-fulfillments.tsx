@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { AdminDeleteButton } from "@/components/admin-delete-button"
 import { FileText, Loader2, PackageCheck, Trash2 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -38,7 +39,7 @@ function needTitle(f: AdminFulfillment) {
 function sourceBadge(f: AdminFulfillment) {
   const gift = firstOf(f.gift_offerings)
   if (!gift) return null
-  return <span className="rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-700 capitalize">Gift · {gift.offering_type}</span>
+  return <span className="rounded bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-700 capitalize">Gift · {gift.offering_type}</span>
 }
 
 // Admin overview of deliveries, with a viewer for the proof (photos, receipts,
@@ -60,7 +61,7 @@ export function AdminFulfillmentsView({ fulfillments, onDelete }: { fulfillments
               <button
                 key={key}
                 onClick={() => setFilter(key)}
-                className={`rounded-full px-3 py-1.5 capitalize ${filter === key ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-[#1A2740]"}`}
+                className={`rounded px-3 py-1.5 capitalize ${filter === key ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-[#1A2740]"}`}
               >
                 {key.replace("_", " ")}
               </button>
@@ -68,7 +69,7 @@ export function AdminFulfillmentsView({ fulfillments, onDelete }: { fulfillments
           </div>
 
           {visible.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-slate-300 dark:border-[#233350] p-6 text-center text-sm text-slate-500">No fulfillments to show.</p>
+            <p className="rounded border border-dashed border-slate-300 dark:border-[#233350] p-6 text-center text-sm text-slate-500">No fulfillments to show.</p>
           ) : (
             <div className="space-y-3">
               {visible.map(f => (
@@ -78,7 +79,7 @@ export function AdminFulfillmentsView({ fulfillments, onDelete }: { fulfillments
                   tabIndex={0}
                   onClick={() => setSelected(f)}
                   onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelected(f) } }}
-                  className="flex cursor-pointer flex-col gap-2 rounded-2xl border border-slate-200 dark:border-[#233350] p-4 hover:border-blue-300 dark:hover:border-blue-800 md:flex-row md:items-center md:justify-between"
+                  className="flex cursor-pointer flex-col gap-2 rounded border border-slate-200 dark:border-[#233350] p-4 hover:border-blue-300 dark:hover:border-blue-800 md:flex-row md:items-center md:justify-between"
                 >
                   <div>
                     <p className="flex items-center gap-2 font-semibold">{needTitle(f)} {sourceBadge(f)}</p>
@@ -87,8 +88,8 @@ export function AdminFulfillmentsView({ fulfillments, onDelete }: { fulfillments
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`rounded-full px-3 py-1 text-xs font-bold capitalize ${STATUS_STYLES[f.status]}`}>{f.status.replace("_", " ")}</span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-xs font-bold">
+                    <span className={`rounded px-3 py-1 text-xs font-bold capitalize ${STATUS_STYLES[f.status]}`}>{f.status.replace("_", " ")}</span>
+                    <span className="inline-flex items-center gap-1 rounded bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-xs font-bold">
                       <FileText className="h-3 w-3" /> {f.proof_count} proof file{f.proof_count === 1 ? "" : "s"}
                     </span>
                   </div>
@@ -178,7 +179,7 @@ function FulfillmentDetail({
                 Organization: {firstOf(fulfillment.organizations)?.name || "-"}<br />
                 Giver: {firstOf(fulfillment.givers)?.name || "-"} {firstOf(fulfillment.givers)?.email ? `· ${firstOf(fulfillment.givers)?.email}` : ""}
               </p>
-              <span className={`mt-2 inline-block rounded-full px-3 py-1 text-xs font-bold capitalize ${STATUS_STYLES[fulfillment.status]}`}>{fulfillment.status.replace("_", " ")}</span>
+              <span className={`mt-2 inline-block rounded px-3 py-1 text-xs font-bold capitalize ${STATUS_STYLES[fulfillment.status]}`}>{fulfillment.status.replace("_", " ")}</span>
               {fulfillment.completed_at && <span className="ml-2 text-xs text-slate-500">Completed {new Date(fulfillment.completed_at).toLocaleDateString()}</span>}
             </div>
 
@@ -202,11 +203,11 @@ function FulfillmentDetail({
                   {proofs.map(item => (
                     <a key={item.id} href={item.signedUrl || undefined} target="_blank" rel="noreferrer" className="block">
                       {isPdf(item.signedUrl) ? (
-                        <span className="flex h-24 items-center justify-center rounded-xl border border-slate-200 dark:border-[#233350] text-xs font-bold text-blue-600">📄 {item.fileName || "Document"}</span>
+                        <span className="flex h-24 items-center justify-center rounded border border-slate-200 dark:border-[#233350] text-xs font-bold text-blue-600">📄 {item.fileName || "Document"}</span>
                       ) : item.signedUrl ? (
-                        <img src={item.signedUrl} alt={item.fileName || "Delivery proof"} className="h-24 w-full rounded-xl border border-slate-200 dark:border-[#233350] object-cover" />
+                        <img src={item.signedUrl} alt={item.fileName || "Delivery proof"} className="h-24 w-full rounded border border-slate-200 dark:border-[#233350] object-cover" />
                       ) : (
-                        <span className="flex h-24 items-center justify-center rounded-xl border text-xs text-slate-400">Unavailable</span>
+                        <span className="flex h-24 items-center justify-center rounded border text-xs text-slate-400">Unavailable</span>
                       )}
                     </a>
                   ))}
@@ -214,9 +215,9 @@ function FulfillmentDetail({
               ) : legacyUrl ? (
                 <a href={legacyUrl} target="_blank" rel="noreferrer" className="block">
                   {isPdf(legacyUrl) ? (
-                    <span className="flex h-24 items-center justify-center rounded-xl border text-xs font-bold text-blue-600">📄 Open document</span>
+                    <span className="flex h-24 items-center justify-center rounded border text-xs font-bold text-blue-600">📄 Open document</span>
                   ) : (
-                    <img src={legacyUrl} alt="Delivery proof" className="max-h-64 w-full rounded-xl border border-slate-200 dark:border-[#233350] object-cover" />
+                    <img src={legacyUrl} alt="Delivery proof" className="max-h-64 w-full rounded border border-slate-200 dark:border-[#233350] object-cover" />
                   )}
                 </a>
               ) : (
@@ -224,18 +225,9 @@ function FulfillmentDetail({
               )}
             </div>
 
-            {deletable && onDelete && (
+            {onDelete && fulfillment && (
               <div className="flex justify-end border-t border-slate-200 dark:border-[#233350] pt-3">
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  disabled={isDeleting}
-                  data-tip="Permanently delete this fulfillment record"
-                  className="inline-flex items-center gap-1.5 rounded-full border border-red-200 dark:border-red-900 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-60"
-                >
-                  {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                  Delete record
-                </button>
+                <AdminDeleteButton kind="fulfillment" id={fulfillment.id} label="Delete record" onDeleted={handleDelete} />
               </div>
             )}
           </div>

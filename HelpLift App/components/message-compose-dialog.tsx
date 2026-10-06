@@ -1,6 +1,8 @@
 "use client"
 
 import { FormEvent, useEffect, useState } from "react"
+import { stageFormFiles } from "@/lib/stage-uploads"
+import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { Loader2, Paperclip, Send, X } from "lucide-react"
 import {
   Dialog,
@@ -71,7 +73,7 @@ export function MessageComposeDialog({ open, onOpenChange, recipientLabel, targe
       else if (recipientId) formData.append("recipientId", recipientId)
       attachments.forEach((file) => formData.append("attachments", file))
 
-      const res = await fetch("/api/messages", { method: "POST", body: formData })
+      const res = await fetch("/api/messages", { method: "POST", body: await stageFormFiles(formData, UPLOAD_LIMITS.messageAttachments) })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.message || "Unable to send message.")
       setSent(true)
@@ -97,12 +99,12 @@ export function MessageComposeDialog({ open, onOpenChange, recipientLabel, targe
         ) : (
           <form onSubmit={handleSubmit} className="space-y-3 pt-2">
             {error && (
-              <div className="rounded-xl bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">
+              <div className="rounded bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">
                 {error}
               </div>
             )}
             {replyTo && (
-              <blockquote className="rounded-xl border-l-4 border-blue-500 bg-slate-50 dark:bg-[#0B1220] px-3 py-2 text-xs text-slate-600 dark:text-slate-300">
+              <blockquote className="rounded border-l-4 border-blue-500 bg-slate-50 dark:bg-[#0B1220] px-3 py-2 text-xs text-slate-600 dark:text-slate-300">
                 <p className="mb-0.5 font-bold text-slate-500 dark:text-slate-400">Replying to</p>
                 <p className="line-clamp-3 whitespace-pre-line">{replyTo.snippet}</p>
               </blockquote>
@@ -120,7 +122,7 @@ export function MessageComposeDialog({ open, onOpenChange, recipientLabel, targe
                   placeholder={`Write your message to ${recipientLabel}...`}
                   required
                   maxLength={2000}
-                  className="w-full min-h-32 rounded-xl border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-3 py-2 pr-11 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  className="w-full min-h-32 rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-3 py-2 pr-11 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 />
                 <MicButton className="top-2 right-2" onText={text => setMessage(m => appendSpeech(m, text))} />
               </div>
@@ -128,14 +130,14 @@ export function MessageComposeDialog({ open, onOpenChange, recipientLabel, targe
             <div className="space-y-1">
               <Label>Attachments (optional)</Label>
               {attachments.map((file, index) => (
-                <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 dark:border-[#233350] bg-slate-50 dark:bg-[#0B1220] px-3 py-2 text-sm">
+                <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-2 rounded border border-slate-200 dark:border-[#233350] bg-slate-50 dark:bg-[#0B1220] px-3 py-2 text-sm">
                   <span className="truncate">{file.name}</span>
                   <button aria-label="Remove" type="button" onClick={() => setAttachments(files => files.filter((_, i) => i !== index))} className="shrink-0 text-slate-400 hover:text-red-500">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
               ))}
-              <label className="flex items-center gap-2 rounded-xl border border-dashed border-slate-300 dark:border-[#233350] px-3 py-2 text-sm text-slate-500 dark:text-slate-400 cursor-pointer hover:border-blue-400">
+              <label className="flex items-center gap-2 rounded border border-dashed border-slate-300 dark:border-[#233350] px-3 py-2 text-sm text-slate-500 dark:text-slate-400 cursor-pointer hover:border-blue-400">
                 <Paperclip className="w-4 h-4 shrink-0" />
                 <span>{attachments.length > 0 ? "Attach another file (max 10MB each)" : "Attach a file (max 10MB)"}</span>
                 <input
@@ -144,6 +146,7 @@ export function MessageComposeDialog({ open, onOpenChange, recipientLabel, targe
                   className="hidden"
                   onChange={(e) => setAttachments(files => [...files, ...Array.from(e.target.files || [])])}
                 />
+                  <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{describeUploadLimit(UPLOAD_LIMITS.messageAttachments)}</span>
               </label>
             </div>
             <DialogFooter className="pt-2 gap-2">

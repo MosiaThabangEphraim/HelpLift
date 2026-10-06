@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client"
 import { isAssistantEnabled, onAssistantPreferenceChange, setAssistantEnabled } from "@/lib/assistant-preference"
 import { isSpeechToTextSupported, useSpeechToText } from "@/lib/speech-to-text"
 import { isTextToSpeechSupported, primeSpeechSynthesis, speakInSentences } from "@/lib/text-to-speech"
+import { logClientAction } from "@/components/activity-tracker"
 
 // Lifty, the floating HelpLift AI assistant, rendered once for every page of the site from
 // app/layout.tsx. Answers come from /api/assistant, which works out who the
@@ -59,7 +60,7 @@ function withSiteLinks(text: string): ReactNode[] {
       <Link
         key={`${match.index}-${path}`}
         href={path}
-        className="inline-flex items-center gap-1 rounded-full bg-blue-50 dark:bg-blue-950/60 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors align-middle"
+        className="inline-flex items-center gap-1 rounded bg-blue-50 dark:bg-blue-950/60 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors align-middle"
       >
         {linkLabel(path)}
         <ArrowRight className="h-3 w-3" />
@@ -185,6 +186,7 @@ export function HelpLiftAssistant() {
     voiceRepliesRef.current = next
     setVoiceReplies(next)
     try { window.localStorage.setItem(VOICE_REPLIES_KEY, next ? "on" : "off") } catch {}
+    logClientAction("Changed settings", `Lifty voice replies turned ${next ? "on" : "off"}`)
     if (next) primeSpeechSynthesis()
     else stopSpeaking()
   }
@@ -248,6 +250,7 @@ export function HelpLiftAssistant() {
     endConversation()
     setIsChatOpen(false)
     setAssistantEnabled(false)
+    logClientAction("Hid the Lifty assistant")
     toast("Lifty is hidden", {
       description: "Turn it back on any time in Settings.",
       action: { label: "Undo", onClick: () => setAssistantEnabled(true) },
@@ -329,7 +332,7 @@ export function HelpLiftAssistant() {
           <Bot className="w-6 h-6" />
         </button>
       ) : (
-        <div className="w-[calc(100vw-2rem)] sm:w-[400px] h-[min(520px,calc(100dvh-6rem))] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+        <div className="w-[calc(100vw-2rem)] sm:w-[400px] h-[min(520px,calc(100dvh-6rem))] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-300">
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white">
             <div className="flex items-center gap-3">
@@ -398,7 +401,7 @@ export function HelpLiftAssistant() {
                   {msg.role === "user" ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
                 </div>
                 <div
-                  className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-line break-words ${
+                  className={`max-w-[75%] px-4 py-3 rounded text-sm leading-relaxed whitespace-pre-line break-words ${
                     msg.role === "user"
                       ? "bg-slate-900 text-white rounded-tr-none"
                       : msg.isError
@@ -416,7 +419,7 @@ export function HelpLiftAssistant() {
                 <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
                   <Bot className="w-4 h-4" />
                 </div>
-                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-4 py-3 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-1.5">
+                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-4 py-3 rounded rounded-tl-none shadow-sm flex items-center gap-1.5">
                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
@@ -456,7 +459,7 @@ export function HelpLiftAssistant() {
               <button
                 type="button"
                 onClick={() => endConversation()}
-                className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-600 px-3 py-1 text-[11px] font-bold text-white hover:bg-red-700 transition-colors"
+                className="inline-flex shrink-0 items-center gap-1 rounded bg-red-600 px-3 py-1 text-[11px] font-bold text-white hover:bg-red-700 transition-colors"
               >
                 <PhoneOff className="h-3 w-3" /> End
               </button>
@@ -479,7 +482,7 @@ export function HelpLiftAssistant() {
               maxLength={MAX_MESSAGE_LENGTH}
               onChange={(e) => setChatInput(e.target.value)}
               aria-label="Message Lifty"
-              className="flex-1 min-w-0 px-4 py-3 bg-slate-100 dark:bg-slate-800 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm text-slate-800 dark:text-slate-200"
+              className="flex-1 min-w-0 px-4 py-3 bg-slate-100 dark:bg-slate-800 border-0 rounded focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm text-slate-800 dark:text-slate-200"
             />
             {canListen && !conversation && (
               <button
@@ -488,7 +491,7 @@ export function HelpLiftAssistant() {
                 disabled={isTyping}
                 aria-label={speech.listening ? "Stop listening" : "Speak your message"}
                 data-tip={speech.listening ? "Stop listening" : "Speak instead of typing - it sends when you pause"}
-                className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-all disabled:opacity-50 ${
+                className={`w-11 h-11 rounded flex items-center justify-center shrink-0 transition-all disabled:opacity-50 ${
                   speech.listening ? "bg-red-600 text-white animate-pulse" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
                 }`}
               >
@@ -499,7 +502,7 @@ export function HelpLiftAssistant() {
               type="submit"
               disabled={isTyping || !chatInput.trim()}
               aria-label="Send message"
-              className="w-11 h-11 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl flex items-center justify-center shadow-md transition-all shrink-0"
+              className="w-11 h-11 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded flex items-center justify-center shadow-md transition-all shrink-0"
             >
               <Send className="w-4 h-4" />
             </button>

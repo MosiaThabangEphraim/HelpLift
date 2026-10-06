@@ -52,7 +52,7 @@ export function FeedbackDetailDialog({
               <div className="flex items-center gap-3">
                 <Stars value={feedback.rating} />
                 <span className="text-sm font-bold">{feedback.sender_name}</span>
-                <span className="rounded-full bg-slate-100 dark:bg-[#1A2740] px-2 py-0.5 text-[11px] font-bold capitalize text-slate-600 dark:text-slate-300">
+                <span className="rounded bg-slate-100 dark:bg-[#1A2740] px-2 py-0.5 text-[11px] font-bold capitalize text-slate-600 dark:text-slate-300">
                   {feedback.sender_role}
                 </span>
               </div>
