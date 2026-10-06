@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { stageFormFiles } from "@/lib/stage-uploads"
-import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
+import { checkUploadLimits, describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
+import { ProfilePicturePicker } from "@/components/profile-picture-picker"
 import { useRouter } from "next/navigation"
 import { AlertCircle, ArrowRight, Building2, CheckCircle2, FileText, HeartHandshake, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -107,6 +108,9 @@ export default function CompleteRegistrationPage() {
   const toggleCategory = (category: string) =>
     setCategories(current => (current.includes(category) ? current.filter(c => c !== category) : [...current, category]))
 
+  // Optional: a giver's display picture or an organization's logo.
+  const [picture, setPicture] = useState<File | null>(null)
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     if (!canSubmit) return
@@ -124,7 +128,20 @@ export default function CompleteRegistrationPage() {
         const attached = documents.filter(d => d.file)
         attached.forEach(d => formData.append("documentFiles", d.file as File))
         formData.append("documentTypes", JSON.stringify(attached.map(d => d.type)))
-        res = await fetch("/api/register/complete", { method: "POST", body: await stageFormFiles(formData, UPLOAD_LIMITS.registrationDocuments) })
+        const documentProblem = checkUploadLimits(attached.map(d => d.file as File), UPLOAD_LIMITS.registrationDocuments)
+        if (documentProblem) throw new Error(documentProblem)
+        if (picture) formData.append("picture", picture)
+        res = await fetch("/api/register/complete", { method: "POST", body: await stageFormFiles(formData) })
+      } else if (picture) {
+        // With a picture the form goes as multipart; the picture was checked when chosen.
+        const formData = new FormData()
+        const fields: Record<string, string> = {
+          full_name: name, phone, account_type: accountType, categories: categories.join(","), locations, password,
+          age_confirmed: String(confirmedAdult),
+        }
+        Object.entries(fields).forEach(([key, value]) => formData.append(key, value))
+        formData.append("picture", picture)
+        res = await fetch("/api/register/complete", { method: "POST", body: await stageFormFiles(formData) })
       } else {
         res = await fetch("/api/register/complete", {
           method: "POST",
@@ -264,6 +281,7 @@ export default function CompleteRegistrationPage() {
         {role === "organization" ? (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Organization Details</h2>
+            <ProfilePicturePicker role="organization" file={picture} onChange={setPicture} />
             <div>
               <FieldLabel>Organization Name</FieldLabel>
               <input value={orgName} onChange={e => setOrgName(e.target.value)} className={inputClass} placeholder="e.g. Hope Academy Foundation" required />
@@ -396,6 +414,7 @@ export default function CompleteRegistrationPage() {
                 </button>
               ))}
             </div>
+            <ProfilePicturePicker role="giver" file={picture} onChange={setPicture} />
             <div>
               <FieldLabel>{accountType === "individual" ? "Full Name" : "Business/Group Name"}</FieldLabel>
               <input value={name} onChange={e => setName(e.target.value)} className={inputClass} placeholder={googleName || undefined} required />

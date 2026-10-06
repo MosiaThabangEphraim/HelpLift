@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { isPasswordValid } from "@/lib/password"
 import { storeOrganizationDocuments } from "@/lib/organization-documents"
+import { checkProfilePicture, saveProfilePicture } from "@/lib/profile-picture"
 
 const ACCOUNT_TYPES = ["individual", "business", "group"]
 const ORGANIZATION_TYPES = ["School", "Church", "Non-Profit", "Welfare Group", "Other"]
@@ -17,7 +18,8 @@ const text = (value: unknown) => (typeof value === "string" ? value.trim() : "")
 // Finishes registration for someone who signed up with Google. Google verified
 // their email; everything else works like a normal sign-up: the same details as
 // the giver or organization registration form, and a password they choose.
-// Givers send JSON; organizations send multipart (their documents are files).
+// Givers send JSON (multipart when they add a picture); organizations send
+// multipart (their documents are files). The picture/logo is optional.
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
@@ -35,10 +37,13 @@ export async function POST(request: Request) {
     let body: Record<string, any> = {}
     let documentFiles: File[] = []
     let documentTypes: string[] = []
+    let picture: File | null = null
     if ((request.headers.get("content-type") || "").includes("multipart/form-data")) {
       const formData = await request.formData()
       formData.forEach((value, key) => { if (typeof value === "string" && !isStagedReference(value)) body[key] = value })
       documentFiles = await readUploadedFiles(formData, "documentFiles")
+      picture = await readUploadedFile(formData, "picture")
+      if (picture && picture.size === 0) picture = null
       { const uploadProblem = checkUploadLimits(documentFiles, UPLOAD_LIMITS.registrationDocuments); if (uploadProblem) return NextResponse.json({ message: uploadProblem }, { status: 400 }) }
       try {
         const parsed = JSON.parse(String(formData.get("documentTypes") || "[]"))
@@ -50,6 +55,10 @@ export async function POST(request: Request) {
 
     const password = typeof body.password === "string" ? body.password : ""
     if (!isPasswordValid(password)) return NextResponse.json({ message: PASSWORD_MESSAGE }, { status: 400 })
+    if (picture) {
+      const pictureProblem = await checkProfilePicture(picture, profile.role)
+      if (pictureProblem) return NextResponse.json({ message: pictureProblem }, { status: 400 })
+    }
 
     const admin = createAdminClient()
     let documentsUploaded = 0
@@ -62,14 +71,15 @@ export async function POST(request: Request) {
       if (!fullName) return NextResponse.json({ message: "Your name is required." }, { status: 400 })
       if (!phone) return NextResponse.json({ message: "Your phone number is required." }, { status: 400 })
       if (!ACCOUNT_TYPES.includes(accountType)) return NextResponse.json({ message: "Choose an account type." }, { status: 400 })
-      if (body.age_confirmed !== true) return NextResponse.json({ message: "You must be 18 or older to register as a giver." }, { status: 400 })
+      if (body.age_confirmed !== true && body.age_confirmed !== "true") return NextResponse.json({ message: "You must be 18 or older to register as a giver." }, { status: 400 })
 
       // Password first: if it fails, nothing else has changed. The 18+ confirmation
       // is recorded in auth metadata alongside it (no schema change needed).
       const { error: passwordError } = await supabase.auth.updateUser({ password, data: { age_confirmed_at: new Date().toISOString() } })
       if (passwordError) return NextResponse.json({ message: passwordError.message }, { status: 400 })
 
-      const picture = (user.user_metadata?.avatar_url || user.user_metadata?.picture) as string | undefined
+      // Their sign-in provider's photo, unless they chose their own picture (saved below).
+      const providerPicture = picture ? undefined : (user.user_metadata?.avatar_url || user.user_metadata?.picture) as string | undefined
       const { error: giverError } = await supabase
         .from("givers")
         .update({
@@ -78,7 +88,7 @@ export async function POST(request: Request) {
           account_type: accountType,
           preferred_categories: splitList(body.categories),
           preferred_locations: splitList(body.locations),
-          ...(picture ? { avatar_url: picture } : {}),
+          ...(providerPicture ? { avatar_url: providerPicture } : {}),
         })
         .eq("profile_id", user.id)
       if (giverError) return NextResponse.json({ message: giverError.message }, { status: 400 })
@@ -137,6 +147,8 @@ export async function POST(request: Request) {
       }
     }
 
+    const pictureFailed = picture ? !(await saveProfilePicture(admin, user.id, profile.role, picture)) : false
+
     // Only the server marks registration complete, after everything above worked.
     const { error: flagError } = await admin.from("profiles").update({ registration_complete: true }).eq("id", user.id)
     if (flagError) return NextResponse.json({ message: flagError.message }, { status: 400 })
@@ -146,6 +158,7 @@ export async function POST(request: Request) {
       role: profile.role,
       documentsUploaded,
       documentsFailed,
+      pictureFailed,
       message: documentsFailed.length
         ? `Registration complete, but ${documentsFailed.length} document(s) couldn't be uploaded (${documentsFailed.join(", ")}). You can upload them again from your dashboard.`
         : "Registration complete.",

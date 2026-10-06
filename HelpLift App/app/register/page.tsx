@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react"
 import { stageFormFiles } from "@/lib/stage-uploads"
-import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
+import { checkUploadLimits, describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
+import { ProfilePicturePicker } from "@/components/profile-picture-picker"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -61,6 +62,8 @@ export default function RegisterPage() {
   const [categories, setCategories] = useState("")
   const needCategories = useNeedCategories()
   const [locations, setLocations] = useState("")
+  // Optional: a giver's display picture or an organization's logo.
+  const [picture, setPicture] = useState<File | null>(null)
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [passwordTouched, setPasswordTouched] = useState(false)
@@ -134,10 +137,17 @@ export default function RegisterPage() {
         formData.append("categories", categories)
         formData.append("locations", locations)
       }
+      if (picture) formData.append("picture", picture)
 
+      // Documents and the picture have different limits, so check each here
+      // (the picture was already checked when it was chosen) and stage them together.
+      if (role === "organization") {
+        const documentProblem = checkUploadLimits(documents.filter(d => d.file).map(d => d.file as File), UPLOAD_LIMITS.registrationDocuments)
+        if (documentProblem) throw new Error(documentProblem)
+      }
       const response = await fetch("/api/register", {
         method: "POST",
-        body: await stageFormFiles(formData, UPLOAD_LIMITS.registrationDocuments),
+        body: await stageFormFiles(formData),
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.message || "Registration failed.")
@@ -222,6 +232,7 @@ export default function RegisterPage() {
           {role === 'organization' ? (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Organization Details</h2>
+              <ProfilePicturePicker role="organization" file={picture} onChange={setPicture} />
               <div>
                 <FieldLabel>Organization Name</FieldLabel>
                 <input value={orgName} onChange={(e) => setOrgName(e.target.value)} className={inputClass} placeholder="e.g. Hope Academy Foundation" required />
@@ -387,6 +398,7 @@ export default function RegisterPage() {
                   </button>
                 ))}
               </div>
+              <ProfilePicturePicker role="giver" file={picture} onChange={setPicture} />
               <div>
                 <FieldLabel>{accountType === 'individual' ? "Full Name" : "Business/Group Name"}</FieldLabel>
                 <input value={name} onChange={(e) => setName(e.target.value)} className={inputClass} required />

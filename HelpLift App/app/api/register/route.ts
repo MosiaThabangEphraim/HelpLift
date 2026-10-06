@@ -4,6 +4,7 @@ import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { createClient } from "@/lib/supabase/server"
 import { isPasswordValid, isValidEmail } from "@/lib/password"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { checkProfilePicture, saveProfilePicture } from "@/lib/profile-picture"
 
 const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024
 const MAX_DOCUMENTS = 10
@@ -16,10 +17,14 @@ export async function POST(req: Request) {
     let body: Record<string, any> = {}
     let documentFiles: File[] = []
     let documentTypes: string[] = []
+    // Optional display picture (giver) or logo (organization).
+    let picture: File | null = null
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await req.formData()
       documentFiles = await readUploadedFiles(formData, "documentFiles")
+      picture = await readUploadedFile(formData, "picture")
+      if (picture && picture.size === 0) picture = null
       { const uploadProblem = checkUploadLimits(documentFiles, UPLOAD_LIMITS.registrationDocuments); if (uploadProblem) return NextResponse.json({ message: uploadProblem }, { status: 400 }) }
       const rawTypes = formData.get("documentTypes")
       if (typeof rawTypes === "string") {
@@ -53,6 +58,11 @@ export async function POST(req: Request) {
     }
     if (!isValidEmail(email)) {
       return NextResponse.json({ success: false, message: "Enter a valid email address." }, { status: 400 })
+    }
+    // Check the picture before creating anything, so a bad file is reported up front.
+    if (picture) {
+      const pictureProblem = await checkProfilePicture(picture, role)
+      if (pictureProblem) return NextResponse.json({ success: false, message: pictureProblem }, { status: 400 })
     }
     if (!isPasswordValid(password)) {
       return NextResponse.json(
@@ -98,6 +108,7 @@ export async function POST(req: Request) {
 
     let documentsUploaded = 0
     const documentsFailed: string[] = []
+    let pictureFailed = false
 
     // If an authenticated session was generated or user created, ensure records exist
     if (data.user) {
@@ -221,7 +232,14 @@ export async function POST(req: Request) {
           })
         }
       }
+
+      // No session yet at email sign-up, so the picture is saved with the service role.
+      if (picture) pictureFailed = !(await saveProfilePicture(createAdminClient(), data.user.id, role, picture))
     }
+
+    const pictureNote = pictureFailed
+      ? ` Your ${role === "organization" ? "logo" : "picture"} couldn't be saved - you can add it from your dashboard.`
+      : ""
 
     return NextResponse.json(
       {
@@ -229,7 +247,8 @@ export async function POST(req: Request) {
         requiresEmailConfirmation: !data.session,
         documentsUploaded,
         documentsFailed,
-        message: registrationMessage(!!data.session, role, documentsUploaded, documentsFailed),
+        pictureFailed,
+        message: registrationMessage(!!data.session, role, documentsUploaded, documentsFailed) + pictureNote,
       },
       { status: 201 }
     )
