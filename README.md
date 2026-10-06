@@ -36,14 +36,18 @@ Either way, Supabase enforces almost every access rule at the database level via
 
 ### RESTful APIs
 
-The backend logic layer is exposed as a REST API via Next.js Route Handlers (`app/api/**/route.ts`, 100+ endpoints) - each file is a resource, and the HTTP method on it maps to the action:
+The backend logic layer is exposed as a REST API via Next.js Route Handlers (`app/api/**/route.ts`, 120+ endpoints) - each file is a resource, and the HTTP method on it maps to the action:
 
 - `GET` - fetch a resource or list (e.g. `GET /api/organization/needs`)
 - `POST` - create a resource (e.g. `POST /api/organization/needs`)
 - `PATCH` - update part of a resource (e.g. `PATCH /api/organization/needs/[id]`)
 - `DELETE` - remove a resource (e.g. `DELETE /api/admin/needs/[id]`)
 
-Requests and responses are JSON (or `multipart/form-data` for file uploads, e.g. need attachments and verification documents), routes are organized by role/resource (`api/admin/...`, `api/organization/...`, `api/giver/...`, `api/public/...`), and every non-public route authenticates the caller and checks their role/permissions before touching the database. The frontend consumes this API with plain `fetch()` calls - there's no separate API client library.
+Requests and responses are JSON (or `multipart/form-data` for forms with files, e.g. need attachments and verification documents), routes are organized by role/resource (`api/admin/...`, `api/organization/...`, `api/giver/...`, `api/public/...`), and every non-public route authenticates the caller and checks their role/permissions before touching the database. The frontend consumes this API with plain `fetch()` calls - there's no separate API client library.
+
+### File uploads
+
+Vercel rejects any request larger than 4.5 MB, so files never travel inside a form to the API. The browser uploads each file straight to a private `upload-staging` storage bucket using a one-time signed upload link (`app/api/uploads/sign`, `lib/stage-uploads.ts`). The API route that receives the form then reads the file back with the service role, checks its real type and size against that upload's limits (`lib/upload-limits.ts`), moves it to its usual bucket and deletes the staged copy (`lib/staged-uploads.ts`). Before uploading, images are compressed in the browser and every file's type is checked from its contents, not its extension (`lib/media-optimizer.ts`).
 
 ## Tech stack
 
@@ -61,6 +65,10 @@ Requests and responses are JSON (or `multipart/form-data` for file uploads, e.g.
 | Accessibility | `harper.js` (grammar checking), Web Speech API (speech-to-text / text-to-speech), adjustable font size |
 | Geolocation | Browser Geolocation API + OpenStreetMap Nominatim (free forward/reverse geocoding, no API key) for "needs near me" |
 | QR codes | `qrcode`, `html-to-image` |
+| AI | Google Gemini API (`lib/gemini.ts`) - Lifty assistant, AI need writer, Snap to pledge photo analysis |
+| Maps | Leaflet with OpenStreetMap tiles (homepage needs map) |
+| Media | `browser-image-compression`, file signature checks before upload |
+| Animation | `tw-animate-css` (tab transitions; off with Reduce motion) |
 
 ## Repository layout
 
@@ -68,7 +76,7 @@ Requests and responses are JSON (or `multipart/form-data` for file uploads, e.g.
 HelpLift/
 ├── HelpLift App/          # the Next.js application - see below
 └── supabase/
-    ├── migrations/        # ~90 timestamped SQL migrations - the source of truth for schema & RLS
+    ├── migrations/        # ~95 timestamped SQL migrations - the source of truth for schema & RLS
     ├── email-templates/   # Supabase Auth email template overrides
     └── role_based_access_all_in_one.sql
 ```
@@ -76,7 +84,7 @@ HelpLift/
 Inside `HelpLift App/`:
 
 ```
-app/              # App Router: role dashboards & public pages, plus api/ (100+ Route Handlers)
+app/              # App Router: role dashboards & public pages, plus api/ (120+ Route Handlers)
 components/       # shared React components (dialogs, cards, ui/ primitives)
 lib/              # business logic & integrations (payments, mailer, geolocation, banking, notifications...)
 hooks/            # shared React hooks
@@ -92,10 +100,21 @@ Database changes are made by adding a new timestamped file to `supabase/migratio
 - **Gift Library**: givers pledge in-kind items or funds; organizations claim pledges, subject to admin review.
 - **Donations**: EFT (with proof-of-payment upload), PayFast, and PayPal, either to a specific need/organization or directly to the platform - with generated receipts.
 - **Organization verification**: document upload and admin review before an organization's needs can go public.
-- **Admin moderation**: needs/gifts/impact-story approval, need "reopen" requests (with a required motivation), user & organization management, platform settings, analytics, and admin-only deletion of historical records (fulfilled needs, decided claims, completed fulfillments).
+- **Admin moderation**: needs/gifts/impact-story approval, need "reopen" requests (with a required motivation), user & organization management (editing names, contact and giver details, roles, suspension and password resets - but never banking details), platform settings, and analytics.
+- **Admin record deletion**: admins can delete most records, with a preview of what else will be removed. Financial records - donations, withdrawals, and needs or accounts that hold them - can never be deleted; accounts with financial history are suspended instead.
+- **Announcements**: messages to users by in-app notification and email, which can also go up as a login page banner or a public homepage notice, each switched on or off from the announcement dialog.
 - **Messaging & notifications**: in-app messaging plus email notifications, with a choice of notification sounds.
-- **Security**: Row Level Security on every table, account lockout after repeated failed logins (unlocked via an emailed verification code), WebAuthn passkeys, and database triggers preventing self-privilege-escalation.
-- **Accessibility**: grammar checking, speech-to-text/text-to-speech, adjustable font size, and four themes including high-contrast and grayscale.
+- **Lifty, the AI assistant**: a chat assistant available across the site that knows how HelpLift works and can look up live data (open needs, organizations, the signed-in user's own activity - no other users' personal data). Supports voice input and spoken replies, and can be turned off in Settings.
+- **AI need writer**: organizations describe a need in a sentence and get a complete need form filled in, which they review before posting.
+- **Snap to pledge**: givers take or upload a photo of an item and the AI fills in the gift pledge for them.
+- **Homepage needs map & live feed**: an interactive map of open needs (each pin opens the needs board) and a live feed of recent platform activity.
+- **First-time dashboard tour**: a short step-by-step tour for givers, organizations and admins on their first visit, saved per account.
+- **Live activity (admin)**: who's online now and what signed-in users are doing - pages opened, settings changed, actions taken - filterable by kind, role, person and date/time, with an option to clear the log. Kept for 90 days.
+- **Login attempts (admin)**: an audit of successful and failed sign-ins with time, device and IP address.
+- **Developers page**: a public page about how HelpLift is built, with an anonymous form for reporting bugs and ideas (with screenshots). Admins get notified and can reply by email.
+- **Security**: Row Level Security on every table, two-factor authentication by emailed code, account lockout after repeated failed logins (unlocked via an emailed verification code), WebAuthn passkeys, rate limiting on sensitive routes, 18+ age confirmation for givers at registration, and database triggers preventing self-privilege-escalation.
+- **Accessibility**: grammar checking, speech-to-text/text-to-speech (including read aloud on announcements), adjustable font size, a Reduce motion setting, optional click sounds, and four themes including high-contrast and grayscale.
+- **Dashboards**: refresh buttons that reload data without losing filters, smooth tab transitions, and an optional analog and digital clock with the date.
 - **PWA**: installable, with offline awareness.
 
 ## Getting started
@@ -109,6 +128,7 @@ npm install
 
 1. Copy the environment variables below into `HelpLift App/.env.local`.
 2. Apply every file in `supabase/migrations/` to your Supabase project, in filename order (via the SQL editor, or the Supabase CLI).
+   This also creates the storage buckets, including the private `upload-staging` bucket used for all file uploads.
 3. Configure Google/LinkedIn/Microsoft as OAuth providers in the Supabase Auth dashboard if you want social sign-in.
 4. Run the dev server:
 
@@ -130,7 +150,9 @@ Set these in `HelpLift App/.env.local` (never commit this file):
 | `CONTACT_EMAIL_TO` | Inbox the "Partner with us" contact form sends to |
 | `NOTIFICATION_WEBHOOK_SECRET` | Shared secret guarding the Supabase → Next.js notification-email webhook |
 | `PAYFAST_MERCHANT_ID` / `PAYFAST_MERCHANT_KEY` / `PAYFAST_PASSPHRASE` / `PAYFAST_URL` | PayFast payment gateway |
-| `PAYPAL_SANDBOX_CLIENT_ID` / `PAYPAL_SANDBOX_SECRET_KEY` / `PAYPAL_WEBHOOK_ID` | PayPal payment gateway |
+| `PAYPAL_SANDBOX_CLIENT_ID` / `PAYPAL_SANDBOX_SECRET_KEY` / `PAYPAL_SANDBOX_URL` / `PAYPAL_WEBHOOK_ID` | PayPal payment gateway |
+| `GEMINI_API_KEY` | Google Gemini API key for the AI features (Lifty, need writer, Snap to pledge) |
+| `NEXT_PUBLIC_ENABLE_SW` | Optional - set to `true` to turn on the service worker in development (it's always on in production) |
 
 ## Scripts
 
@@ -142,3 +164,14 @@ Run from inside `HelpLift App/`:
 | `npm run build` | Production build |
 | `npm run start` | Serve the production build |
 | `npm run lint` | Lint the codebase |
+
+## Deployment
+
+The app is built for [Vercel](https://vercel.com):
+
+1. Import the repository and set **Root Directory** to `HelpLift App`.
+2. Add the environment variables above, with `NEXT_PUBLIC_SITE_URL` set to the deployed address.
+3. In Supabase, set **Authentication → URL Configuration** (Site URL and redirect URLs) to the deployed address, and point the notification-email database webhook at `/api/webhooks/notification-created`.
+4. Point the PayPal webhook at `/api/public/paypal/webhook` and use its ID for `PAYPAL_WEBHOOK_ID`.
+
+Every push to `main` redeploys the site. Database migrations are not applied automatically - apply new ones in Supabase before pushing code that depends on them.
