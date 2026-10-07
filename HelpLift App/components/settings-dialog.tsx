@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { PasskeySettings } from "@/components/passkey-settings"
+import { setReturnTo } from "@/lib/window-return"
 import {
   getNotificationSoundChoice,
   isNotificationSoundEnabled,
@@ -49,7 +50,7 @@ function SettingRow({
   danger?: boolean
 }) {
   return (
-    <div className={`flex items-center gap-4 rounded border p-4 ${danger ? "border-red-200 dark:border-red-900/60" : "border-slate-200 dark:border-[#233350]"}`}>
+    <div className={`flex h-full items-center gap-4 rounded border p-4 ${danger ? "border-red-200 dark:border-red-900/60" : "border-slate-200 dark:border-[#233350]"}`}>
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded ${danger ? "bg-red-50 dark:bg-red-950/40 text-red-600" : "bg-slate-100 dark:bg-[#1A2740] text-slate-600 dark:text-slate-300"}`}>
         {icon}
       </div>
@@ -123,6 +124,13 @@ export function SettingsDialog({
     }
   }, [open])
 
+  // Windows opened from here (Edit profile, Change password...) get
+  // "Back to Settings" - see lib/window-return.ts.
+  const withReturn = (action?: () => void) => () => {
+    setReturnTo("Settings", () => onOpenChange(true))
+    action?.()
+  }
+
   const changeFontSize = (level: FontSizeLevel) => {
     setFontSize(level)
     setFontSizeLevel(level)
@@ -176,38 +184,42 @@ export function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      {/* Two columns on larger screens; one column on phones. Size and the
+          maximize button come from DialogContent itself. */}
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>Manage your account and preferences.</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 pt-1">
+        <div className="grid grid-cols-1 gap-3 pt-1 md:grid-cols-2 md:grid-flow-row-dense">
           {onEditProfile && (
             <SettingRow icon={<UserRound className="h-5 w-5" />} title="Edit profile" description="Update your details, contact information, email and password.">
-              <Button type="button" variant="outline" size="sm" onClick={onEditProfile}>Edit</Button>
+              <Button type="button" variant="outline" size="sm" onClick={withReturn(onEditProfile)}>Edit</Button>
             </SettingRow>
           )}
 
           {!onEditProfile && onChangeEmail && (
             <SettingRow icon={<AtSign className="h-5 w-5" />} title="Login email" description="Change the email address you sign in with.">
-              <Button type="button" variant="outline" size="sm" onClick={onChangeEmail}>Change</Button>
+              <Button type="button" variant="outline" size="sm" onClick={withReturn(onChangeEmail)}>Change</Button>
             </SettingRow>
           )}
 
           {!onEditProfile && onChangePassword && (
             <SettingRow icon={<KeyRound className="h-5 w-5" />} title="Change password" description="Choose a new password for your account.">
-              <Button type="button" variant="outline" size="sm" onClick={onChangePassword}>Change</Button>
+              <Button type="button" variant="outline" size="sm" onClick={withReturn(onChangePassword)}>Change</Button>
             </SettingRow>
           )}
 
           {onPlatformSettings && (
             <SettingRow icon={<SlidersHorizontal className="h-5 w-5" />} title="Platform settings" description="Maintenance mode, bank accounts, need categories and withdrawal limits.">
-              <Button type="button" variant="outline" size="sm" onClick={onPlatformSettings} data-tip="Open maintenance mode, bank accounts, need categories and withdrawal limits">Open</Button>
+              <Button type="button" variant="outline" size="sm" onClick={withReturn(onPlatformSettings)} data-tip="Open maintenance mode, bank accounts, need categories and withdrawal limits">Open</Button>
             </SettingRow>
           )}
 
-          <PasskeySettings open={open} />
+          <div className="md:col-span-2">
+            <PasskeySettings open={open} />
+          </div>
 
           {onToggleTwoFactor && (
             <SettingRow
@@ -233,7 +245,7 @@ export function SettingsDialog({
           </SettingRow>
 
           {soundOn && (
-            <div className="rounded border border-slate-200 dark:border-[#233350] p-4 -mt-1">
+            <div className="rounded border border-slate-200 dark:border-[#233350] p-4 md:col-span-2">
               <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-2">Choose a sound</p>
               <div className="flex flex-wrap gap-1.5">
                 {NOTIFICATION_SOUNDS.map(option => (
@@ -370,11 +382,13 @@ export function SettingsDialog({
           )}
 
           {onDeleteAccount && (
+            <div className="md:col-span-2">
             <SettingRow danger icon={<Trash2 className="h-5 w-5" />} title="Delete account" description="Permanently delete your account and its data. This can't be undone.">
-              <Button type="button" variant="outline" size="sm" onClick={onDeleteAccount} className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/40">
+              <Button type="button" variant="outline" size="sm" onClick={withReturn(onDeleteAccount)} className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/40">
                 Delete
               </Button>
             </SettingRow>
+            </div>
           )}
         </div>
       </DialogContent>

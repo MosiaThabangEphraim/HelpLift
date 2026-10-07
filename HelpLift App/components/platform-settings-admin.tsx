@@ -361,11 +361,12 @@ export function PlatformSettingsAdmin() {
     return <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-blue-600" /></div>
   }
 
+  // Two columns on wide screens; the larger sections span both.
   return (
-    <div className="space-y-6">
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
 
       {/* --- Maintenance mode --- */}
-      <section className="rounded border border-slate-200 dark:border-[#233350] p-5 space-y-3">
+      <section className="rounded border border-slate-200 dark:border-[#233350] p-5 space-y-3 lg:col-span-2">
         <div className="flex items-center gap-2">
           <Wrench className="w-4 h-4 text-amber-600" />
           <h3 className="text-sm font-bold">Maintenance mode</h3>
@@ -448,7 +449,7 @@ export function PlatformSettingsAdmin() {
       </section>
 
       {/* --- Badge thresholds --- */}
-      <section className="rounded border border-slate-200 dark:border-[#233350] p-5 space-y-4">
+      <section className="rounded border border-slate-200 dark:border-[#233350] p-5 space-y-4 lg:col-span-2">
         <div className="flex items-center gap-2">
           <Award className="w-4 h-4 text-amber-600" />
           <h3 className="text-sm font-bold">Badge thresholds</h3>
@@ -498,7 +499,7 @@ export function PlatformSettingsAdmin() {
       </section>
 
       {/* --- Monthly spotlight override --- */}
-      <section className="rounded border border-slate-200 dark:border-[#233350] p-5 space-y-4">
+      <section className="rounded border border-slate-200 dark:border-[#233350] p-5 space-y-4 lg:col-span-2">
         <div className="flex items-center gap-2">
           <Trophy className="w-4 h-4 text-amber-600" />
           <h3 className="text-sm font-bold">Giver / Organization of the Month</h3>
@@ -586,7 +587,7 @@ export function PlatformSettingsAdmin() {
       </section>
 
       {/* --- Bank accounts --- */}
-      <section className="rounded border border-slate-200 dark:border-[#233350] p-5 space-y-4">
+      <section className="rounded border border-slate-200 dark:border-[#233350] p-5 space-y-4 lg:col-span-2">
         <div className="flex items-center gap-2">
           <Banknote className="w-4 h-4 text-emerald-600" />
           <h3 className="text-sm font-bold">HelpLift's bank accounts</h3>
@@ -641,7 +642,7 @@ export function PlatformSettingsAdmin() {
       </section>
 
       {/* --- Need categories --- */}
-      <section className="rounded border border-slate-200 dark:border-[#233350] p-5 space-y-4">
+      <section className="rounded border border-slate-200 dark:border-[#233350] p-5 space-y-4 lg:col-span-2">
         <div className="flex items-center gap-2">
           <Tag className="w-4 h-4 text-purple-600" />
           <h3 className="text-sm font-bold">Need categories</h3>

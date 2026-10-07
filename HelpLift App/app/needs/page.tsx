@@ -39,6 +39,7 @@ import { LocateFixed } from "lucide-react"
 import { ViewToggle, type ListView } from "@/components/view-toggle"
 import { OrgLogo } from "@/components/org-logo"
 import { RefreshButton } from "@/components/refresh-button"
+import { MaximizeToggle } from "@/components/maximize-toggle"
 
 type OrganizationInfo = {
   id: string
@@ -679,7 +680,8 @@ export default function PublicNeedsPage() {
         {/* --- EXPRESS INTEREST MODAL FOR LOGGED-IN GIVERS --- */}
         {selectedNeed && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in">
-            <div className="w-full max-w-lg bg-white dark:bg-[#121B2E] border border-slate-200 dark:border-[#233350] rounded p-6 md:p-8 shadow-2xl space-y-6">
+            <div className="relative w-full max-w-3xl lg:max-w-5xl max-h-[90vh] overflow-y-auto pt-12 md:pt-12 bg-white dark:bg-[#121B2E] border border-slate-200 dark:border-[#233350] rounded p-6 md:p-8 shadow-2xl space-y-6">
+              <MaximizeToggle />
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 mb-2">
@@ -795,7 +797,8 @@ export default function PublicNeedsPage() {
         {/* --- AUTH PROMPT MODAL FOR UNAUTHENTICATED USERS --- */}
         {showAuthPrompt && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in">
-            <div className="w-full max-w-md bg-white dark:bg-[#121B2E] border border-slate-200 dark:border-[#233350] rounded p-6 md:p-8 shadow-2xl text-center space-y-6">
+            <div className="relative w-full max-w-3xl lg:max-w-5xl max-h-[90vh] overflow-y-auto pt-12 md:pt-12 bg-white dark:bg-[#121B2E] border border-slate-200 dark:border-[#233350] rounded p-6 md:p-8 shadow-2xl text-center space-y-6">
+              <MaximizeToggle />
               <div className="w-14 h-14 bg-blue-50 dark:bg-blue-950/60 border border-blue-100 dark:border-blue-900 rounded flex items-center justify-center mx-auto text-blue-600 dark:text-blue-400">
                 <HeartHandshake className="w-7 h-7" />
               </div>

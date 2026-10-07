@@ -2,9 +2,10 @@
 
 import * as React from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
-import { XIcon } from 'lucide-react'
+import { ArrowLeftIcon, Maximize2Icon, Minimize2Icon, XIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { clearReturnTo, getReturnTo } from '@/lib/window-return'
 
 function Dialog({
   ...props
@@ -50,10 +51,20 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  allowMaximize = true,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  /** Shows a maximize/restore button next to the close button (on by default). */
+  allowMaximize?: boolean
 }) {
+  // Every window opens large (the same size as Settings) and can be
+  // maximized to fill the screen. The content unmounts when the window
+  // closes, so it always reopens at the normal size.
+  const [maximized, setMaximized] = React.useState(false)
+  // Opened from another window (e.g. a notification from the Notifications
+  // list)? Then offer a way back to it - see lib/window-return.ts.
+  const [returnTo] = React.useState(() => getReturnTo())
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
@@ -62,10 +73,48 @@ function DialogContent({
         className={cn(
           'bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] max-h-[85vh] translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg',
           className,
+          // Applied after the window's own classes so every window shares one size.
+          'sm:max-w-3xl lg:max-w-5xl max-h-[90vh]',
+          // content-start: keep sections stacked at the top instead of the
+          // grid spreading them out to fill the full screen height.
+          maximized && 'w-screen max-w-none sm:max-w-none lg:max-w-none h-[100dvh] max-h-[100dvh] rounded-none border-0 content-start',
+          // Room above the title for the "Back to ..." link.
+          returnTo && 'pt-12',
         )}
         {...props}
       >
+        {returnTo && (
+          <DialogPrimitive.Close asChild>
+            <button
+              type="button"
+              onClick={() => {
+                clearReturnTo()
+                // Let this window close before the previous one reopens.
+                window.setTimeout(returnTo.reopen, 120)
+              }}
+              className="absolute top-4 left-6 inline-flex items-center gap-1.5 rounded px-1.5 py-1 -ml-1.5 text-xs font-bold text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/40 [&_svg]:size-3.5"
+            >
+              <ArrowLeftIcon /> Back to {returnTo.label}
+            </button>
+          </DialogPrimitive.Close>
+        )}
         {children}
+        {allowMaximize && (
+          <button
+            type="button"
+            onClick={() => setMaximized(m => !m)}
+            aria-label={maximized ? 'Restore size' : 'Maximize'}
+            aria-pressed={maximized}
+            data-tip={maximized ? 'Restore size' : 'Maximize'}
+            className={cn(
+              'absolute rounded p-1 text-slate-400 opacity-80 transition-colors hover:bg-slate-100 hover:text-slate-600 hover:opacity-100 dark:hover:bg-[#1A2740] dark:hover:text-slate-300 [&_svg]:size-4',
+              // Beside the built-in close button, or left of a window's own header close button.
+              showCloseButton ? 'top-3 right-10' : 'top-6 right-14',
+            )}
+          >
+            {maximized ? <Minimize2Icon /> : <Maximize2Icon />}
+          </button>
+        )}
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"

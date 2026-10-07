@@ -91,6 +91,8 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { SettingsDialog } from "@/components/settings-dialog"
 import { AnalogClock } from "@/components/analog-clock"
+import { TimeGreeting } from "@/components/time-greeting"
+import { setReturnTo } from "@/lib/window-return"
 import { ChangeEmailFlow, ChangePasswordFlow } from "@/components/account-security"
 import { MicButton } from "@/components/mic-button"
 import { GrammarCheckButton } from "@/components/grammar-check-button"
@@ -120,6 +122,7 @@ import {
 import { AnnouncementComposeDialog } from "@/components/announcement-compose-dialog"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { CountUp } from "@/components/count-up"
+import { NotificationsWindow } from "@/components/notifications-window"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1001,7 +1004,9 @@ export default function AdminDashboardPage() {
     <main className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100">
       <div className="mx-auto max-w-[2400px] px-4 md:px-10 py-10 md:py-14 space-y-6">
 
-        <div className="flex justify-end">
+        {/* Greeting for the time of day, with the clock and date beside it. */}
+        <div className="flex flex-wrap items-center justify-end gap-x-8 gap-y-3">
+          <TimeGreeting name={profiles.find(p => p.email === ownEmail)?.full_name} firstNameOnly />
           <AnalogClock />
         </div>
 
@@ -1073,56 +1078,21 @@ export default function AdminDashboardPage() {
               <Settings className="h-4 w-4" />
             </button>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  aria-label="Notifications"
-                  data-tip={unreadNotifications > 0 ? `Notifications: ${unreadNotifications} need attention. Click to see them.` : "Notifications. You're all caught up."}
-                  className="relative inline-flex h-9 w-9 items-center justify-center rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740] transition-colors">
-                  <Bell className="w-4 h-4" />
-                  {unreadNotifications > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
-                      {unreadNotifications > 9 ? "9+" : unreadNotifications}
-                    </span>
-                  )}
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-80">
-                <div className="flex items-center justify-between gap-2 px-2 py-1.5">
-                  <DropdownMenuLabel className="p-0">Notifications</DropdownMenuLabel>
-                  {unreadMessages > 0 && (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.preventDefault(); markAllMessagesRead() }}
-                      data-tip="Mark every message as read (doesn't affect items still awaiting review below)"
-                      className="text-xs font-bold text-blue-600 hover:underline"
-                    >
-                      Mark all as read
-                    </button>
-                  )}
-                </div>
-                <DropdownMenuSeparator />
-                {notificationItems.length === 0 ? (
-                  <p className="px-2 py-4 text-center text-xs text-muted-foreground">No notifications yet.</p>
-                ) : (
-                  <div className="max-h-80 overflow-y-auto">
-                    {notificationItems.map(item => (
-                      <DropdownMenuItem
-                        key={item.id}
-                        onSelect={(e) => { e.preventDefault(); item.onOpen() }}
-                        className={`flex items-start gap-2 whitespace-normal ${!item.read ? "bg-blue-50 dark:bg-blue-950/30" : ""}`}
-                      >
-                        <item.icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
-                        <div className="flex flex-col items-start gap-0.5">
-                          <span className="font-semibold text-xs">{item.title}</span>
-                          <span className="text-xs text-muted-foreground line-clamp-2">{item.subtitle}</span>
-                        </div>
-                      </DropdownMenuItem>
-                    ))}
-                  </div>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <NotificationsWindow
+              unreadCount={unreadNotifications}
+              buttonTip={unreadNotifications > 0 ? `Notifications: ${unreadNotifications} need attention. Click to see them.` : "Notifications. You're all caught up."}
+              onMarkAllRead={unreadMessages > 0 ? markAllMessagesRead : undefined}
+              markAllTip="Mark every message as read (doesn't affect items still awaiting review)"
+              items={notificationItems.map(item => ({
+                id: item.id,
+                title: item.title,
+                subtitle: item.subtitle,
+                read: item.read,
+                createdAt: item.created_at,
+                icon: item.icon,
+                onOpen: item.onOpen,
+              }))}
+            />
 
             <RefreshButton onRefresh={refreshAll} />
             <Link
@@ -1188,7 +1158,7 @@ export default function AdminDashboardPage() {
             <StoriesView stories={stories} onReview={reviewStory} onDeleted={afterDelete} />
           </TabsContent>
           <TabsContent value="messages" className={tabMotion}>
-            <MessagesView refreshKey={refreshKey} messages={messages} onOpen={openMessage} onDeleted={afterDelete} />
+            <MessagesView refreshKey={refreshKey} messages={messages} onOpen={item => { setReturnTo("Messages", () => {}); openMessage(item) }} onDeleted={afterDelete} />
           </TabsContent>
           <TabsContent value="users" className={`space-y-6 ${tabMotion}`}>
             <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Users view">
@@ -1390,7 +1360,7 @@ export default function AdminDashboardPage() {
         onPlatformSettings={() => { setSettingsMessage(""); setSettingsMode("platform") }}
       />
       <Dialog open={isSettingsOpen && settingsMode !== "menu"} onOpenChange={open => !open && setSettingsMode("menu")}>
-        <DialogContent showCloseButton={false} className={settingsMode === "platform" ? "sm:max-w-3xl max-h-[85vh] overflow-y-auto" : "sm:max-w-lg"}>
+        <DialogContent showCloseButton={false} className="overflow-y-auto">
           <DialogHeader className="flex flex-row items-center justify-between">
             <DialogTitle>
               {settingsMode === "email" ? "Change Login Email" : settingsMode === "password" ? "Change Password" : "Platform Settings"}

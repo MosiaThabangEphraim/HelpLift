@@ -114,8 +114,12 @@ import { FeedbackButton } from "@/components/feedback-button"
 import { SupportPlatformDialog } from "@/components/support-platform-dialog"
 import { SettingsDialog } from "@/components/settings-dialog"
 import { AnalogClock } from "@/components/analog-clock"
+import { TimeGreeting } from "@/components/time-greeting"
+import { setReturnTo } from "@/lib/window-return"
 import { PasskeyPrompt } from "@/components/passkey-prompt"
 import { useNotificationAlerts } from "@/hooks/use-notification-alerts"
+import { MaximizeToggle } from "@/components/maximize-toggle"
+import { NotificationsWindow } from "@/components/notifications-window"
 
 type Organization = {
   id: string
@@ -1271,7 +1275,9 @@ export default function OrganizationDashboardPage() {
     <main className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100">
       <div className="mx-auto max-w-[2400px] px-4 md:px-10 py-10 md:py-14 space-y-6">
 
-        <div className="flex justify-end">
+        {/* Greeting for the time of day, with the clock and date beside it. */}
+        <div className="flex flex-wrap items-center justify-end gap-x-8 gap-y-3">
+          <TimeGreeting name={organization?.name} />
           <AnalogClock />
         </div>
 
@@ -1328,54 +1334,21 @@ export default function OrganizationDashboardPage() {
               </button>
             )}
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  data-tour="notifications"
-                  aria-label="Notifications"
-                  data-tip={unreadCount > 0 ? `Notifications: ${unreadCount} unread. Click to see them.` : "Notifications. You're all caught up."}
-                  className="relative inline-flex h-9 w-9 items-center justify-center rounded-sm border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740] transition-colors">
-                  <Bell className="w-4 h-4" />
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
-                      {unreadCount > 9 ? "9+" : unreadCount}
-                    </span>
-                  )}
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-80">
-                <div className="flex items-center justify-between gap-2 px-2 py-1.5">
-                  <DropdownMenuLabel className="p-0">Notifications</DropdownMenuLabel>
-                  {unreadCount > 0 && (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.preventDefault(); markAllNotificationsRead() }}
-                      data-tip="Mark every notification as read"
-                      className="text-xs font-bold text-blue-600 hover:underline"
-                    >
-                      Mark all as read
-                    </button>
-                  )}
-                </div>
-                <DropdownMenuSeparator />
-                {notifications.length === 0 ? (
-                  <p className="px-2 py-4 text-center text-xs text-muted-foreground">No notifications yet.</p>
-                ) : (
-                  <div className="max-h-80 overflow-y-auto">
-                    {notifications.map(item => (
-                      <DropdownMenuItem
-                        key={item.id}
-                        onSelect={(e) => { e.preventDefault(); openMessage(item) }}
-                        className={`flex flex-col items-start gap-0.5 whitespace-normal ${!item.read_at ? "bg-blue-50 dark:bg-blue-950/30" : ""}`}
-                      >
-                        <span className="font-semibold text-xs">{item.title}</span>
-                        <span className="text-xs text-muted-foreground line-clamp-2">{item.message}</span>
-                      </DropdownMenuItem>
-                    ))}
-                  </div>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <NotificationsWindow
+              dataTour="notifications"
+              buttonClassName="rounded-sm"
+              unreadCount={unreadCount}
+              buttonTip={unreadCount > 0 ? `Notifications: ${unreadCount} unread. Click to see them.` : "Notifications. You're all caught up."}
+              onMarkAllRead={markAllNotificationsRead}
+              items={notifications.map(item => ({
+                id: item.id,
+                title: item.title,
+                subtitle: item.message,
+                read: !!item.read_at,
+                createdAt: item.created_at,
+                onOpen: () => openMessage(item),
+              }))}
+            />
 
             <Link
               href="/organizations"
@@ -1416,7 +1389,7 @@ export default function OrganizationDashboardPage() {
               data-tour="badges"
               onClick={() => setShowBadges(true)}
               data-tip="Your organization's badges and progress toward the next one"
-              className="inline-flex items-center gap-1.5 rounded-sm border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40 px-4 py-2 text-sm font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-950/70"
+              className="inline-flex items-center gap-1.5 rounded-sm border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 px-4 py-2 text-sm font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950/70"
             >
               <Star className="h-3.5 w-3.5" fill="currentColor" /> Badges
             </button>
@@ -2202,7 +2175,8 @@ export default function OrganizationDashboardPage() {
                       key={item.id}
                       role="button"
                       tabIndex={0}
-                      onClick={() => openMessage(item)}
+                      // "Back to Messages" closes the message and leaves you on the list.
+                      onClick={() => { setReturnTo("Messages", () => {}); openMessage(item) }}
                       onKeyDown={activateOnKey}
                       className={`w-full rounded border p-4 text-left cursor-pointer ${item.read_at ? "border-slate-200 dark:border-[#233350]" : "border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40"}`}
                     >
@@ -2903,7 +2877,8 @@ export default function OrganizationDashboardPage() {
       {/* --- VERIFICATION PROOF MODAL (Item 6) --- */}
       {verifyingFulfillment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="w-full max-w-md bg-white dark:bg-[#121B2E] rounded p-6 md:p-8 shadow-2xl space-y-5">
+          <div className="relative w-full max-w-3xl lg:max-w-5xl max-h-[90vh] overflow-y-auto pt-12 md:pt-12 bg-white dark:bg-[#121B2E] rounded p-6 md:p-8 shadow-2xl space-y-5">
+            <MaximizeToggle />
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-bold bg-emerald-50 text-emerald-700 mb-2">
