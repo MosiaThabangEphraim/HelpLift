@@ -194,6 +194,8 @@ Donating:
   ("Donate to HelpLift" supports running the platform, not any organization).
   Visitors can support the platform from the homepage without an account.
 - Payment methods: EFT (bank transfer), PayFast, or PayPal.
+- International donors (paying from outside South Africa) should use PayPal. PayPal
+  charges in US dollars, converted from the Rand amount at the day's exchange rate.
 - EFT: transfer to the bank account shown, then upload proof of payment. An
   administrator confirms it.
 - PayFast/PayPal: confirmed automatically after payment.

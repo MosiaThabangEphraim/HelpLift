@@ -7,12 +7,15 @@
 // Live tab's Client ID/Secret and change apiBase() to
 // https://api-m.paypal.com.
 //
-// Currency note: PayPal does not support ZAR at all (no South African Rand
-// in its supported-currency list), while the rest of this app is priced in
-// Rands throughout. Rather than a real FX conversion (unnecessary complexity
-// for sandbox money that isn't real either way), the Rand amount is sent to
-// PayPal as-is under currency code USD. This is a real limitation worth
-// noting if this were ever taken beyond sandbox/demo use.
+// Currency: PayPal does not support ZAR at all (no South African Rand in its
+// supported-currency list), while the rest of this app is priced in Rands.
+// So the Rand amount is converted to US dollars at today's rate
+// (lib/exchange-rates.ts) and PayPal charges that. The donation itself is
+// still recorded in Rands. The order carries both amounts and the rate in
+// its custom_id ("zar=...;usd=...;rate=..."), so the capture can be checked
+// against exactly what was asked for, without storing anything extra.
+
+import { getZarToUsdRate, zarToUsd } from "@/lib/exchange-rates"
 
 function apiBase() {
   return "https://api-m.sandbox.paypal.com"
@@ -36,18 +39,32 @@ async function getAccessToken(): Promise<string> {
   return data.access_token
 }
 
-export type PaypalOrder = { id: string; approveUrl: string }
+export type PaypalOrder = { id: string; approveUrl: string; usdAmount: number; zarToUsdRate: number }
+
+// "zar=100.00;usd=5.45;rate=0.054512" - what the order was created for.
+export function parseOrderAmounts(customId: unknown): { zar: number; usd: number; rate: number } | null {
+  if (typeof customId !== "string") return null
+  const values = Object.fromEntries(customId.split(";").map(part => part.split("=")))
+  const zar = Number(values.zar), usd = Number(values.usd), rate = Number(values.rate)
+  return Number.isFinite(zar) && Number.isFinite(usd) && Number.isFinite(rate) ? { zar, usd, rate } : null
+}
 
 // Creates an order and returns the link the browser should be sent to for
 // the donor to approve it on paypal.com - the equivalent of PayFast's
 // buildPaymentFields() "action" + signed fields.
 export async function createOrder(input: {
+  /** The donation in Rands - converted to US dollars here. */
   amount: number
   referenceId: string
   description: string
   returnUrl: string
   cancelUrl: string
 }): Promise<PaypalOrder> {
+  // Convert first: if no exchange rate can be found, nothing is created.
+  const { rate } = await getZarToUsdRate()
+  const usd = zarToUsd(input.amount, rate)
+  const zarLabel = `R${input.amount.toFixed(2)}`
+
   const token = await getAccessToken()
   const res = await fetch(`${apiBase()}/v2/checkout/orders`, {
     method: "POST",
@@ -59,8 +76,10 @@ export async function createOrder(input: {
       intent: "CAPTURE",
       purchase_units: [{
         reference_id: input.referenceId,
-        description: input.description.slice(0, 127),
-        amount: { currency_code: "USD", value: input.amount.toFixed(2) },
+        // The donor sees the Rand amount on PayPal's page too.
+        description: `${input.description} (${zarLabel})`.slice(0, 127),
+        custom_id: `zar=${input.amount.toFixed(2)};usd=${usd.toFixed(2)};rate=${rate.toFixed(6)}`,
+        amount: { currency_code: "USD", value: usd.toFixed(2) },
       }],
       application_context: {
         brand_name: "HelpLift",
@@ -77,10 +96,17 @@ export async function createOrder(input: {
   const data = await res.json()
   const approveUrl = (data.links || []).find((l: any) => l.rel === "approve")?.href
   if (!approveUrl) throw new Error("PayPal did not return an approval link.")
-  return { id: data.id, approveUrl }
+  return { id: data.id, approveUrl, usdAmount: usd, zarToUsdRate: rate }
 }
 
-export type PaypalCaptureResult = { status: string; amount: number; captureId: string | null }
+export type PaypalCaptureResult = {
+  status: string
+  /** What PayPal captured, in US dollars. */
+  amount: number
+  captureId: string | null
+  /** What the order was created for (see parseOrderAmounts), if known. */
+  ordered: { zar: number; usd: number; rate: number } | null
+}
 
 // Captures a previously-approved order - the equivalent of PayFast's
 // validate() call, except here the capture call itself both confirms AND
@@ -106,11 +132,13 @@ export async function captureOrder(orderId: string): Promise<PaypalCaptureResult
     }
     throw new Error(`PayPal capture failed (${res.status}): ${JSON.stringify(data)}`)
   }
-  const capture = data.purchase_units?.[0]?.payments?.captures?.[0]
+  const unit = data.purchase_units?.[0]
+  const capture = unit?.payments?.captures?.[0]
   return {
     status: data.status,
     amount: Number(capture?.amount?.value || 0),
     captureId: capture?.id || null,
+    ordered: parseOrderAmounts(capture?.custom_id ?? unit?.custom_id),
   }
 }
 
@@ -120,11 +148,13 @@ async function getOrderStatus(orderId: string): Promise<PaypalCaptureResult> {
     headers: { Authorization: `Bearer ${token}` },
   })
   const data = await res.json().catch(() => ({}))
-  const capture = data.purchase_units?.[0]?.payments?.captures?.[0]
+  const unit = data.purchase_units?.[0]
+  const capture = unit?.payments?.captures?.[0]
   return {
     status: data.status,
     amount: Number(capture?.amount?.value || 0),
     captureId: capture?.id || null,
+    ordered: parseOrderAmounts(capture?.custom_id ?? unit?.custom_id),
   }
 }
 

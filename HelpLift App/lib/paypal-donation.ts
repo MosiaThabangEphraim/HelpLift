@@ -30,10 +30,18 @@ export async function reconcilePaypalOrder(
 
   const capture = await captureOrder(orderId)
   const paypalSucceeded = capture.status === "COMPLETED"
-  if (paypalSucceeded && Math.abs(capture.amount - Number(donation.amount)) > 1) {
-    // Wider tolerance than PayFast's - this is a ZAR amount sent to PayPal as
-    // a same-numeric USD value (see lib/paypal.ts), not a real FX match.
-    console.warn("PayPal reconcile: amount mismatch", { donationId, expected: donation.amount, received: capture.amount })
+  // PayPal charges in US dollars (lib/paypal.ts). The order records the Rand
+  // amount and the dollars it was converted to, so check both: the order was
+  // for this donation's amount, and PayPal captured exactly those dollars.
+  if (paypalSucceeded && capture.ordered) {
+    const rightDonation = Math.abs(capture.ordered.zar - Number(donation.amount)) < 0.01
+    const rightDollars = Math.abs(capture.amount - capture.ordered.usd) < 0.01
+    if (!rightDonation || !rightDollars) {
+      console.warn("PayPal reconcile: amount mismatch", { donationId, donationZar: donation.amount, ordered: capture.ordered, capturedUsd: capture.amount })
+    }
+  } else if (paypalSucceeded) {
+    // Orders created before the dollar conversion don't carry their amounts.
+    console.warn("PayPal reconcile: order has no recorded amounts to check", { donationId, capturedUsd: capture.amount })
   }
 
   const newStatus: "successful" | "unsuccessful" = paypalSucceeded ? "successful" : "unsuccessful"

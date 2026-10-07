@@ -216,10 +216,12 @@ export function DonateDialog({ open, onOpenChange, need, onDone, initialAmount, 
                 >
                   <CreditCard className="w-4 h-4 text-blue-600 mb-1.5" />
                   <p className="text-sm font-bold">PayPal</p>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Pay with your PayPal balance or card</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">For international payments - PayPal balance or card</p>
                 </button>
               </div>
             </div>
+
+
 
             {method === "eft" && (
               <div className="space-y-1.5">
