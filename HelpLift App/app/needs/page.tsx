@@ -595,7 +595,7 @@ export default function PublicNeedsPage() {
                       <h3 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white line-clamp-2">
                         {need.title}
                       </h3>
-                      <p className="mt-2 text-sm text-slate-600 dark:text-slate-400 line-clamp-3 leading-relaxed">
+                      <p className="mt-2 text-sm text-slate-600 dark:text-slate-400 line-clamp-3 leading-relaxed text-justify-smart">
                         {need.description}
                       </p>
                       <div className="mt-2">
@@ -679,7 +679,7 @@ export default function PublicNeedsPage() {
 
         {/* --- EXPRESS INTEREST MODAL FOR LOGGED-IN GIVERS --- */}
         {selectedNeed && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in">
             <div className="relative w-full max-w-3xl lg:max-w-5xl max-h-[90vh] overflow-y-auto pt-12 md:pt-12 bg-white dark:bg-[#121B2E] border border-slate-200 dark:border-[#233350] rounded p-6 md:p-8 shadow-2xl space-y-6">
               <MaximizeToggle />
               <div className="flex items-start justify-between gap-4">
@@ -796,7 +796,7 @@ export default function PublicNeedsPage() {
 
         {/* --- AUTH PROMPT MODAL FOR UNAUTHENTICATED USERS --- */}
         {showAuthPrompt && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in">
             <div className="relative w-full max-w-3xl lg:max-w-5xl max-h-[90vh] overflow-y-auto pt-12 md:pt-12 bg-white dark:bg-[#121B2E] border border-slate-200 dark:border-[#233350] rounded p-6 md:p-8 shadow-2xl text-center space-y-6">
               <MaximizeToggle />
               <div className="w-14 h-14 bg-blue-50 dark:bg-blue-950/60 border border-blue-100 dark:border-blue-900 rounded flex items-center justify-center mx-auto text-blue-600 dark:text-blue-400">

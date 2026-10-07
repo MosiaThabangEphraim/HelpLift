@@ -172,7 +172,7 @@ export function SnapToPledge({ onDraft }: { onDraft: (draft: PledgeDraft, photo:
       </div>
 
       {cameraOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 p-4" role="dialog" aria-modal="true" aria-label="Take a photo">
+        <div className="fixed inset-0 z-[230] flex items-center justify-center bg-slate-950/80 p-4" role="dialog" aria-modal="true" aria-label="Take a photo">
           <div className="w-full max-w-lg rounded bg-white dark:bg-slate-900 p-4 shadow-2xl space-y-3">
             <div className="flex items-center justify-between">
               <p className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-slate-100">

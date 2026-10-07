@@ -14,6 +14,8 @@ export function CountUp({
   prefix = "",
   decimals = 0,
   duration = 1200,
+  delay = 0,
+  easing = "cubic",
   className,
 }: {
   value: number
@@ -21,6 +23,10 @@ export function CountUp({
   /** Decimal places to animate and display to - e.g. 2 for a Rand amount, matching formatCurrency's own formatting. */
   decimals?: number
   duration?: number
+  /** Wait this long (ms) after scrolling into view before counting - for staggering a row of numbers. */
+  delay?: number
+  /** "expo" races up then settles slowly into the final number. */
+  easing?: "cubic" | "expo"
   className?: string
 }) {
   const ref = useRef<HTMLSpanElement>(null)
@@ -45,7 +51,9 @@ export function CountUp({
       const start = performance.now()
       const step = (now: number) => {
         const progress = Math.min(1, (now - start) / ms)
-        const eased = 1 - Math.pow(1 - progress, 3) // ease-out cubic
+        const eased = easing === "expo"
+          ? (progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress)) // ease-out expo
+          : 1 - Math.pow(1 - progress, 3) // ease-out cubic
         show(Math.round((from + (value - from) * eased) * factor) / factor)
         if (progress < 1) frame.current = requestAnimationFrame(step)
       }
@@ -63,11 +71,12 @@ export function CountUp({
       show(value)
       return
     }
+    let delayTimer = 0
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && !hasAnimated.current) {
           hasAnimated.current = true
-          animateTo(duration)
+          delayTimer = window.setTimeout(() => animateTo(duration), delay)
           observer.disconnect()
         }
       },
@@ -76,6 +85,7 @@ export function CountUp({
     observer.observe(el)
     return () => {
       observer.disconnect()
+      window.clearTimeout(delayTimer)
       cancelAnimationFrame(frame.current)
     }
   }, [value, duration, decimals])

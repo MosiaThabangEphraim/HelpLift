@@ -405,6 +405,96 @@ body::-webkit-scrollbar {
   100% { transform: translateX(100%); }
 }
 
+/* Justified long text (descriptions, policies, FAQ answers...). Phones keep
+   left-aligned text - justifying narrow columns leaves big gaps between
+   words. Words are never split across lines with a hyphen.
+   .text-justify-smart on one element, .justify-prose on a container (its
+   paragraphs and list items). */
+@media (min-width: 640px) {
+  .text-justify-smart,
+  .justify-prose p,
+  .justify-prose li {
+    text-align: justify;
+    -webkit-hyphens: manual;
+    hyphens: manual;
+  }
+}
+
+/* --- Homepage (app/page.tsx) ------------------------------------------------ */
+
+/* Sections fade and lift in as they scroll into view (components/reveal.tsx). */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  filter: blur(4px);
+  transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1), transform 0.8s cubic-bezier(0.22, 1, 0.36, 1), filter 0.8s ease-out;
+}
+.reveal.reveal-shown { opacity: 1; transform: none; filter: none; }
+
+/* Items in a .reveal-stagger list ripple in one after another once their
+   section has appeared. */
+.reveal-stagger > * {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1), transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal-shown .reveal-stagger > *,
+.reveal-shown.reveal-stagger > * { opacity: 1; transform: none; }
+.reveal-shown .reveal-stagger > *:nth-child(2) { transition-delay: 80ms; }
+.reveal-shown .reveal-stagger > *:nth-child(3) { transition-delay: 160ms; }
+.reveal-shown .reveal-stagger > *:nth-child(4) { transition-delay: 240ms; }
+.reveal-shown .reveal-stagger > *:nth-child(5) { transition-delay: 320ms; }
+.reveal-shown .reveal-stagger > *:nth-child(6) { transition-delay: 400ms; }
+.reveal-shown .reveal-stagger > *:nth-child(n + 7) { transition-delay: 480ms; }
+
+/* Section label icons pop as their section appears. */
+.reveal-shown .reveal-pop { animation: badge-pop 0.6s 0.15s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+/* A light sweep across a button on hover. */
+.btn-shine { position: relative; overflow: hidden; isolation: isolate; }
+.btn-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.3) 50%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 0.75s ease;
+  pointer-events: none;
+}
+.btn-shine:hover::after { transform: translateX(120%); }
+
+/* Slowly drifting colour blobs behind the hero and call-to-action. */
+@keyframes blob-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(40px, -30px) scale(1.08); }
+  66% { transform: translate(-30px, 20px) scale(0.95); }
+}
+.blob-drift { animation: blob-drift 18s ease-in-out infinite; }
+
+/* A faint dotted grid behind the hero, fading out at the edges. */
+.hero-grid {
+  background-image: radial-gradient(rgba(100, 116, 139, 0.18) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 30%, transparent 75%);
+}
+
+/* The heart on the Support The Platform banner beats softly. */
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); }
+  15% { transform: scale(1.18); }
+  30% { transform: scale(1); }
+  45% { transform: scale(1.12); }
+}
+.heartbeat { animation: heartbeat 2.4s ease-in-out infinite; }
+
+/* Moving sheen across the gradient text in the hero heading. */
+@keyframes text-sheen {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+.text-sheen { background-size: 200% auto; animation: text-sheen 6s linear infinite; }
+
 /* Dashboard greeting icon (components/time-greeting.tsx) bobs gently. */
 @keyframes greeting-float {
   0%, 100% { transform: translateY(0) rotate(0); }

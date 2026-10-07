@@ -93,6 +93,13 @@ export const TOOLTIP_LABELS: Record<string, string> = {
   "browse needs": "See every open need on the public board",
   "browse community needs": "See every open need on the public board",
   "view open needs": "See every open need on the public board",
+  "join the platform": "Create a free account as a giver or an organization",
+  "my dashboard": "Go to your dashboard",
+  "support the platform": "Donate to HelpLift itself - it keeps the platform free for everyone",
+  "donate without an account": "Donate to HelpLift with just your name and email for the receipt",
+  "register": "Create a free HelpLift account",
+  "check grammar": "Check this text for spelling and grammar",
+  "listen to this story": "Hear this story read aloud",
   "explore all needs": "See every open need on the public board",
 
   // --- Organization actions

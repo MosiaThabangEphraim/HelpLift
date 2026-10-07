@@ -2876,7 +2876,7 @@ export default function OrganizationDashboardPage() {
 
       {/* --- VERIFICATION PROOF MODAL (Item 6) --- */}
       {verifyingFulfillment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in">
           <div className="relative w-full max-w-3xl lg:max-w-5xl max-h-[90vh] overflow-y-auto pt-12 md:pt-12 bg-white dark:bg-[#121B2E] rounded p-6 md:p-8 shadow-2xl space-y-5">
             <MaximizeToggle />
             <div className="flex items-start justify-between gap-4">

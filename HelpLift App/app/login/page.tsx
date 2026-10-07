@@ -16,6 +16,7 @@ import { createClient } from "@/lib/supabase/client"
 import { isPasskeySupported, passkeyErrorMessage } from "@/lib/passkeys"
 import { AccountUnlockDialog } from "@/components/account-unlock-dialog"
 import { TwoFactorDialog, type TwoFactorUser } from "@/components/two-factor-dialog"
+import { BrandLogo } from "@/components/brand-logo"
 
 // Messages for the ?error= values /auth/callback redirects back with.
 const CALLBACK_ERRORS: Record<string, string> = {
@@ -239,9 +240,7 @@ function LoginContent() {
 
       {/* Header */}
       <div className="text-center mb-12">
-        <div className="bg-gradient-to-tr from-blue-600 to-indigo-500 p-3 rounded shadow-lg inline-block mb-3">
-          <HeartHandshake className="w-8 h-8 text-white" />
-        </div>
+        <BrandLogo className="h-14 w-14 inline-block mb-3 shadow-lg shadow-blue-600/25" />
 
         <p className="text-sm font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-3">
           Giving made transparent. Impact made real.

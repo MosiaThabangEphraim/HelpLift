@@ -172,7 +172,7 @@ export function NeedsMap({ needs }: { needs: MapNeed[] }) {
         ref={containerRef}
         role="region"
         aria-label="Map of open community needs"
-        className="isolate h-[380px] md:h-[440px] w-full rounded border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 overflow-hidden"
+        className="isolate h-[380px] md:h-[440px] w-full rounded bg-slate-100 dark:bg-slate-900 overflow-hidden shadow-[0_24px_60px_-30px_rgba(15,23,42,0.35)]"
       />
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
         <div className="flex items-center gap-4">

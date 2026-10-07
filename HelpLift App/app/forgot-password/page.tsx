@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { BrandLogo } from "@/components/brand-logo"
 import { 
   Mail, 
   ChevronLeft, 
@@ -66,7 +67,7 @@ export default function ForgotPasswordPage() {
             {/* WELCOME/INFO SECTION */}
             <div className="text-center space-y-4 mb-12">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded bg-primary/10 border border-primary/20 text-primary text-sm font-semibold mx-auto">
-                <HeartHandshake className="w-4 h-4" />
+                <BrandLogo className="h-4 w-4" />
                 <span>HelpLift Account Recovery</span>
               </div>
               

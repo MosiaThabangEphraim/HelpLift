@@ -24,7 +24,13 @@ import {
   ExternalLink,
   Loader2,
   Heart,
-  Code2
+  Code2,
+  Mail,
+  KeyRound,
+  Banknote,
+  Ban,
+  Flag,
+  HelpCircle
 } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -46,13 +52,29 @@ import { LiveActivityFeed } from "@/components/live-activity-feed"
 import { OrgLogo } from "@/components/org-logo"
 import { HomepageNotice } from "@/components/homepage-notice"
 import { MaximizeToggle } from "@/components/maximize-toggle"
+import { Reveal } from "@/components/reveal"
+import { CONTACT_OTHER_TOPIC_MAX, CONTACT_TOPICS } from "@/lib/contact-topics"
+import { ScrollProgress } from "@/components/scroll-progress"
+import { SpotlightGlow, spotlightMove } from "@/components/spotlight-card"
+import { BrandLogo } from "@/components/brand-logo"
 
 // -------------------- Data (HelpLift Ecosystem) --------------------
 const faqs = [
-  { question: "How do you verify organizations?", answer: "Every organization undergoes a strict vetting process. Our Main Admin reviews their registration documents, tax exemption status, and community footprint before approving their profile." },
-  { question: "What is the Gift Library?", answer: "The Gift Library allows individuals and businesses to proactively post offerings-like surplus inventory, free professional services, or bulk goods. Organizations can then browse and request these offerings." },
-  { question: "Is HelpLift free to use?", answer: "Yes, the platform is entirely free for verified organizations to post needs and for givers to browse and fulfill them." },
+  { question: "How do I join HelpLift?", answer: "Choose Join the Platform and register as a giver (an individual, business or group) or as an organization. Givers must be 18 or older. You can sign up with your email or with Google, Microsoft or LinkedIn, and joining is free." },
+  { question: "Is HelpLift free to use?", answer: "Yes. There are no platform fees for organizations to post needs or for givers to browse, pledge and donate. HelpLift is kept running by voluntary donations through Support The Platform." },
+  { question: "How do you verify organizations?", answer: "Every organization is reviewed by a HelpLift administrator before it can use the platform. We check their registration documents, tax exemption status and community footprint. Until approved, an organization can only see its verification status, and its needs aren't shown publicly." },
+  { question: "How do I support a need?", answer: "Open a need on the needs board and choose Support this Need. You can send the organization an expression of interest explaining how you'd like to help, or donate money towards it. Expressing interest needs a free giver account." },
+  { question: "How can I donate, and will I get a receipt?", answer: "You can donate by EFT (bank transfer, then upload your proof of payment), PayFast or PayPal. PayFast and PayPal donations are confirmed automatically; EFT donations are confirmed by an administrator. Once a donation is confirmed, a receipt is emailed to you." },
+  { question: "What is the Gift Library?", answer: "The Gift Library lets individuals and businesses offer goods, services or funds before a specific need exists - for example surplus stock or free professional services. Verified organizations can browse the offerings and claim them, and an administrator approves each claim." },
+  { question: "How do organizations receive donated money?", answer: "Confirmed donations go into the organization's HelpLift wallet. The organization's owner can request a withdrawal to its verified bank account, and each withdrawal is reviewed by an administrator before it's paid out." },
+  { question: "Can I find needs near me?", answer: "Yes. On the needs board, use Near me to see needs close to your location - no account needed. Signed-in givers can also see needs that match the categories and areas they chose when registering." },
+  { question: "Can I donate to HelpLift without an account?", answer: "Yes - Support The Platform lets anyone donate to HelpLift itself with just a name and email for the receipt. These donations keep the platform running; they don't go to any organization." },
+  { question: "Will my personal details be shown publicly?", answer: "No. Organizations' public profiles never show donations or donors, and we never share your contact details. Givers can opt out of being featured as Giver of the Month in Settings. See our Privacy Policy for the full details." },
   { question: "How do I stay safe from scammers?", answer: "HelpLift will never ask you to pay a fee to receive a donation, claim a gift, verify your account, or unlock funds. We will never ask for your password, PIN, or a one-time verification code. All payments happen through the platform's own donation flow - never by direct bank transfer to an individual, WhatsApp, or a \"processing fee\" request. If anyone claiming to be from HelpLift asks you to pay upfront or share login details, it's a scam - please report it to us immediately." },
+  { question: "How do I keep my account secure?", answer: "Use a strong password, and turn on two-factor sign-in in Settings for an emailed code at every sign-in. You can also add a passkey to sign in with your fingerprint, face or device PIN. After repeated wrong passwords, an account is locked until it's unlocked with an emailed code." },
+  { question: "Who is Lifty?", answer: "Lifty is HelpLift's AI assistant - the chat button in the corner of every page. Ask it how anything on HelpLift works, or about open needs and organizations, by typing or speaking. It can also read its answers aloud." },
+  { question: "Can I use HelpLift on my phone?", answer: "Yes. HelpLift works in any modern browser on phones, tablets and computers, and you can install it like an app from your browser's menu. It also offers larger text, light, dark, high-contrast and grayscale themes, and read-aloud." },
+  { question: "How do I report a problem or suggest an improvement?", answer: "Use the contact form on this page, or the form on the Developers page to report a bug or suggest an improvement - anonymously if you prefer. Signed-in users can also use the Feedback button or message an administrator from their dashboard." },
 ]
 
 export default function LandingPage() {
@@ -61,6 +83,11 @@ export default function LandingPage() {
   const [activeStoryIndex, setActiveStoryIndex] = useState(0)
   const [openFaq, setOpenFaq] = useState<string | null>(null)
   const [faqSearchQuery, setFaqSearchQuery] = useState("")
+  const [showAllFaqs, setShowAllFaqs] = useState(false)
+  const [allFaqsSearch, setAllFaqsSearch] = useState("")
+  const matchesFaq = (faq: { question: string; answer: string }, query: string) =>
+    faq.question.toLowerCase().includes(query.toLowerCase()) || faq.answer.toLowerCase().includes(query.toLowerCase())
+  const matchingFaqs = faqs.filter(faq => matchesFaq(faq, faqSearchQuery))
 
   // Dynamic Data - populated from the database only; no hardcoded demo content.
   const [featuredNeeds, setFeaturedNeeds] = useState<any[]>([])
@@ -135,6 +162,8 @@ export default function LandingPage() {
   // --- "Partner with us" contact form ---
   const [contactEmail, setContactEmail] = useState("")
   const [contactMessage, setContactMessage] = useState("")
+  const [contactTopic, setContactTopic] = useState("")
+  const [contactOtherTopic, setContactOtherTopic] = useState("")
   const [isSendingContact, setIsSendingContact] = useState(false)
   const [contactFeedback, setContactFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null)
 
@@ -204,13 +233,15 @@ export default function LandingPage() {
       const res = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: contactEmail, message: contactMessage }),
+        body: JSON.stringify({ email: contactEmail, topic: contactTopic, otherTopic: contactOtherTopic, message: contactMessage }),
       })
       const data = await res.json()
       if (!res.ok || !data.success) throw new Error(data.message || "Unable to send your message.")
       setContactFeedback({ type: "success", text: data.message })
       setContactEmail("")
       setContactMessage("")
+      setContactTopic("")
+      setContactOtherTopic("")
     } catch (err: any) {
       setContactFeedback({ type: "error", text: err.message || "Unable to send your message." })
     } finally {
@@ -221,11 +252,11 @@ export default function LandingPage() {
   const currentStory = stories[activeStoryIndex] || null
 
   const navLinks = [
-    { name: "Home", id: "home" },
-    { name: "Needs", id: "featured-needs" },
-    { name: "Platform", id: "platform" },
-    { name: "Impact", id: "impact" },
-    { name: "FAQ", id: "faq" },
+    { name: "Home", id: "home", tip: "Back to the top of the page" },
+    { name: "Needs", id: "featured-needs", tip: "Jump to urgent community needs" },
+    { name: "Platform", id: "platform", tip: "Jump to how HelpLift works" },
+    { name: "Impact", id: "impact", tip: "Jump to impact stories from organizations" },
+    { name: "FAQ", id: "faq", tip: "Jump to common questions and the contact form" },
   ]
 
   const handleScrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
@@ -245,22 +276,21 @@ export default function LandingPage() {
       >
         <div className={`flex items-center justify-between px-6 py-3 rounded transition-all duration-500 ${
           isScrolled
-            ? "bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/40 dark:border-slate-800/60 shadow-[0_8px_30px_rgb(0,0,0,0.06)] w-full max-w-3xl"
-            : "bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border border-slate-100/50 dark:border-slate-800/50 shadow-sm w-full max-w-4xl"
+            ? "bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] w-full max-w-3xl"
+            : "bg-white/60 dark:bg-slate-900/60 backdrop-blur-md shadow-sm w-full max-w-4xl"
         }`}>
           <div className="flex items-center gap-2">
-            <div className="bg-gradient-to-tr from-blue-600 to-indigo-500 p-1.5 rounded">
-              <HeartHandshake className="w-5 h-5 text-white" />
-            </div>
+            <BrandLogo className="h-8 w-8" />
             <span className="font-extrabold text-lg tracking-tight text-slate-900 dark:text-slate-100">HelpLift</span>
           </div>
 
-          <div className="hidden md:flex items-center gap-1 bg-slate-50/50 dark:bg-slate-800/50 p-1 rounded border border-slate-100 dark:border-slate-800">
+          <div className="hidden md:flex items-center gap-1 bg-slate-100/60 dark:bg-slate-800/50 p-1 rounded">
             {navLinks.map((link) => (
               <a
                 key={link.id}
                 href={`#${link.id}`}
                 onClick={(e) => handleScrollToSection(e, link.id)}
+                data-tip={link.tip}
                 className="px-5 py-2 rounded text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 hover:bg-white dark:hover:bg-slate-800 hover:shadow-sm transition-all duration-300"
               >
                 {link.name}
@@ -273,7 +303,7 @@ export default function LandingPage() {
             <Link
               href="/developers"
               data-tip="Report a bug or suggest an improvement - anonymously"
-              className="inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded bg-slate-900/5 dark:bg-white/10 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
             >
               <Code2 className="h-4 w-4" />
               <span>Developers</span>
@@ -296,18 +326,22 @@ export default function LandingPage() {
         </div>
       </nav>
 
+      <ScrollProgress />
       <main>
         {/* --- HERO SECTION --- */}
-        <section id="home" className="relative pt-5 pb-5 md:pt-30 md:pb-10 overflow-hidden px-4">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-blue-300/20 rounded blur-[120px] -z-10 mix-blend-multiply opacity-60" />
+        <section id="home" className="relative pt-5 pb-4 md:pt-28 md:pb-6 overflow-hidden px-4">
+          {/* Background: a faint dotted grid and two slowly drifting colour blobs. */}
+          <div aria-hidden="true" className="hero-grid absolute inset-0 -z-10" />
+          <div aria-hidden="true" className="blob-drift absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-blue-300/20 rounded-full blur-[120px] -z-10 mix-blend-multiply opacity-60" />
+          <div aria-hidden="true" className="blob-drift absolute top-20 left-[15%] w-[380px] h-[380px] bg-indigo-300/20 rounded-full blur-[110px] -z-10 opacity-60 [animation-delay:-7s]" />
 
           {/* Admin's public notice (Send Announcement -> Homepage public notice). Extra
               top margin on phones so the floating navbar doesn't cover it. */}
           <HomepageNotice className="mt-16 md:mt-0 mb-8" />
           
-          <div className="max-w-5xl mx-auto text-center space-y-4">
+          <Reveal className="max-w-5xl mx-auto text-center space-y-4">
             <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 leading-[1.15]">
-              Giving made <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">transparent.</span>
+              Giving made <span className="text-sheen text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-500 to-blue-600">transparent.</span>
               <br className="hidden md:block" /> Impact made real.
             </h1>
             
@@ -328,169 +362,123 @@ export default function LandingPage() {
               
               <button 
                 onClick={() => router.push("/needs")}
-                className="group inline-flex items-center justify-center px-8 py-4 text-base font-bold text-slate-700 dark:text-slate-200 transition-all duration-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-sm w-full sm:w-auto"
+                className="group inline-flex items-center justify-center px-8 py-4 text-base font-bold text-slate-700 dark:text-slate-200 transition-all duration-300 bg-slate-900/5 dark:bg-white/10 rounded hover:bg-slate-900/10 dark:hover:bg-white/15 w-full sm:w-auto"
               >
                 View Open Needs
               </button>
             </div>
             
             <div className="pt-2 flex flex-wrap items-center justify-center gap-8 text-sm font-semibold text-slate-400">
-              <div className="flex items-center gap-2 bg-white dark:bg-slate-900 px-4 py-2 rounded border border-slate-100 dark:border-slate-800 shadow-sm"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> 100% Verified NPOs</div>
-              <div className="flex items-center gap-2 bg-white dark:bg-slate-900 px-4 py-2 rounded border border-slate-100 dark:border-slate-800 shadow-sm"><CheckCircle2 className="w-4 h-4 text-blue-500" /> Zero Platform Fees</div>
-              <div className="flex items-center gap-2 bg-white dark:bg-slate-900 px-4 py-2 rounded border border-slate-100 dark:border-slate-800 shadow-sm"><CheckCircle2 className="w-4 h-4 text-indigo-500" /> Direct Impact</div>
+              <div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> 100% Verified NPOs</div>
+              <div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-blue-500" /> Zero Platform Fees</div>
+              <div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-indigo-500" /> Direct Impact</div>
             </div>
-          </div>
+          </Reveal>
         </section>
 
         {/* --- MODERN BENTO BOX FEATURES (PLATFORM) --- */}
         {platformStats && (
-          <section id="statistics" aria-label="Platform statistics" className="max-w-6xl mx-auto px-4 pb-10">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <section id="statistics" aria-label="Platform statistics" className="max-w-6xl mx-auto px-4 pb-4">
+            {/* Big numbers only - each counts up a moment after the one before it. */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-10 py-6">
               {[
-                { icon: ShieldCheck, value: platformStats.organizations, label: "Verified organizations" },
-                { icon: Users, value: platformStats.givers, label: "Registered givers" },
-                { icon: Flame, value: platformStats.openNeeds, label: "Open needs" },
-                { icon: CheckCircle2, value: platformStats.fulfilledNeeds, label: "Needs fulfilled" },
-                { icon: Gift, value: platformStats.totalDonated, prefix: "R", label: `Donated (${platformStats.donationCount.toLocaleString()} gifts)` },
-                { icon: Sparkles, value: platformStats.stories, label: "Impact stories" },
-              ].map(({ icon: Icon, value, prefix, label }) => (
-                <div key={label} className="rounded border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 text-center shadow-sm">
-                  <Icon className="w-5 h-5 mx-auto text-blue-600 dark:text-blue-400" />
-                  <p className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
-                    <CountUp value={value} prefix={prefix} />
-                  </p>
-                  <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">{label}</p>
-                </div>
+                { value: platformStats.organizations, label: "Verified organizations" },
+                { value: platformStats.givers, label: "Registered givers" },
+                { value: platformStats.openNeeds, label: "Open needs" },
+                { value: platformStats.fulfilledNeeds, label: "Needs fulfilled" },
+                { value: platformStats.totalDonated, prefix: "R", label: `Donated (${platformStats.donationCount.toLocaleString()} gifts)` },
+                { value: platformStats.stories, label: "Impact stories" },
+              ].map(({ value, prefix, label }, index) => (
+                <Reveal key={label} delay={index * 90}>
+                  <div className="text-center">
+                    <p className="text-3xl sm:text-5xl md:text-6xl font-black tracking-tight tabular-nums whitespace-nowrap text-transparent bg-clip-text bg-gradient-to-b from-slate-900 to-slate-500 dark:from-white dark:to-slate-400 leading-tight">
+                      <CountUp value={value} prefix={prefix} duration={2200} delay={index * 140} easing="expo" />
+                    </p>
+                    <p className="mt-2 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</p>
+                  </div>
+                </Reveal>
               ))}
             </div>
           </section>
         )}
 
-        <section id="platform" className="max-w-6xl mx-auto px-4 py-2">
-          <div className="text-center mb-10 max-w-2xl mx-auto">
-            <h2 className="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">A structured ecosystem.</h2>
-            <p className="text-lg text-slate-500 dark:text-slate-400 mt-4 leading-relaxed">Replacing chaotic group chats with streamlined, secure philanthropy.</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-[280px]">
-            <div className="md:col-span-2 relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded p-10 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] hover:border-slate-200 dark:border-slate-800 transition-all duration-500 group flex flex-col justify-between">
-              <div className="absolute top-0 right-0 p-8 opacity-[0.02] transition-opacity duration-500 group-hover:opacity-[0.04]">
-                <Gift className="w-64 h-64 text-purple-900" />
-              </div>
-              <div className="w-14 h-14 bg-purple-50 dark:bg-purple-950 rounded flex items-center justify-center border border-purple-100 dark:border-purple-900 mb-6 group-hover:scale-110 transition-transform duration-500">
-                <Gift className="w-6 h-6 text-purple-600" />
-              </div>
-              <div className="relative z-10">
-                <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-3">The Gift Library</h3>
-                <p className="text-slate-500 dark:text-slate-400 leading-relaxed max-w-md text-lg">
-                  Don't wait for a need to be posted. Proactively list surplus inventory, bulk goods, or pro-bono services for verified organizations to claim.
-                </p>
-              </div>
+        {/* --- HOW IT WORKS: one panel, four features --- */}
+        <section id="platform" className="max-w-6xl mx-auto px-4 py-10">
+          <Reveal>
+            <SectionHeader icon={LayoutDashboard} eyebrow="How it works" title="A structured ecosystem." subtitle="Replacing chaotic group chats with streamlined, secure philanthropy." />
+          </Reveal>
+          <Reveal delay={100}>
+            <div className="reveal-stagger grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+              {[
+                { icon: Gift, tint: "bg-purple-100 text-purple-600 dark:bg-purple-950 dark:text-purple-400", title: "The Gift Library", text: "Don't wait for a need to be posted. Proactively list surplus inventory, bulk goods, or pro-bono services for verified organizations to claim." },
+                { icon: ShieldCheck, tint: "bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400", title: "Verified Trust", text: "Every entity undergoes strict vetting for tax status and community footprint before joining." },
+                { icon: LayoutDashboard, tint: "bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-400", title: "Central Dashboard", text: "Track open requests, coordinate drop-offs, and generate fulfillment reports." },
+                { icon: Users, tint: "bg-orange-100 text-orange-600 dark:bg-orange-950 dark:text-orange-400", title: "Direct Matching", text: "Givers are alerted about new needs that match their location and the causes they care about." },
+              ].map(({ icon: Icon, tint, title, text }) => (
+                <div key={title} className="group rounded-2xl p-6 transition-colors duration-300 hover:bg-white/70 dark:hover:bg-slate-900/40">
+                  <span className={`flex h-14 w-14 items-center justify-center rounded-full ${tint} transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6`}>
+                    <Icon className="h-6 w-6" strokeWidth={1.75} />
+                  </span>
+                  <h3 className="mt-5 text-lg font-bold text-slate-900 dark:text-slate-100">{title}</h3>
+                  <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 leading-relaxed text-justify-smart">{text}</p>
+                </div>
+              ))}
             </div>
-
-            <div className="relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded p-10 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] hover:border-slate-200 dark:border-slate-800 transition-all duration-500 group flex flex-col justify-between">
-              <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-950 rounded flex items-center justify-center border border-emerald-100 dark:border-emerald-900 mb-6 group-hover:scale-110 transition-transform duration-500">
-                <ShieldCheck className="w-6 h-6 text-emerald-600" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">Verified Trust</h3>
-                <p className="text-slate-500 dark:text-slate-400 leading-relaxed">
-                  Every entity undergoes strict vetting for tax status and community footprint before joining.
-                </p>
-              </div>
-            </div>
-
-            <div className="relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded p-10 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] hover:border-slate-200 dark:border-slate-800 transition-all duration-500 group flex flex-col justify-between">
-              <div className="w-14 h-14 bg-blue-50 dark:bg-blue-950 rounded flex items-center justify-center border border-blue-100 dark:border-blue-900 mb-6 group-hover:scale-110 transition-transform duration-500">
-                <LayoutDashboard className="w-6 h-6 text-blue-600" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">Central Dashboard</h3>
-                <p className="text-slate-500 dark:text-slate-400 leading-relaxed">
-                  Track open requests, coordinate drop-offs, and generate fulfillment reports.
-                </p>
-              </div>
-            </div>
-
-            <div className="md:col-span-2 relative overflow-hidden bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded p-10 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] hover:border-slate-200 dark:border-slate-800 transition-all duration-500 group flex flex-col justify-between">
-               <div className="absolute -bottom-10 -right-10 p-8 opacity-[0.02] transition-opacity duration-500 group-hover:opacity-[0.04]">
-                <Users className="w-72 h-72 text-orange-900" />
-              </div>
-              <div className="w-14 h-14 bg-orange-50 dark:bg-orange-950 rounded flex items-center justify-center border border-orange-100 dark:border-orange-900 mb-6 group-hover:scale-110 transition-transform duration-500">
-                <Users className="w-6 h-6 text-orange-600" />
-              </div>
-              <div className="relative z-10">
-                <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-3">Direct Matching</h3>
-                <p className="text-slate-500 dark:text-slate-400 leading-relaxed max-w-md text-lg">
-                  Our system intelligently alerts givers about new needs that align with their specific geographic location and historical giving preferences.
-                </p>
-              </div>
-            </div>
-          </div>
+          </Reveal>
         </section>
 
-        {/* --- FEATURED & URGENT NEEDS PREVIEW (Item 1 & 3) --- */}
-        <section id="featured-needs" className="max-w-6xl mx-auto px-4 py-12">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10">
-            <div>
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-600 text-xs font-bold uppercase tracking-wider mb-3">
-                <Flame className="w-3.5 h-3.5 text-red-500 fill-red-500" />
-                <span>Urgent Needs Awaiting Support</span>
-              </div>
-              <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
-                Community Requests
-              </h2>
-              <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-                Direct verified requests from non-profits, schools, and community welfare initiatives.
-              </p>
-            </div>
+        {/* --- FEATURED & URGENT NEEDS PREVIEW --- */}
+        <section id="featured-needs" className="max-w-6xl mx-auto px-4 py-10">
+          <Reveal>
+            <SectionHeader
+              icon={Flame}
+              eyebrow="Urgent needs"
+              title="Community requests."
+              subtitle="Direct verified requests from non-profits, schools, and community welfare initiatives."
+              action={
+                <Link href="/needs" className="btn-shine group inline-flex items-center gap-2 rounded-xl bg-slate-900 dark:bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg">
+                  Explore all needs <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                </Link>
+              }
+            />
+          </Reveal>
 
-            <Link
-              href="/needs"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded bg-slate-900 dark:bg-blue-600 text-white font-bold text-sm hover:bg-slate-800 dark:hover:bg-blue-700 transition-all shadow-md shrink-0 self-start md:self-auto"
-            >
-              <span>Explore All Needs</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {isLoadingNeeds ? (
-              [0, 1, 2].map(i => (
-                <div key={i} className="rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm h-56 animate-pulse" />
-              ))
+              [0, 1, 2].map(i => <div key={i} className={`${PANEL} h-60 animate-pulse`} />)
             ) : featuredNeeds.length === 0 ? (
-              <div className="col-span-full rounded border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-10 text-center">
+              <div className={`${PANEL} col-span-full p-10 text-center`}>
                 <p className="text-slate-500 dark:text-slate-400 font-medium">No open needs right now - check back soon, or browse verified organizations directly.</p>
               </div>
             ) : (
-              featuredNeeds.map((need: any) => {
+              featuredNeeds.map((need: any, index: number) => {
                 const org = Array.isArray(need.organizations) ? need.organizations[0] : need.organizations
                 return (
-                  <div key={need.id} className="rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm flex flex-col justify-between space-y-4 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md transition-all">
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-bold px-3 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">{need.category}</span>
-                        {need.urgency === "high" ? (
-                          <span className="text-xs font-bold px-2.5 py-0.5 rounded bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-400 flex items-center gap-1">
-                            <Flame className="w-3 h-3 fill-red-500" /> High Urgency
-                          </span>
-                        ) : (
-                          <span className="text-xs font-bold px-2.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-400">Open</span>
-                        )}
+                  <Reveal key={need.id} delay={index * 90}>
+                    <div className={`${PANEL} group h-full p-6 flex flex-col justify-between gap-5 transition-all duration-300 hover:-translate-y-1 hover:bg-white dark:hover:bg-slate-900/70`}>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">{need.category}</span>
+                          {need.urgency === "high" ? (
+                            <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 flex items-center gap-1">
+                              <Flame className="w-3 h-3 fill-red-500" /> High urgency
+                            </span>
+                          ) : (
+                            <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400">Open</span>
+                          )}
+                        </div>
+                        <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100 line-clamp-1">{need.title}</h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-3 leading-relaxed">{need.description}</p>
+                        <p className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 pt-1 min-w-0">
+                          <OrgLogo src={org?.logo_url} name={org?.name || "Verified Organization"} className="h-6 w-6 text-[10px]" />
+                          <span className="truncate">{org?.name || "Verified Organization"}{need.location ? ` · ${need.location}` : ""}</span>
+                        </p>
                       </div>
-                      <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100 line-clamp-1">{need.title}</h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-3 leading-relaxed">{need.description}</p>
-                      <p className="flex items-center gap-2 text-xs font-semibold text-blue-600 dark:text-blue-400 pt-1 min-w-0">
-                        <OrgLogo src={org?.logo_url} name={org?.name || "Verified Organization"} className="h-6 w-6 text-[10px]" />
-                        <span className="truncate">{org?.name || "Verified Organization"} {need.location ? `· ${need.location}` : ""}</span>
-                      </p>
+                      <Link href={`/needs?search=${encodeURIComponent(need.title)}`} className="btn-shine inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3 px-4 text-sm font-bold text-white shadow-md shadow-blue-600/20 transition-all hover:shadow-blue-600/40">
+                        Support this need <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                      </Link>
                     </div>
-                    <Link href={`/needs?search=${encodeURIComponent(need.title)}`} className="inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 transition-colors shadow-sm">
-                      <span>Support this Need</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </Link>
-                  </div>
+                  </Reveal>
                 )
               })
             )}
@@ -498,137 +486,175 @@ export default function LandingPage() {
         </section>
 
         {/* --- NEEDS MAP & LIVE ACTIVITY --- */}
-        <section id="needs-map" aria-labelledby="needs-map-heading" className="max-w-6xl mx-auto px-4 py-12">
-          <div className="mb-8 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-600 text-xs font-bold uppercase tracking-wider mb-3">
-              <MapPin className="w-3.5 h-3.5" />
-              <span>Happening now</span>
+        <section id="needs-map" aria-labelledby="needs-map-heading" className="max-w-6xl mx-auto px-4 py-10">
+          <Reveal>
+            <SectionHeader id="needs-map-heading" icon={MapPin} eyebrow="Happening now" title="Needs across South Africa." subtitle="Every pin is a verified request. Click one to see it in full on the needs board." />
+          </Reveal>
+          <Reveal delay={100}>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              <div className="lg:col-span-2 overflow-hidden rounded-2xl">
+                {isLoadingNeeds ? (
+                  <div className="h-[380px] md:h-[440px] rounded-xl bg-slate-100 dark:bg-slate-800 animate-pulse" />
+                ) : (
+                  <div className="overflow-hidden rounded-xl">
+                    <NeedsMap needs={mapNeeds} />
+                  </div>
+                )}
+              </div>
+              <div>
+                <LiveActivityFeed />
+              </div>
             </div>
-            <h2 id="needs-map-heading" className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
-              Needs across South Africa
-            </h2>
-            <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-              Every pin is a verified request. Click one to see it in full on the needs board.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              {isLoadingNeeds ? (
-                <div className="h-[380px] md:h-[440px] rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 animate-pulse" />
-              ) : (
-                <NeedsMap needs={mapNeeds} />
-              )}
-            </div>
-            <LiveActivityFeed />
-          </div>
+          </Reveal>
         </section>
 
         <MonthlySpotlight />
 
         {/* --- IMPACT STORIES --- */}
-        <section id="impact" className="py-15 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-white dark:from-slate-950 via-blue-50/30 dark:via-slate-900/30 to-[#FAFAFA] dark:to-slate-950 -z-10" />
-
-          <div className="max-w-6xl mx-auto px-4">
-            <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-6">
-              <div className="max-w-xl">
-                <h2 className="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">Real impact, documented.</h2>
-                <p className="text-lg text-slate-500 dark:text-slate-400 mt-4 leading-relaxed">See how verified contributions are actively shaping and supporting local communities.</p>
-              </div>
-              {stories.length > 0 && (
-                <div className="flex gap-3">
+        <section id="impact" className="max-w-6xl mx-auto px-4 py-10">
+          <Reveal>
+            <SectionHeader
+              icon={Quote}
+              eyebrow="Impact stories"
+              title="Real impact, documented."
+              subtitle="See how verified contributions are actively shaping and supporting local communities."
+              action={stories.length > 0 ? (
+                <div className="flex gap-2">
                   <button
                     onClick={() => setActiveStoryIndex((prev) => (prev - 1 + stories.length) % stories.length)}
-                    className="w-12 h-12 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:shadow-sm transition-all hover:-translate-x-0.5"
+                    aria-label="Previous story"
+                    data-tip="Previous story"
+                    className="flex h-11 w-11 items-center justify-center rounded-full bg-white/80 dark:bg-slate-900/60 text-slate-600 dark:text-slate-300 transition-all hover:-translate-x-0.5 hover:text-blue-600"
                   >
                     <ArrowRight className="w-5 h-5 rotate-180" />
                   </button>
                   <button
                     onClick={() => setActiveStoryIndex((prev) => (prev + 1) % stories.length)}
-                    className="w-12 h-12 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:shadow-sm transition-all hover:translate-x-0.5"
+                    aria-label="Next story"
+                    data-tip="Next story"
+                    className="flex h-11 w-11 items-center justify-center rounded-full bg-white/80 dark:bg-slate-900/60 text-slate-600 dark:text-slate-300 transition-all hover:translate-x-0.5 hover:text-blue-600"
                   >
                     <ArrowRight className="w-5 h-5" />
                   </button>
                 </div>
-              )}
-            </div>
+              ) : undefined}
+            />
+          </Reveal>
 
-            <div className="relative min-h-[500px]">
-              <div className="absolute right-0 top-0 w-full md:w-2/3 h-[400px] md:h-[500px] rounded bg-slate-100 dark:bg-slate-900 overflow-hidden shadow-lg border border-slate-200 dark:border-slate-800">
+          <Reveal delay={100}>
+            <div className={`${PANEL} grid grid-cols-1 md:grid-cols-2 overflow-hidden`}>
+              <div className="relative min-h-[260px] md:min-h-[440px] bg-slate-100 dark:bg-slate-800">
                 {currentStory?.imageUrl ? (
-                  <img src={currentStory.imageUrl} alt={currentStory.title} className="absolute inset-0 w-full h-full object-cover" />
+                  <img key={currentStory.id} src={currentStory.imageUrl} alt={currentStory.title} className="absolute inset-0 w-full h-full object-cover animate-in fade-in duration-700" />
                 ) : (
-                  <>
-                    <div className="absolute inset-0 bg-gradient-to-tr from-blue-100 dark:from-blue-950 to-indigo-50 dark:to-slate-900 opacity-50 mix-blend-multiply dark:mix-blend-normal" />
-                    <div className="absolute inset-0 flex items-center justify-center opacity-10">
-                        <HeartHandshake className="w-64 h-64" />
-                    </div>
-                  </>
+                  <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-slate-900">
+                    <HeartHandshake className="w-24 h-24 text-blue-200 dark:text-blue-900" strokeWidth={1.25} />
+                  </div>
                 )}
               </div>
 
               {!isLoadingStories && !currentStory ? (
-                <div className="relative pt-32 md:pt-16 md:w-1/2 z-10">
-                  <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white dark:border-slate-800 p-10 md:p-14 rounded shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] flex flex-col items-start gap-3">
-                    <Quote className="w-10 h-10 text-blue-200 dark:text-blue-900" />
-                    <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100">No impact stories yet.</h3>
-                    <p className="text-slate-500 dark:text-slate-400">Verified organizations will share real outcomes here as they publish updates.</p>
-                  </div>
+                <div className="p-8 md:p-10 flex flex-col justify-center gap-3">
+                  <Quote className="w-9 h-9 text-blue-200 dark:text-blue-900" />
+                  <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100">No impact stories yet.</h3>
+                  <p className="text-slate-500 dark:text-slate-400">Verified organizations will share real outcomes here as they publish updates.</p>
                 </div>
               ) : currentStory ? (
-                <div className="relative pt-32 md:pt-16 md:w-1/2 z-10" key={`rev-${currentStory.id}`}>
-                  <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white dark:border-slate-800 p-10 md:p-14 rounded shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] animate-in fade-in slide-in-from-left-8 duration-700">
-                      <Quote className="w-10 h-10 text-blue-200 dark:text-blue-900 mb-6" />
-
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-400 text-xs font-bold uppercase tracking-wider mb-6">
-                        <MapPin className="w-3.5 h-3.5" /> {currentStory.location}
+                <div key={`rev-${currentStory.id}`} className="p-8 md:p-10 flex flex-col animate-in fade-in slide-in-from-right-4 duration-700">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 dark:bg-blue-950 px-2.5 py-1 text-xs font-bold text-blue-600 dark:text-blue-400">
+                      <MapPin className="w-3.5 h-3.5" /> {currentStory.location}
+                    </span>
+                    <span className="flex gap-0.5">
+                      {[...Array(currentStory.rating)].map((_, i) => (
+                        <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
+                      ))}
+                    </span>
+                  </div>
+                  <h3 className="mt-5 text-2xl font-bold text-slate-900 dark:text-slate-100 line-clamp-2">{currentStory.title}</h3>
+                  {/* Capped and floored to the same 3-line block so the card keeps one height as stories rotate. */}
+                  <blockquote className="mt-3 text-base text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-3 min-h-[4.75rem] text-justify-smart">
+                    &ldquo;{currentStory.review}&rdquo;
+                  </blockquote>
+                  <div className="mt-2">
+                    <ReadAloudButton text={currentStory.review} label="Listen to this story" />
+                  </div>
+                  <div className="mt-auto pt-6 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <OrgLogo src={currentStory.organizationLogo} name={currentStory.organization} className="h-11 w-11 text-sm" />
+                      <div className="min-w-0">
+                        <div className="font-bold text-slate-900 dark:text-slate-100 truncate">{currentStory.reviewer}</div>
+                        <div className="text-sm font-medium text-blue-600 dark:text-blue-400 truncate">{currentStory.organization}</div>
                       </div>
-
-                      <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-4 line-clamp-2 min-h-[3.5rem]">{currentStory.title}</h3>
-
-                      <div className="flex gap-1 mb-6">
-                        {[...Array(currentStory.rating)].map((_, i) => (
-                          <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                        ))}
-                      </div>
-
-                      {/* Both capped AND floored to the same 3-line block - a long
-                          review can run much longer than a short one, and a max-height
-                          cap alone (line-clamp) still lets a short review sit shorter
-                          than a long one; the min-height makes every story reserve the
-                          same space regardless, so the card's height (and everything
-                          below it on the page) stays constant as it auto-rotates.
-                          "Read full story" already exists as the place to read the
-                          whole thing. */}
-                      <blockquote className="text-lg text-slate-600 dark:text-slate-300 leading-relaxed font-medium line-clamp-3 min-h-[5.5rem]">
-                        "{currentStory.review}"
-                      </blockquote>
-                      <div className="mb-10 mt-2">
-                        <ReadAloudButton text={currentStory.review} label="Listen to this story" />
-                      </div>
-
-                      <div className="flex items-center justify-between gap-4 pt-6 border-t border-slate-100 dark:border-slate-800">
-                        <div className="flex items-center gap-4 min-w-0">
-                          <OrgLogo src={currentStory.organizationLogo} name={currentStory.organization} className="h-12 w-12 text-base shadow-md" />
-                          <div className="min-w-0">
-                            <div className="font-bold text-slate-900 dark:text-slate-100 truncate">{currentStory.reviewer}</div>
-                            <div className="text-sm font-medium text-blue-600 dark:text-blue-400 truncate">{currentStory.organization}</div>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => setOpenStory(currentStory)}
-                          className="shrink-0 text-sm font-bold text-blue-600 dark:text-blue-400 hover:underline"
-                        >
-                          Read full story
-                        </button>
-                      </div>
+                    </div>
+                    <button onClick={() => setOpenStory(currentStory)} className="group shrink-0 inline-flex items-center gap-1 text-sm font-bold text-blue-600 dark:text-blue-400">
+                      Read full story <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                    </button>
                   </div>
                 </div>
-              ) : null}
+              ) : (
+                <div className="p-10 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-blue-600" /></div>
+              )}
             </div>
-          </div>
+          </Reveal>
         </section>
+
+        {/* --- ALL FAQs WINDOW --- */}
+        <Dialog
+          open={showAllFaqs}
+          onOpenChange={(open) => {
+            setShowAllFaqs(open)
+            // Start from the homepage search when opening it.
+            if (open) setAllFaqsSearch(faqSearchQuery)
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-blue-600 text-white">
+                  <HelpCircle className="h-4 w-4" />
+                </span>
+                Frequently asked questions
+              </DialogTitle>
+            </DialogHeader>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search all questions..."
+                value={allFaqsSearch}
+                onChange={(e) => setAllFaqsSearch(e.target.value)}
+                className="w-full rounded-xl border border-transparent bg-slate-100 dark:bg-slate-800 pl-11 pr-4 py-3 text-sm font-medium text-slate-900 dark:text-slate-100 transition-all focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500"
+              />
+            </div>
+            <div className="space-y-2">
+              {faqs.filter(faq => matchesFaq(faq, allFaqsSearch)).map(faq => (
+                <FaqItem
+                  key={faq.question}
+                  faq={faq}
+                  number={faqs.indexOf(faq) + 1}
+                  isOpen={openFaq === faq.question}
+                  onToggle={() => setOpenFaq(openFaq === faq.question ? null : faq.question)}
+                  tinted
+                />
+              ))}
+              {faqs.every(faq => !matchesFaq(faq, allFaqsSearch)) && (
+                <p className="p-6 text-center text-sm text-slate-500 dark:text-slate-400">No questions match your search.</p>
+              )}
+            </div>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Still need help?{" "}
+              <a
+                href="#contact"
+                onClick={() => setShowAllFaqs(false)}
+                className="font-semibold text-blue-600 hover:underline"
+              >
+                Ask us using the contact form
+              </a>
+              , or ask Lifty in the corner of the page.
+            </p>
+          </DialogContent>
+        </Dialog>
 
         {/* --- FULL IMPACT STORY MODAL --- */}
         <Dialog open={!!openStory} onOpenChange={(open) => !open && setOpenStory(null)}>
@@ -660,7 +686,7 @@ export default function LandingPage() {
                           ]
                     }
                   />
-                  <p className="text-base text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line">{openStory.review}</p>
+                  <p className="text-base text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line text-justify-smart">{openStory.review}</p>
                   <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-slate-100 dark:border-slate-800">
                     <div className="flex items-center gap-3">
                       <OrgLogo src={openStory.organizationLogo} name={openStory.organization} className="h-10 w-10 text-sm" />
@@ -702,7 +728,7 @@ export default function LandingPage() {
         )}
 
         {showSupportAuthPrompt && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in">
             <div className="relative w-full max-w-3xl lg:max-w-5xl max-h-[90vh] overflow-y-auto pt-12 md:pt-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded p-6 md:p-8 shadow-2xl text-center space-y-6">
               <MaximizeToggle />
               <div className="w-14 h-14 bg-pink-50 dark:bg-pink-950/60 border border-pink-100 dark:border-pink-900 rounded flex items-center justify-center mx-auto text-pink-600 dark:text-pink-400">
@@ -711,8 +737,12 @@ export default function LandingPage() {
               <div className="space-y-2">
                 <h3 className="text-2xl font-black text-slate-900 dark:text-white">Support the platform</h3>
                 <p className="text-sm text-slate-600 dark:text-slate-400">
+                  HelpLift is free - we don&apos;t charge organizations, givers or anyone else a cent to use the platform.
+                  Donations to HelpLift itself (not to any organization) are what keep it running and growing.
+                </p>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
                   Sign in for a donation history you can track from your dashboard, or donate right now without an account -
-                  we'll just need your name and email for the receipt.
+                  we&apos;ll just need your name and email for the receipt.
                 </p>
               </div>
               <div className="space-y-3 pt-2">
@@ -747,123 +777,118 @@ export default function LandingPage() {
           </div>
         )}
 
-        {/* --- FAQ / CONTACT SECTION --- */}
-        <section id="faq" className="max-w-6xl mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-start">
-            
-            <div>
-              <div className="mb-6">
-                <h2 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">Common Questions</h2>
-                <p className="text-slate-500 dark:text-slate-400 mt-2">Everything you need to know about the platform.</p>
-              </div>
-
-              <div className="relative mb-6">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
-                  <Search className="w-5 h-5 text-slate-400" />
-                </div>
+        {/* --- FAQ / CONTACT --- */}
+        <section id="faq" className="max-w-6xl mx-auto px-4 py-10 scroll-mt-24">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* FAQs */}
+            <Reveal className="lg:col-span-7">
+              <SectionHeader icon={HelpCircle} eyebrow="FAQs" title="Questions? We've got answers." subtitle="Everything you need to know about HelpLift - and a direct line to us if it isn't here." />
+              <div className="relative mb-4">
+                <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
                   type="text"
                   placeholder="Search FAQs..."
                   value={faqSearchQuery}
                   onChange={(e) => setFaqSearchQuery(e.target.value)}
-                  className="w-full pl-12 pr-5 py-3.5 bg-[#FAFAFA] dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-sm font-medium text-slate-900 dark:text-slate-100"
+                  className="w-full rounded-xl border border-transparent bg-white/80 dark:bg-slate-900/60 pl-11 pr-4 py-3 text-sm font-medium text-slate-900 dark:text-slate-100 transition-all focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500"
                 />
               </div>
-
-              <div className="space-y-2">
-                {faqs
-                  .filter(faq => 
-                    faq.question.toLowerCase().includes(faqSearchQuery.toLowerCase()) || 
-                    faq.answer.toLowerCase().includes(faqSearchQuery.toLowerCase())
-                  )
-                  .map((faq) => (
-                  <div key={faq.question} className="border-b border-slate-200 dark:border-slate-800 last:border-0 group">
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setOpenFaq(openFaq === faq.question ? null : faq.question)}
-                      onKeyDown={activateOnKey}
-                      className="w-full py-6 flex items-center justify-between text-left cursor-pointer focus:outline-none"
-                    >
-                      <span className={`font-bold text-lg transition-colors ${openFaq === faq.question ? 'text-blue-600' : 'text-slate-800 dark:text-slate-200 group-hover:text-blue-600'}`}>
-                        {faq.question}
-                      </span>
-                      <div className={`ml-4 shrink-0 transition-transform duration-300 ${openFaq === faq.question ? 'rotate-180 text-blue-600' : 'text-slate-400'}`}>
-                        {openFaq === faq.question ? <Minus className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-                      </div>
-                    </div>
-                    <div className={`overflow-hidden transition-all duration-500 ease-in-out ${openFaq === faq.question ? 'max-h-96 opacity-100 pb-6' : 'max-h-0 opacity-0'}`}>
-                      <p className="text-slate-500 dark:text-slate-400 leading-relaxed pr-8">
-                         {faq.answer}
-                      </p>
-                    </div>
-                  </div>
+              <div className="reveal-stagger space-y-3">
+                {matchingFaqs.slice(0, FAQ_PREVIEW_COUNT).map(faq => (
+                  <FaqItem
+                    key={faq.question}
+                    faq={faq}
+                    number={faqs.indexOf(faq) + 1}
+                    isOpen={openFaq === faq.question}
+                    onToggle={() => setOpenFaq(openFaq === faq.question ? null : faq.question)}
+                  />
                 ))}
+                {matchingFaqs.length === 0 && (
+                  <p className="rounded-xl bg-white/70 dark:bg-slate-900/40 p-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                    No questions match your search. Try other words, or ask us using the form.
+                  </p>
+                )}
               </div>
+              {matchingFaqs.length > FAQ_PREVIEW_COUNT || !faqSearchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAllFaqs(true)}
+                  data-tip="Open every frequently asked question in one window"
+                  className="group mt-4 inline-flex items-center gap-2 text-sm font-bold text-blue-600 dark:text-blue-400"
+                >
+                  {faqSearchQuery ? "See all matching questions" : "See all questions"}
+                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                </button>
+              ) : null}
+            </Reveal>
 
-              {/* Scam safety notice - sits under the FAQs (one of which covers the same topic). */}
-              <div className="mt-10 rounded border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-8">
-                <div className="flex items-start gap-4">
-                  <div className="shrink-0 rounded bg-amber-100 dark:bg-amber-900/50 p-3 text-amber-700 dark:text-amber-400">
-                    <ShieldCheck className="w-6 h-6" />
+            {/* Contact */}
+            <Reveal delay={120} className="lg:col-span-5">
+              <div id="contact" className="scroll-mt-24 relative lg:pt-[4.5rem]">
+                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-600/25">
+                  <MessageSquare className="w-5 h-5" />
+                </span>
+                <h3 className="mt-5 text-2xl font-bold text-slate-900 dark:text-slate-100">Partner with us or get in touch</h3>
+                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 leading-relaxed text-justify-smart">Need help registering your organization? Reach out. This is also where you can contact us with any other inquiry or question.</p>
+                <a href="mailto:helplift_platform@yahoo.com" data-tip="Email HelpLift from your email app" className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:underline">
+                  <Mail className="w-4 h-4" /> helplift_platform@yahoo.com
+                </a>
+
+                {contactFeedback && (
+                  <div className={`mt-5 p-4 rounded-xl text-sm font-semibold ${
+                    contactFeedback.type === "success"
+                      ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
+                      : "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300"
+                  }`}>
+                    {contactFeedback.text}
                   </div>
+                )}
+
+                <form className="mt-5 space-y-4" onSubmit={handleContactSubmit}>
                   <div>
-                    <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">Stay safe: HelpLift will never ask you to pay</h3>
-                    <p className="mt-2 text-slate-600 dark:text-slate-300 leading-relaxed">
-                      We will never ask you to pay a fee to receive a donation, claim a gift, verify your account, or "unlock"
-                      funds - and we will never ask for your password, PIN, or a one-time verification code. Every payment on
-                      HelpLift happens through the platform's own donation flow, never by direct bank transfer to an
-                      individual, WhatsApp, or a "processing fee" request.
-                    </p>
-                    <p className="mt-3 text-slate-600 dark:text-slate-300 leading-relaxed">
-                      If anyone claiming to be from HelpLift asks you to pay upfront or share your login details, it's a scam
-                      - please{" "}
-                      <a href="#contact" className="font-semibold text-amber-700 dark:text-amber-400 hover:underline">report it to us</a>{" "}
-                      right away.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Right column: contact form with the platform-support card under it. */}
-            <div className="space-y-8">
-            <div id="contact" className="scroll-mt-24 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded p-10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] relative overflow-hidden">
-               <div className="absolute -top-10 -right-10 w-40 h-40 bg-blue-50 dark:bg-blue-950 rounded blur-2xl -z-10" />
-               <h3 className="text-2xl font-bold mb-2 text-slate-900 dark:text-slate-100">Partner with us or get in touch</h3>
-               <p className="text-slate-500 dark:text-slate-400 mb-2">Need help registering your organization? Reach out. This is also where you can contact us with any other inquiry or question.</p>
-               <p className="text-slate-500 dark:text-slate-400 mb-8">
-                 Prefer email? Write to us at{" "}
-                 <a href="mailto:helplift_platform@yahoo.com" className="font-semibold text-blue-600 hover:underline">helplift_platform@yahoo.com</a>.
-               </p>
-
-               {contactFeedback && (
-                 <div className={`mb-5 p-4 rounded text-sm font-semibold ${
-                   contactFeedback.type === "success"
-                     ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
-                     : "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300"
-                 }`}>
-                   {contactFeedback.text}
-                 </div>
-               )}
-
-               <form className="space-y-5" onSubmit={handleContactSubmit}>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Email Address</label>
+                    <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Email address</label>
                     <input
                       type="email"
                       placeholder="name@example.com"
                       value={contactEmail}
                       onChange={(e) => setContactEmail(e.target.value)}
                       required
-                      className="w-full px-5 py-4 bg-[#FAFAFA] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-sm font-medium text-slate-900 dark:text-slate-100"
+                      className="w-full rounded-xl border border-transparent bg-white/80 dark:bg-slate-900/60 px-4 py-3 text-sm font-medium text-slate-900 dark:text-slate-100 transition-all focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500"
                     />
                   </div>
                   <div>
-                     <div className="flex items-center justify-between gap-2 mb-2">
-                       <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Message</label>
-                       <GrammarCheckButton text={contactMessage} onTextChange={setContactMessage} />
-                     </div>
+                    <label htmlFor="contact-topic" className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Topic</label>
+                    <select
+                      id="contact-topic"
+                      value={contactTopic}
+                      onChange={(e) => setContactTopic(e.target.value)}
+                      required
+                      className={`w-full rounded-xl border border-transparent bg-white/80 dark:bg-slate-900/60 px-4 py-3 text-sm font-medium transition-all focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 ${contactTopic ? "text-slate-900 dark:text-slate-100" : "text-slate-400"}`}
+                    >
+                      <option value="" disabled>What is your message about?</option>
+                      {CONTACT_TOPICS.map(topic => (
+                        <option key={topic.id} value={topic.id}>{topic.label}</option>
+                      ))}
+                    </select>
+                    {contactTopic === "other" && (
+                      <input
+                        type="text"
+                        value={contactOtherTopic}
+                        onChange={(e) => setContactOtherTopic(e.target.value)}
+                        maxLength={CONTACT_OTHER_TOPIC_MAX}
+                        required
+                        autoFocus
+                        placeholder="Tell us the topic in a few words"
+                        aria-label="Your topic"
+                        className="mt-2 w-full rounded-xl border border-transparent bg-white/80 dark:bg-slate-900/60 px-4 py-3 text-sm font-medium text-slate-900 dark:text-slate-100 transition-all focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 animate-in fade-in slide-in-from-top-1 duration-300"
+                      />
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Message</label>
+                      <GrammarCheckButton text={contactMessage} onTextChange={setContactMessage} />
+                    </div>
                     <div className="relative">
                       <textarea
                         placeholder="How can we assist you?"
@@ -871,65 +896,203 @@ export default function LandingPage() {
                         value={contactMessage}
                         onChange={(e) => setContactMessage(e.target.value)}
                         required
-                        className="w-full px-5 py-4 pr-12 bg-[#FAFAFA] dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-sm font-medium resize-none text-slate-900 dark:text-slate-100"
+                        className="w-full resize-none rounded-xl border border-transparent bg-white/80 dark:bg-slate-900/60 px-4 py-3 pr-12 text-sm font-medium text-slate-900 dark:text-slate-100 transition-all focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500"
                       />
                       <MicButton className="top-3 right-3" onText={text => setContactMessage(m => appendSpeech(m, text))} />
                     </div>
                   </div>
-                  <button type="submit" disabled={isSendingContact} className="w-full group inline-flex items-center justify-center px-6 py-4 text-sm font-bold text-white transition-all duration-300 bg-slate-900 dark:bg-blue-600 rounded hover:bg-slate-800 dark:hover:bg-blue-700 hover:shadow-lg hover:shadow-slate-200 dark:hover:shadow-none hover:-translate-y-0.5 disabled:opacity-60">
-                     <span className="flex items-center gap-2">
-                       {isSendingContact ? "Sending..." : "Send Message"}
-                       {isSendingContact ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-transform" />}
-                     </span>
+                  <button type="submit" disabled={isSendingContact} data-tip="Send your message to the HelpLift team - we'll reply by email" className="btn-shine group w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:-translate-y-0.5 hover:shadow-blue-600/40 disabled:opacity-60">
+                    {isSendingContact ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    {isSendingContact ? "Sending..." : "Send Message"}
+                    {!isSendingContact && <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />}
                   </button>
-               </form>
-            </div>
-
-            <div className="bg-pink-50 dark:bg-pink-950/30 border border-pink-100 dark:border-pink-900 rounded p-10 relative overflow-hidden">
-              <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-pink-100 dark:bg-pink-900/40 rounded blur-2xl -z-10" />
-              <div className="flex items-center gap-2 mb-2">
-                <Heart className="w-5 h-5 text-pink-600" />
-                <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Support The Platform</h3>
+                </form>
               </div>
-              <p className="text-slate-600 dark:text-slate-300 mb-2">
-                This donation goes directly to HelpLift - not to any organization. We don't charge organizations or
-                givers a cent to use the platform, so your support is what helps us keep it running and growing.
-                Thank you for believing in what we're doing. 💙
-              </p>
-              <button
-                onClick={handleSupportPlatformClick}
-                className="mt-6 w-full inline-flex items-center justify-center gap-2 px-6 py-4 text-sm font-bold text-white transition-all duration-300 bg-pink-600 rounded hover:bg-pink-700 hover:shadow-lg hover:-translate-y-0.5"
-              >
-                <Heart className="w-4 h-4" />
-                <span>Support The Platform</span>
-              </button>
-            </div>
-            </div>
+            </Reveal>
           </div>
         </section>
 
-        {/* --- FOOTER --- */}
-        <footer className="bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 pt-16 pb-8">
-          <div className="max-w-6xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-8">
-            <div className="flex items-center gap-2">
-              <div className="bg-gradient-to-tr from-blue-600 to-indigo-500 p-2 rounded shadow-sm">
-                <HeartHandshake className="w-6 h-6 text-white" />
+        {/* --- SAFETY PROMISE + SUPPORT THE PLATFORM --- */}
+        <section aria-labelledby="safety-heading" className="max-w-6xl mx-auto px-4 pt-4">
+          <Reveal>
+            <div className="pt-6">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <div className="lg:col-span-5">
+                  <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-orange-500">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-md bg-orange-500 text-white">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                    </span>
+                    Your safety matters
+                  </p>
+                  <h2 id="safety-heading" className="mt-4 text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
+                    HelpLift will never ask you to pay
+                  </h2>
+                  <p className="mt-4 text-sm md:text-base text-slate-500 dark:text-slate-400 leading-relaxed text-justify-smart">
+                    Every payment on HelpLift happens through the platform&apos;s own donation flow. If anyone claiming to be from
+                    HelpLift asks you to pay upfront or share your login details, it&apos;s a scam.
+                  </p>
+                </div>
+                <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-6">
+                  {[
+                    { icon: Banknote, title: "No fees, ever", text: "Never a fee to receive a donation, claim a gift, verify your account or \"unlock\" funds." },
+                    { icon: KeyRound, title: "No passwords or codes", text: "We'll never ask for your password, PIN or a one-time verification code." },
+                    { icon: Ban, title: "No side payments", text: "Never a bank transfer to an individual, a WhatsApp payment or a \"processing fee\"." },
+                  ].map(({ icon: Icon, title, text }, index) => (
+                    <Reveal key={title} delay={120 + index * 110} className="">
+                      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-950 text-orange-500 dark:text-orange-400">
+                        <Icon className="w-5 h-5" strokeWidth={1.9} />
+                      </span>
+                      <h3 className="mt-4 font-bold text-slate-900 dark:text-slate-100">{title}</h3>
+                      <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{text}</p>
+                    </Reveal>
+                  ))}
+                </div>
               </div>
-              <span className="font-extrabold text-2xl tracking-tight text-slate-900 dark:text-slate-100">HelpLift</span>
+
+              <div className="reveal-stagger mt-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <a
+                  href="#contact"
+                  onClick={() => setContactTopic("scam")}
+                  data-tip="Tell us about anyone asking you to pay or share your login details"
+                  className="btn-shine group inline-flex h-12 items-center gap-2.5 self-start rounded-xl bg-slate-900 dark:bg-slate-800 px-5 text-sm font-bold text-white shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg"
+                >
+                  <Flag className="w-4 h-4" /> Report a scam to us
+                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                </a>
+                <div className="flex flex-col-reverse md:flex-row md:items-center gap-3 md:gap-4">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed md:max-w-[17rem] md:text-right">
+                    Donations go directly to HelpLift, not to any organization. Your support keeps it running and growing. Thank you! 💙
+                  </p>
+                  <button
+                    onClick={handleSupportPlatformClick}
+                    data-tip="Donate to HelpLift itself - it keeps the platform free for everyone"
+                    className="btn-shine group inline-flex h-12 shrink-0 items-center gap-2.5 self-start md:self-auto rounded-xl bg-gradient-to-r from-pink-600 to-pink-500 px-5 text-sm font-bold text-white shadow-lg shadow-pink-600/25 transition-all hover:-translate-y-0.5 hover:shadow-pink-600/40"
+                  >
+                    <span className="flex h-6 w-6 items-center justify-center rounded-md bg-white">
+                      <Heart className="heartbeat w-3.5 h-3.5 fill-pink-600 text-pink-600" />
+                    </span>
+                    Support The Platform
+                    <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                  </button>
+                </div>
+              </div>
             </div>
-            
+          </Reveal>
+        </section>
+
+        {/* --- FOOTER --- */}
+        <footer className="relative pt-6 pb-6">
+          <div className="max-w-6xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-8">
+            <div className="text-center md:text-left">
+              <div className="flex items-center justify-center md:justify-start gap-2">
+                <BrandLogo className="h-10 w-10" />
+                <span className="font-extrabold text-2xl tracking-tight text-slate-900 dark:text-slate-100">HelpLift</span>
+              </div>
+              <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">Giving made transparent. Impact made real.</p>
+            </div>
+
             <div className="flex flex-wrap items-center justify-center gap-8 text-sm font-bold text-slate-500 dark:text-slate-400">
-              <Link href="/privacy" className="hover:text-blue-600 transition-colors">Privacy Policy</Link>
-              <Link href="/terms" className="hover:text-blue-600 transition-colors">Terms of Service</Link>
-              <Link href="/developers" className="hover:text-blue-600 transition-colors">Developers</Link>
+              <Link href="/privacy" data-tip="How HelpLift collects, uses and protects your information" className="hover:text-blue-600 transition-colors">Privacy Policy</Link>
+              <Link href="/terms" data-tip="The rules for using HelpLift" className="hover:text-blue-600 transition-colors">Terms of Service</Link>
             </div>
           </div>
-          <div className="max-w-6xl mx-auto px-4 mt-12 pt-8 border-t border-slate-100 dark:border-slate-800 text-center text-sm font-medium text-slate-400">
+          <div className="max-w-6xl mx-auto px-4 mt-6 text-center text-sm font-medium text-slate-400">
             © 2026 HelpLift. Empowering verified community support.
           </div>
         </footer>
       </main>
 
+    </div>
+  )
+}
+
+// --- Homepage section building blocks ----------------------------------------
+
+// A soft, slightly lighter area used by the sections below the hero - no
+// outline or shadow, so sections blend into the page rather than sitting on it.
+const PANEL = "rounded-2xl bg-white/70 dark:bg-slate-900/40"
+
+// Section heading: a small icon label, a bold title and a short line under it,
+// with an optional action (button or arrows) on the right.
+function SectionHeader({
+  icon: Icon,
+  eyebrow,
+  title,
+  subtitle,
+  action,
+  id,
+}: {
+  icon: React.ComponentType<{ className?: string }>
+  eyebrow: string
+  title: string
+  subtitle?: string
+  action?: React.ReactNode
+  id?: string
+}) {
+  return (
+    <div className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div className="max-w-2xl">
+        <p className="flex items-center gap-2 text-sm font-bold text-blue-600 dark:text-blue-400">
+          <span className="reveal-pop flex h-6 w-6 items-center justify-center rounded-md bg-blue-600 text-white">
+            <Icon className="h-3.5 w-3.5" />
+          </span>
+          {eyebrow}
+        </p>
+        <h2 id={id} className="mt-3 text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">{title}</h2>
+        {subtitle && <p className="mt-2 text-slate-500 dark:text-slate-400">{subtitle}</p>}
+      </div>
+      {action && <div className="shrink-0">{action}</div>}
+    </div>
+  )
+}
+
+// How many questions show beside the contact form; the rest are in the
+// "See all questions" window.
+const FAQ_PREVIEW_COUNT = 6
+
+// One expandable question - in the homepage list and the all-questions window.
+function FaqItem({
+  faq,
+  number,
+  isOpen,
+  onToggle,
+  tinted = false,
+}: {
+  faq: { question: string; answer: string }
+  number: number
+  isOpen: boolean
+  onToggle: () => void
+  /** Use a grey fill (inside a white window) instead of the page's white one. */
+  tinted?: boolean
+}) {
+  const idle = tinted
+    ? "bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800"
+    : "bg-white/70 dark:bg-slate-900/40 hover:bg-white dark:hover:bg-slate-900/70"
+  return (
+    <div className={`rounded-xl transition-colors duration-300 ${isOpen ? "bg-blue-50/80 dark:bg-blue-950/30" : idle}`}>
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={isOpen}
+        onClick={onToggle}
+        onKeyDown={activateOnKey}
+        className="group flex w-full items-center gap-4 px-4 py-4 text-left cursor-pointer focus:outline-none"
+      >
+        <span className="flex h-7 min-w-9 shrink-0 items-center justify-center rounded-md bg-blue-50 dark:bg-blue-950 px-2 text-xs font-bold text-blue-600 dark:text-blue-400">
+          {String(number).padStart(2, "0")}
+        </span>
+        <span className={`flex-1 text-sm md:text-base font-bold transition-colors ${isOpen ? "text-blue-600" : "text-slate-900 dark:text-slate-100 group-hover:text-blue-600"}`}>
+          {faq.question}
+        </span>
+        <span className={`shrink-0 text-blue-600 transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`}>
+          {isOpen ? <Minus className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+        </span>
+      </div>
+      <div className={`grid transition-all duration-500 ease-in-out ${isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
+        <div className="overflow-hidden">
+          <p className="px-4 pb-5 pl-[4.25rem] text-sm text-slate-500 dark:text-slate-400 leading-relaxed text-justify-smart">{faq.answer}</p>
+        </div>
+      </div>
     </div>
   )
 }

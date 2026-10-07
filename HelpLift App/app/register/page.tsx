@@ -20,6 +20,7 @@ import { BackButton } from "@/components/back-button"
 import { MicButton } from "@/components/mic-button"
 import { GrammarCheckButton } from "@/components/grammar-check-button"
 import { appendSpeech } from "@/lib/speech-to-text"
+import { BrandLogo } from "@/components/brand-logo"
 
 function FieldLabel({ children, required = true }: { children: React.ReactNode; required?: boolean }) {
   return (
@@ -171,9 +172,7 @@ export default function RegisterPage() {
       </div>
 
       <div className="text-center mb-12">
-        <div className="bg-gradient-to-tr from-blue-600 to-indigo-500 p-3 rounded shadow-lg inline-block mb-6">
-          <HeartHandshake className="w-8 h-8 text-white" />
-        </div>
+        <BrandLogo className="h-14 w-14 inline-block mb-6 shadow-lg shadow-blue-600/25" />
         <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">Join HelpLift</h1>
       </div>
 

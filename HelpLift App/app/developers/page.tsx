@@ -127,7 +127,7 @@ export default function DevelopersPage() {
 
   return (
     <main className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 pt-28 pb-24 px-4 md:px-8">
-      <div className="max-w-5xl mx-auto space-y-10">
+      <div className="max-w-5xl mx-auto space-y-10 justify-prose">
         <div className="space-y-4">
           <Link
             href="/"

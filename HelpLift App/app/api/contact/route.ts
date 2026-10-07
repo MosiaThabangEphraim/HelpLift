@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { sendEmail, escapeHtml } from "@/lib/mailer"
 import { createClient } from "@/lib/supabase/server"
+import { contactTopicLabel } from "@/lib/contact-topics"
 
 /**
  * Sends "Partner with us" contact form submissions (home page) via
@@ -18,9 +19,14 @@ export async function POST(req: Request) {
     const body = await req.json()
     const email = typeof body.email === "string" ? body.email.trim() : ""
     const message = typeof body.message === "string" ? body.message.trim() : ""
+    // The topic chosen from the list ("Other" comes with the sender's own words).
+    const topic = contactTopicLabel(body.topic, body.otherTopic)
 
     if (!email || !message) {
       return NextResponse.json({ success: false, message: "Email and message are required." }, { status: 400 })
+    }
+    if (!topic) {
+      return NextResponse.json({ success: false, message: body.topic === "other" ? "Please tell us what your message is about." : "Please choose a topic." }, { status: 400 })
     }
     const basicEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!basicEmail.test(email)) {
@@ -32,7 +38,7 @@ export async function POST(req: Request) {
 
     try {
       const supabase = await createClient()
-      const { error: rpcError } = await supabase.rpc("add_contact_inquiry", { p_email: email, p_message: message })
+      const { error: rpcError } = await supabase.rpc("add_contact_inquiry", { p_email: email, p_message: `[${topic}] ${message}` })
       if (rpcError) console.warn("Contact inquiry notification warning:", rpcError.message)
     } catch (notifyErr) {
       console.warn("Contact inquiry notification warning:", notifyErr)
@@ -47,10 +53,11 @@ export async function POST(req: Request) {
     await sendEmail({
       to: CONTACT_EMAIL_TO,
       replyTo: email,
-      subject: "New HelpLift partnership inquiry",
-      text: `New message from the HelpLift "Partner with us" form.\n\nFrom: ${email}\n\nMessage:\n${message}`,
+      subject: `HelpLift contact form: ${topic}`,
+      text: `New message from the HelpLift contact form.\n\nTopic: ${topic}\nFrom: ${email}\n\nMessage:\n${message}`,
       html: `
-        <p><strong>New message from the HelpLift "Partner with us" form.</strong></p>
+        <p><strong>New message from the HelpLift contact form.</strong></p>
+        <p><strong>Topic:</strong> ${escapeHtml(topic)}</p>
         <p><strong>From:</strong> ${escapeHtml(email)}</p>
         <p><strong>Message:</strong></p>
         <p style="white-space:pre-line">${escapeHtml(message)}</p>

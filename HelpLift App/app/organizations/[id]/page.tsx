@@ -285,7 +285,7 @@ export default function OrganizationPublicProfilePage() {
                 </span>
                 <ReadAloudButton text={org.mission} label="Listen to mission" />
               </div>
-              <p className="text-sm md:text-base text-slate-700 dark:text-slate-300 leading-relaxed italic">
+              <p className="text-sm md:text-base text-slate-700 dark:text-slate-300 leading-relaxed italic text-justify-smart">
                 "{org.mission}"
               </p>
             </div>

@@ -16,6 +16,7 @@ import { GrammarCheckButton } from "@/components/grammar-check-button"
 import { appendSpeech } from "@/lib/speech-to-text"
 import { TermsAgreementCheckbox } from "@/components/terms-agreement-checkbox"
 import { AgeConfirmationCheckbox } from "@/components/age-confirmation-checkbox"
+import { BrandLogo } from "@/components/brand-logo"
 
 const inputClass = "w-full bg-transparent border-0 border-b-2 border-slate-200 dark:border-slate-800 focus:border-blue-600 pb-2 outline-none text-slate-900 dark:text-slate-100 transition-all"
 
@@ -196,9 +197,7 @@ export default function CompleteRegistrationPage() {
     return (
       <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 flex flex-col items-center py-20 px-4">
         <div className="text-center mb-10">
-          <div className="bg-gradient-to-tr from-blue-600 to-indigo-500 p-3 rounded shadow-lg inline-block mb-6">
-            <HeartHandshake className="w-8 h-8 text-white" />
-          </div>
+          <BrandLogo className="h-14 w-14 inline-block mb-6 shadow-lg shadow-blue-600/25" />
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">Welcome to HelpLift</h1>
           <p className="text-slate-500 dark:text-slate-400 mt-3 max-w-md mx-auto">
             Google has verified <strong>{email}</strong>. How would you like to use HelpLift?
@@ -247,9 +246,7 @@ export default function CompleteRegistrationPage() {
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 flex flex-col items-center py-20 px-4">
       <div className="text-center mb-10">
-        <div className="bg-gradient-to-tr from-blue-600 to-indigo-500 p-3 rounded shadow-lg inline-block mb-6">
-          <HeartHandshake className="w-8 h-8 text-white" />
-        </div>
+        <BrandLogo className="h-14 w-14 inline-block mb-6 shadow-lg shadow-blue-600/25" />
         <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">Finish signing up</h1>
         <p className="text-slate-500 dark:text-slate-400 mt-3 max-w-md mx-auto">
           Google has verified your email. {role === "organization"

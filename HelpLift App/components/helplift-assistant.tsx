@@ -335,6 +335,18 @@ export function HelpLiftAssistant() {
   return (
     <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[150]">
       {!isChatOpen ? (
+        <div className="flex items-center gap-3">
+        {/* On the homepage, a speech bubble beside the button always invites a question. */}
+        {pathname === "/" && (
+          <button
+            type="button"
+            onClick={() => setIsChatOpen(true)}
+            className="relative hidden sm:block rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 shadow-lg animate-in fade-in slide-in-from-right-2 duration-500 hover:text-blue-600"
+          >
+            Hi, I&apos;m Lifty 😊 How can I help you?
+            <span aria-hidden="true" className="absolute top-1/2 -right-1.5 h-3 w-3 -translate-y-1/2 rotate-45 border-t border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900" />
+          </button>
+        )}
         <button
           data-tour="lifty"
           onClick={() => setIsChatOpen(true)}
@@ -347,6 +359,7 @@ export function HelpLiftAssistant() {
           </span>
           <Bot className="w-6 h-6" />
         </button>
+        </div>
       ) : (
         <div className="w-[calc(100vw-2rem)] sm:w-[400px] h-[min(520px,calc(100dvh-6rem))] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-300">
           {/* Header */}

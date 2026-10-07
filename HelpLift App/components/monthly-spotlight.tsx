@@ -32,17 +32,21 @@ export function MonthlySpotlight() {
   return (
     <section className="py-10">
       <div className="max-w-6xl mx-auto px-4">
-        <div className="flex items-center gap-2 mb-8">
-          <Trophy className="w-6 h-6 text-amber-500" />
-          <div>
-            <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">This Month's Spotlight</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{data.periodLabel}</p>
-          </div>
+        {/* Same header style as the other homepage sections. */}
+        <div className="mb-6">
+          <p className="flex items-center gap-2 text-sm font-bold text-blue-600 dark:text-blue-400">
+            <span className="reveal-pop flex h-6 w-6 items-center justify-center rounded-md bg-blue-600 text-white">
+              <Trophy className="h-3.5 w-3.5" />
+            </span>
+            Spotlight
+          </p>
+          <h2 className="mt-3 text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">This month&apos;s spotlight.</h2>
+          {data.periodLabel && <p className="mt-2 text-slate-500 dark:text-slate-400">{data.periodLabel}</p>}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {data.giver && (
-            <div className="rounded border border-amber-200 dark:border-amber-900 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/20 p-6 flex items-center gap-5 shadow-sm">
+            <div className="rounded-2xl bg-white/70 dark:bg-slate-900/40 p-6 flex items-center gap-5 transition-all duration-300 hover:-translate-y-1 hover:bg-white dark:hover:bg-slate-900/70">
               <UserAvatar src={data.giver.avatarUrl} name={data.giver.name} className="size-16 text-2xl shadow-lg shadow-amber-500/30 ring-2 ring-white dark:ring-[#0B1220]" />
               <div className="min-w-0">
                 <p className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Giver of the Month</p>
@@ -55,8 +59,8 @@ export function MonthlySpotlight() {
           )}
 
           {data.organization && (
-            <div className="rounded border border-blue-200 dark:border-blue-900 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/20 p-6 flex items-center gap-5 shadow-sm">
-              <div className="shrink-0 rounded bg-gradient-to-br from-blue-500 to-indigo-600 p-4 text-white shadow-lg shadow-blue-500/30 overflow-hidden">
+            <div className="rounded-2xl bg-white/70 dark:bg-slate-900/40 p-6 flex items-center gap-5 transition-all duration-300 hover:-translate-y-1 hover:bg-white dark:hover:bg-slate-900/70">
+              <div className="shrink-0 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 p-4 text-white shadow-lg shadow-blue-500/30 overflow-hidden">
                 {data.organization.logoUrl ? (
                   <img src={data.organization.logoUrl} alt={data.organization.name} className="w-7 h-7 object-cover rounded" />
                 ) : (

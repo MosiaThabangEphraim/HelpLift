@@ -369,7 +369,7 @@ export default function PublicGiftLibraryPage() {
                     {gift.title}
                   </h3>
 
-                  <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-3 leading-relaxed">
+                  <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-3 leading-relaxed text-justify-smart">
                     {gift.description}
                   </p>
                   <ReadAloudButton text={`${gift.title}. ${gift.description}`} label="Listen" />
@@ -430,7 +430,7 @@ export default function PublicGiftLibraryPage() {
 
         {/* --- ORG SIGN-IN PROMPT MODAL --- */}
         {showOrgPrompt && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-in fade-in">
             <div className="relative w-full max-w-3xl lg:max-w-5xl max-h-[90vh] overflow-y-auto pt-12 md:pt-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded p-6 md:p-8 shadow-2xl text-center space-y-6">
               <MaximizeToggle />
               <div className="w-14 h-14 bg-purple-50 dark:bg-purple-950/60 border border-purple-100 dark:border-purple-900 rounded flex items-center justify-center mx-auto text-purple-600 dark:text-purple-400">

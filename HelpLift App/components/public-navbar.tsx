@@ -23,6 +23,7 @@ import {
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { logClientAction } from "@/components/activity-tracker"
+import { BrandLogo } from "@/components/brand-logo"
 
 const DASHBOARD_PATH: Record<string, string> = {
   giver: "/givers-dashboard",
@@ -106,9 +107,7 @@ export default function PublicNavbar() {
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 bg-primary rounded flex items-center justify-center transition-transform group-hover:scale-105">
-              <HeartHandshake className="w-5 h-5 text-primary-foreground" />
-            </div>
+            <BrandLogo className="h-8 w-8 transition-transform group-hover:scale-105" />
             <span className="font-black tracking-tighter text-xl text-foreground">
               HelpLift
             </span>

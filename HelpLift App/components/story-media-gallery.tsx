@@ -135,7 +135,7 @@ export function StoryMediaGallery({
       {lightboxIndex !== null && images[lightboxIndex] && typeof document !== "undefined" && createPortal(
         <div
           data-story-lightbox=""
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4"
+          className="fixed inset-0 z-[230] flex items-center justify-center bg-black/90 p-4"
           onClick={() => setLightboxIndex(null)}
         >
           <button

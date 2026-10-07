@@ -65,8 +65,8 @@ export function LiveActivityFeed() {
   }, [])
 
   return (
-    <div className="flex flex-col h-[380px] md:h-[440px] rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+    <div className="flex flex-col h-[380px] md:h-[440px] overflow-hidden">
+      <div className="flex items-center justify-between px-2 pb-3">
         <h3 className="font-bold text-slate-900 dark:text-slate-100">Live activity</h3>
         <span className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
           <span className="relative flex h-2 w-2">
@@ -77,10 +77,10 @@ export function LiveActivityFeed() {
         </span>
       </div>
 
-      <ul aria-live="polite" className="flex-1 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+      <ul aria-live="polite" className="flex-1 overflow-y-auto">
         {isLoading ? (
           [0, 1, 2, 3, 4].map(i => (
-            <li key={i} className="flex items-start gap-3 px-5 py-3.5">
+            <li key={i} className="flex items-start gap-3 px-2 py-3">
               <div className="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800 animate-pulse shrink-0" />
               <div className="flex-1 space-y-2 pt-1">
                 <div className="h-3 rounded bg-slate-100 dark:bg-slate-800 animate-pulse" />
@@ -114,11 +114,11 @@ export function LiveActivityFeed() {
             return (
               <li key={item.id} className="animate-in fade-in duration-500">
                 {item.href ? (
-                  <Link href={item.href} className="flex items-start gap-3 px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+                  <Link href={item.href} className="flex items-start gap-3 rounded px-2 py-3 hover:bg-white/70 dark:hover:bg-slate-900/60 transition-colors">
                     {body}
                   </Link>
                 ) : (
-                  <div className="flex items-start gap-3 px-5 py-3.5">{body}</div>
+                  <div className="flex items-start gap-3 px-2 py-3">{body}</div>
                 )}
               </li>
             )

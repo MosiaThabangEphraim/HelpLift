@@ -17,7 +17,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export default function TermsOfServicePage() {
   return (
     <main className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 pt-28 pb-24 px-4 md:px-8">
-      <div className="max-w-3xl mx-auto space-y-10">
+      <div className="max-w-3xl mx-auto space-y-10 justify-prose">
         <div className="space-y-4">
           <Link href="/" className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 dark:text-slate-400 hover:text-blue-600 transition-colors">
             <ArrowLeft className="w-4 h-4" /> Back to home
