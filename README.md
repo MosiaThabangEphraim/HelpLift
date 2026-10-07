@@ -27,7 +27,7 @@ The app is a single Next.js project split across three logical layers - but laye
                          the actual backend infrastructure
 ```
 
-Layers 1 and 2 live in the same Next.js codebase (`HelpLift App/`), and the frontend does **not** always go through the backend logic layer to reach the database. Two paths exist side by side:
+Layers 1 and 2 live in the same Next.js codebase (`helplift-app/`), and the frontend does **not** always go through the backend logic layer to reach the database. Two paths exist side by side:
 
 - **Frontend → Supabase, directly.** Dashboards and pages (e.g. `admin-dashboard`, `givers-dashboard`, `organisation-dashboard`) load most of their data with the browser Supabase client, querying Postgres straight from the client. This is safe only because Row Level Security policies on every table enforce who can read/write what - the database itself is the access-control layer here, not application code.
 - **Frontend → Next.js API route → Supabase.** Anything needing server-side business logic, validation, secrets, payment processing, outbound email, or a privileged service-role bypass (e.g. incrementing a failed-login counter before any session exists) goes through an `app/api/**/route.ts` handler instead, using either the caller's own session (subject to RLS) or a service-role client.
@@ -74,14 +74,14 @@ Vercel rejects any request larger than 4.5 MB, so files never travel inside a fo
 
 ```
 HelpLift/
-├── HelpLift App/          # the Next.js application - see below
+├── helplift-app/          # the Next.js application - see below
 └── supabase/
     ├── migrations/        # ~95 timestamped SQL migrations - the source of truth for schema & RLS
     ├── email-templates/   # Supabase Auth email template overrides
     └── role_based_access_all_in_one.sql
 ```
 
-Inside `HelpLift App/`:
+Inside `helplift-app/`:
 
 ```
 app/              # App Router: role dashboards & public pages, plus api/ (120+ Route Handlers)
@@ -122,11 +122,11 @@ Database changes are made by adding a new timestamped file to `supabase/migratio
 Prerequisites: Node.js, a [Supabase](https://supabase.com) project, and (optional, for full functionality) a Brevo account and PayFast/PayPal sandbox credentials.
 
 ```bash
-cd "HelpLift App"
+cd "helplift-app"
 npm install
 ```
 
-1. Copy the environment variables below into `HelpLift App/.env.local`.
+1. Copy the environment variables below into `helplift-app/.env.local`.
 2. Apply every file in `supabase/migrations/` to your Supabase project, in filename order (via the SQL editor, or the Supabase CLI).
    This also creates the storage buckets, including the private `upload-staging` bucket used for all file uploads.
 3. Configure Google/LinkedIn/Microsoft as OAuth providers in the Supabase Auth dashboard if you want social sign-in.
@@ -138,7 +138,7 @@ npm run dev
 
 ## Environment variables
 
-Set these in `HelpLift App/.env.local` (never commit this file):
+Set these in `helplift-app/.env.local` (never commit this file):
 
 | Variable | Purpose |
 |---|---|
@@ -156,7 +156,7 @@ Set these in `HelpLift App/.env.local` (never commit this file):
 
 ## Scripts
 
-Run from inside `HelpLift App/`:
+Run from inside `helplift-app/`:
 
 | Command | Description |
 |---|---|
@@ -169,7 +169,7 @@ Run from inside `HelpLift App/`:
 
 The app is built for [Vercel](https://vercel.com):
 
-1. Import the repository and set **Root Directory** to `HelpLift App`.
+1. Import the repository and set **Root Directory** to `helplift-app`.
 2. Add the environment variables above, with `NEXT_PUBLIC_SITE_URL` set to the deployed address.
 3. In Supabase, set **Authentication → URL Configuration** (Site URL and redirect URLs) to the deployed address, and point the notification-email database webhook at `/api/webhooks/notification-created`.
 4. Point the PayPal webhook at `/api/public/paypal/webhook` and use its ID for `PAYPAL_WEBHOOK_ID`.

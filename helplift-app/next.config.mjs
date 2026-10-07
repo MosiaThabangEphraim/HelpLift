@@ -1,10 +1,10 @@
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
-// This folder ("HelpLift App") is the project root. Without saying so, Next.js
-// can pick the repository folder above it instead, and then the folder name -
-// which has a space - ends up in Vercel's server function names, which Vercel
-// rejects ("A Serverless Function has an invalid name").
+// This folder is the project root. Without saying so, Next.js can pick the
+// repository folder above it instead, and the folder name then ends up in
+// Vercel's server function names (which must not contain spaces - the reason
+// this folder is called "helplift-app" rather than "HelpLift App").
 const projectRoot = path.dirname(fileURLToPath(import.meta.url))
 
 /** @type {import('next').NextConfig} */
