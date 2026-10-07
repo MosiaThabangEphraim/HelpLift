@@ -80,19 +80,46 @@ function getVoicesAsync(): Promise<SpeechSynthesisVoice[]> {
   })
 }
 
-// Speaks a longer text (e.g. a Lifty reply) sentence by sentence - Chrome cuts
+// Utterances still playing. Chrome can garbage-collect an utterance that
+// nothing references, after which it goes silent and never fires "end".
+const liveUtterances = new Set<SpeechSynthesisUtterance>()
+
+// How long a sentence may take to start before we assume its voice failed.
+// Online ("natural") voices sometimes fail silently - no sound, no error.
+const START_TIMEOUT_MS = 2500
+
+// Speaks a longer text (e.g. a Lifty reply) one sentence at a time - Chrome cuts
 // single utterances off after ~15 seconds, and shorter pieces start playing
 // sooner - with the same best-voice choice as the "read aloud" buttons.
-// Cancels anything already speaking. `onDone` runs once the last sentence
-// finishes (not when cancelled). Returns a function that stops it.
-export function speakInSentences(text: string, onDone?: () => void): () => void {
+// If the chosen voice doesn't start (common with online voices), it switches
+// to a voice installed on the device and carries on. Cancels anything already
+// speaking. `onDone` runs once it has finished - including when speech turned
+// out to be impossible, so callers never stay stuck in "speaking" - but not
+// when cancelled. If other speech on the page (a "Listen" button) cuts it off,
+// `onInterrupted` runs instead. Returns a function that stops it - which only
+// ever stops this reply's own speech, never someone else's.
+export function speakInSentences(text: string, onDone?: () => void, onInterrupted?: () => void): () => void {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) {
     onDone?.()
     return () => {}
   }
+  const synth = window.speechSynthesis
   let cancelled = false
+  let finished = false
+  // Set while WE cancel (to retry with another voice), so the resulting
+  // "interrupted" error isn't mistaken for someone else taking over.
+  let selfCancelling = false
+  let watchdog: number | undefined
   const chunks = (text.match(/[^.!?\n]+[.!?]*/g) || []).map(chunk => chunk.trim()).filter(Boolean)
-  window.speechSynthesis.cancel()
+
+  const finish = () => {
+    if (finished || cancelled) return
+    finished = true
+    window.clearTimeout(watchdog)
+    onDone?.()
+  }
+
+  synth.cancel()
   if (chunks.length === 0) {
     onDone?.()
     return () => {}
@@ -101,22 +128,97 @@ export function speakInSentences(text: string, onDone?: () => void): () => void 
   getVoicesAsync().then((voices) => {
     if (cancelled) return
     const lang = typeof navigator !== "undefined" ? navigator.language || "en-US" : "en-US"
-    const voice = pickBestVoice(voices, lang)
-    chunks.forEach((chunk, index) => {
-      const utterance = new SpeechSynthesisUtterance(chunk)
+    let voice = pickBestVoice(voices, lang)
+    // Fallback: the best voice that runs on the device itself (no network).
+    const localVoice = pickBestVoice(voices.filter(v => v.localService), lang)
+    let usedFallback = !voice || voice === localVoice
+
+    const speakChunk = (index: number) => {
+      selfCancelling = false
+      if (cancelled || finished) return
+      if (index >= chunks.length) return finish()
+
+      const utterance = new SpeechSynthesisUtterance(chunks[index])
       utterance.lang = lang
       if (voice) utterance.voice = voice
-      if (index === chunks.length - 1) {
-        utterance.onend = () => { if (!cancelled) onDone?.() }
-        utterance.onerror = (event) => { if (!cancelled && event.error !== "interrupted" && event.error !== "canceled") onDone?.() }
+      liveUtterances.add(utterance)
+      // Some voices play without ever firing "start", so word boundaries and
+      // the time an utterance took also count as proof that it played.
+      let started = false
+      const spokenAt = Date.now()
+      utterance.onboundary = () => { started = true }
+
+      const retryWithLocalVoice = () => {
+        liveUtterances.delete(utterance)
+        if (!usedFallback) {
+          usedFallback = true
+          voice = localVoice
+          selfCancelling = true
+          synth.cancel()
+          window.setTimeout(() => speakChunk(index), 60)
+        } else {
+          selfCancelling = true
+          synth.cancel()
+          finish() // no voice works - don't leave the caller waiting
+        }
       }
-      window.speechSynthesis.speak(utterance) // queued - plays after the previous chunk
-    })
+
+      utterance.onstart = () => {
+        started = true
+        window.clearTimeout(watchdog)
+      }
+      utterance.onend = () => {
+        liveUtterances.delete(utterance)
+        window.clearTimeout(watchdog)
+        // Ending almost instantly without any sign of playing means it failed.
+        if (!started && Date.now() - spokenAt < 400) return retryWithLocalVoice()
+        speakChunk(index + 1)
+      }
+      utterance.onerror = (event) => {
+        liveUtterances.delete(utterance)
+        window.clearTimeout(watchdog)
+        if (cancelled || finished) return
+        if (event.error === "interrupted" || event.error === "canceled") {
+          if (selfCancelling) return
+          // Something else on the page started speaking: this reply is over,
+          // and from now on it must not cancel that other speech.
+          finished = true
+          onInterrupted?.()
+          return
+        }
+        if (!started) return retryWithLocalVoice()
+        speakChunk(index + 1)
+      }
+
+      // A stuck/paused engine plays nothing until resumed.
+      if (synth.paused) synth.resume()
+      synth.speak(utterance)
+      // Silent-failure check: nothing has started and the engine isn't busy
+      // speaking. If it is busy, give it until the sentence could reasonably
+      // have finished before giving up on the voice.
+      const sentenceDeadline = 4000 + chunks[index].length * 150
+      const check = () => {
+        if (started || cancelled || finished) return
+        if (synth.speaking && Date.now() - spokenAt < sentenceDeadline) {
+          watchdog = window.setTimeout(check, 500)
+          return
+        }
+        retryWithLocalVoice()
+      }
+      window.clearTimeout(watchdog)
+      watchdog = window.setTimeout(check, START_TIMEOUT_MS)
+    }
+
+    // Chrome can ignore speak() straight after cancel(); give it a moment.
+    window.setTimeout(() => speakChunk(0), 60)
   })
 
   return () => {
+    const stillOurs = !cancelled && !finished
     cancelled = true
-    window.speechSynthesis.cancel()
+    window.clearTimeout(watchdog)
+    liveUtterances.clear()
+    if (stillOurs) synth.cancel()
   }
 }
 
@@ -140,10 +242,16 @@ export function useTextToSpeech() {
   const [speaking, setSpeaking] = useState(false)
   const [error, setError] = useState("")
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
+  // True only while THIS button's own speech is playing. There's one speech
+  // engine for the whole page, so a button must never cancel speech it didn't
+  // start - e.g. Lifty's reply when a homepage story (and its Listen button)
+  // rotates away.
+  const ownsSpeechRef = useRef(false)
 
   const stop = useCallback(() => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return
-    window.speechSynthesis.cancel()
+    if (ownsSpeechRef.current) window.speechSynthesis.cancel()
+    ownsSpeechRef.current = false
     setSpeaking(false)
   }, [])
 
@@ -169,8 +277,9 @@ export function useTextToSpeech() {
     if (bestVoice) utterance.voice = bestVoice
 
     utterance.onstart = () => setSpeaking(true)
-    utterance.onend = () => setSpeaking(false)
+    utterance.onend = () => { ownsSpeechRef.current = false; setSpeaking(false) }
     utterance.onerror = (event) => {
+      ownsSpeechRef.current = false
       // "interrupted"/"canceled" fire when stop() or a newer speak() call
       // cuts this utterance off deliberately - not a real error.
       if (event.error !== "interrupted" && event.error !== "canceled") {
@@ -179,11 +288,15 @@ export function useTextToSpeech() {
       setSpeaking(false)
     }
     utteranceRef.current = utterance
+    ownsSpeechRef.current = true
     window.speechSynthesis.speak(utterance)
   }, [])
 
-  // Stop speaking if the component unmounts (dialog closed, navigated away) mid-utterance.
-  useEffect(() => () => { if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel() }, [])
+  // Stop speaking if the component unmounts (dialog closed, navigated away)
+  // mid-utterance - but only this button's own speech.
+  useEffect(() => () => {
+    if (ownsSpeechRef.current && typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel()
+  }, [])
 
   return { speaking, error, speak, stop }
 }

@@ -3,12 +3,13 @@
 import { useState, useEffect, useRef, type ReactNode } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
-import { ArrowRight, Bot, EyeOff, Headphones, Mic, PhoneOff, Sparkles, Square, Volume2, VolumeX, X, User, Send } from "lucide-react"
+import { ArrowRight, Bot, EyeOff, Headphones, Mic, PhoneOff, Sparkles, Square, Volume2, X, User, Send } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { isAssistantEnabled, onAssistantPreferenceChange, setAssistantEnabled } from "@/lib/assistant-preference"
 import { isSpeechToTextSupported, useSpeechToText } from "@/lib/speech-to-text"
 import { isTextToSpeechSupported, primeSpeechSynthesis, speakInSentences } from "@/lib/text-to-speech"
+import { ReadAloudButton } from "@/components/read-aloud-button"
 import { logClientAction } from "@/components/activity-tracker"
 
 // Lifty, the floating HelpLift AI assistant, rendered once for every page of the site from
@@ -102,8 +103,6 @@ function toSpeakable(text: string) {
   return links > 0 ? `${spoken} I've added ${links === 1 ? "a link" : "links"} in the chat.` : spoken
 }
 
-const VOICE_REPLIES_KEY = "helplift:lifty-voice-replies"
-
 function greetingFor(role: Role) {
   if (role === "giver") return "Hi there! I'm Lifty, your HelpLift assistant 😊 Need help browsing needs, managing your pledges, or tracking donations?"
   if (role === "organization") return "Hi there! I'm Lifty, your HelpLift assistant 😊 Need help posting needs, uploading verification documents, or claiming gifts?"
@@ -124,25 +123,39 @@ export function HelpLiftAssistant() {
   // --- Voice ---
   const [canListen, setCanListen] = useState(false)
   const [canSpeak, setCanSpeak] = useState(false)
-  const [voiceReplies, setVoiceReplies] = useState(false) // read replies aloud (remembered on this device)
   const [conversation, setConversation] = useState(false) // hands-free voice chat
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [voiceNote, setVoiceNote] = useState<string | null>(null)
   // Refs mirror state for callbacks that outlive a render (speech events, fetches).
   const conversationRef = useRef(false)
-  const voiceRepliesRef = useRef(false)
   const messagesRef = useRef(messages)
   messagesRef.current = messages
   const isTypingRef = useRef(false)
   const stopSpeakingRef = useRef<(() => void) | null>(null)
   const sendMessageRef = useRef<(text: string) => void>(() => {})
 
+  // The browser stops listening after only a few seconds of silence, so a
+  // silent turn restarts listening a couple of times (about 20-30 seconds in
+  // all) before the voice chat ends.
+  const silentTurnsRef = useRef(0)
+  const MAX_SILENT_TURNS = 3
   const speech = useSpeechToText(text => sendMessageRef.current(text), {
     continuous: false, // one spoken message, sent when the person pauses
     onEnd: heardSpeech => {
-      if (!heardSpeech && conversationRef.current) {
-        endConversation("I didn't hear anything, so I ended the voice chat. Tap the headphones to talk again.")
+      if (!conversationRef.current) return
+      if (heardSpeech) {
+        silentTurnsRef.current = 0
+        return
       }
+      // Still waiting for Lifty's answer, or Lifty is talking - don't count it.
+      if (isTypingRef.current || stopSpeakingRef.current) return
+      silentTurnsRef.current += 1
+      if (silentTurnsRef.current < MAX_SILENT_TURNS) {
+        window.setTimeout(() => { if (conversationRef.current) speech.start() }, 250)
+        return
+      }
+      silentTurnsRef.current = 0
+      endConversation("I didn't hear anything for a while, so I ended the voice chat. Tap the headphones to talk again.")
     },
   })
 
@@ -157,16 +170,27 @@ export function HelpLiftAssistant() {
     if (!isTextToSpeechSupported()) return
     stopSpeaking()
     setIsSpeaking(true)
-    stopSpeakingRef.current = speakInSentences(toSpeakable(text), () => {
-      stopSpeakingRef.current = null
-      setIsSpeaking(false)
-      if (conversationRef.current) speech.start()
-    })
+    stopSpeakingRef.current = speakInSentences(
+      toSpeakable(text),
+      () => {
+        stopSpeakingRef.current = null
+        setIsSpeaking(false)
+        if (conversationRef.current) speech.start()
+      },
+      // A "Listen" button elsewhere on the page took over the speaker: stop
+      // here, and end a voice chat rather than listen to that other speech.
+      () => {
+        stopSpeakingRef.current = null
+        setIsSpeaking(false)
+        if (conversationRef.current) endConversation("Voice chat ended because something else on the page started reading aloud. Tap the headphones to talk again.")
+      }
+    )
   }
 
   const startConversation = () => {
     primeSpeechSynthesis() // lets phones speak the replies that arrive later
     stopSpeaking()
+    silentTurnsRef.current = 0
     setVoiceNote(null)
     conversationRef.current = true
     setConversation(true)
@@ -181,24 +205,9 @@ export function HelpLiftAssistant() {
     if (note) setVoiceNote(note)
   }
 
-  const toggleVoiceReplies = () => {
-    const next = !voiceRepliesRef.current
-    voiceRepliesRef.current = next
-    setVoiceReplies(next)
-    try { window.localStorage.setItem(VOICE_REPLIES_KEY, next ? "on" : "off") } catch {}
-    logClientAction("Changed settings", `Lifty voice replies turned ${next ? "on" : "off"}`)
-    if (next) primeSpeechSynthesis()
-    else stopSpeaking()
-  }
-
   useEffect(() => {
     setCanListen(isSpeechToTextSupported())
     setCanSpeak(isTextToSpeechSupported())
-    try {
-      const saved = window.localStorage.getItem(VOICE_REPLIES_KEY) === "on"
-      voiceRepliesRef.current = saved
-      setVoiceReplies(saved)
-    } catch {}
     return () => { stopSpeakingRef.current?.() }
   }, [])
 
@@ -283,13 +292,20 @@ export function HelpLiftAssistant() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: history }),
+        // Never leave the typing dots spinning forever.
+        signal: AbortSignal.timeout(60_000),
+      }).catch((fetchError: any) => {
+        if (fetchError?.name === "TimeoutError") throw new Error("Lifty is taking too long to answer. Please try again.")
+        throw fetchError
       })
 
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.reply) throw new Error(data.message || FRIENDLY_ERROR)
 
       setMessages(prev => [...prev, { role: "assistant", text: data.reply }])
-      if (conversationRef.current || voiceRepliesRef.current) speakReply(data.reply)
+      // Replies are only spoken automatically in a voice chat; otherwise each
+      // reply has its own Listen button.
+      if (conversationRef.current) speakReply(data.reply)
     } catch (err: any) {
       const errorText = err?.message || FRIENDLY_ERROR
       setMessages(prev => [...prev, { role: "assistant", text: errorText, isError: true }])
@@ -355,17 +371,6 @@ export function HelpLiftAssistant() {
                   <Headphones className="w-5 h-5" />
                 </button>
               )}
-              {canSpeak && (
-                <button
-                  onClick={toggleVoiceReplies}
-                  className={`p-1 rounded transition-colors ${voiceReplies ? "text-blue-400 hover:text-blue-300" : "text-slate-400 hover:text-white"}`}
-                  aria-label={voiceReplies ? "Stop reading replies aloud" : "Read Lifty's replies aloud"}
-                  aria-pressed={voiceReplies}
-                  data-tip={voiceReplies ? "Voice replies on - Lifty reads its answers aloud" : "Turn on voice replies"}
-                >
-                  {voiceReplies ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
-                </button>
-              )}
               {signedIn && (
                 <button
                   onClick={hideAssistant}
@@ -410,6 +415,11 @@ export function HelpLiftAssistant() {
                   }`}
                 >
                   {msg.role === "assistant" && !msg.isError ? withSiteLinks(msg.text) : msg.text}
+                  {msg.role === "assistant" && !msg.isError && canSpeak && (
+                    <div className="mt-1.5 -mb-1 flex justify-end">
+                      <ReadAloudButton text={toSpeakable(msg.text)} label="Listen to this reply" iconOnly />
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

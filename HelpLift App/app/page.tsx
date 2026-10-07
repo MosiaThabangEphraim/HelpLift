@@ -58,7 +58,7 @@ export default function LandingPage() {
   const router = useRouter()
   const [isScrolled, setIsScrolled] = useState(false)
   const [activeStoryIndex, setActiveStoryIndex] = useState(0)
-  const [openFaq, setOpenFaq] = useState<string | null>(faqs[0]?.question ?? null)
+  const [openFaq, setOpenFaq] = useState<string | null>(null)
   const [faqSearchQuery, setFaqSearchQuery] = useState("")
 
   // Dynamic Data - populated from the database only; no hardcoded demo content.
