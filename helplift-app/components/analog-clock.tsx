@@ -100,12 +100,12 @@ function ClockFace({ size, className }: { size: number; className: string }) {
   const timeLabel = now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
 
   return (
-    <div className={`flex items-center gap-3 ${className}`}>
+    <div className={`flex shrink-0 items-center gap-3 ${className}`}>
       <p className="text-right leading-tight">
-        <span ref={digitalRef} aria-hidden="true" className="block text-lg font-extrabold tabular-nums tracking-tight text-slate-900 dark:text-slate-100">
+        <span ref={digitalRef} aria-hidden="true" className="block text-lg max-md:text-sm font-extrabold tabular-nums tracking-tight text-slate-900 dark:text-slate-100">
           {now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
         </span>
-        <span className="block text-xs font-semibold text-slate-500 dark:text-slate-400">
+        <span className="block text-xs font-semibold text-slate-500 dark:text-slate-400 max-md:hidden">
           {now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
         </span>
       </p>
@@ -115,7 +115,7 @@ function ClockFace({ size, className }: { size: number; className: string }) {
         height={size}
         role="img"
         aria-label={`Current time ${timeLabel}`}
-        className="shrink-0 text-slate-700 dark:text-slate-200"
+        className="shrink-0 text-slate-700 dark:text-slate-200 max-md:hidden"
       >
         <circle cx="50" cy="50" r="47" className="fill-white dark:fill-[#121B2E] stroke-slate-200 dark:stroke-[#233350]" strokeWidth="2" />
         {TICKS.map(i => {

@@ -1002,16 +1002,16 @@ export default function AdminDashboardPage() {
 
   return (
     <main className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100">
-      <div className="mx-auto max-w-[2400px] px-4 md:px-10 py-10 md:py-14 space-y-6">
+      <div className="mx-auto max-w-[2400px] px-4 md:px-10 py-6 md:py-14 space-y-6">
 
         {/* Greeting for the time of day, with the clock and date beside it. */}
-        <div className="flex flex-wrap items-center justify-end gap-x-8 gap-y-3">
+        <div className="flex flex-wrap items-center justify-end max-md:flex-nowrap max-md:justify-between gap-x-8 max-md:gap-x-3 gap-y-3">
           <TimeGreeting name={profiles.find(p => p.email === ownEmail)?.full_name} firstNameOnly />
           <AnalogClock />
         </div>
 
         {/* --- HEADER --- */}
-        <header className="flex flex-wrap items-center justify-between gap-5">
+        <header className="flex flex-wrap items-center justify-between gap-5 max-md:gap-4">
           <div className="flex items-center gap-4">
             <div className="rounded bg-gradient-to-br from-slate-800 to-slate-950 dark:from-blue-600 dark:to-indigo-600 p-3.5 text-white shadow-lg shadow-slate-900/20 dark:shadow-blue-600/20">
               <ShieldCheck className="h-6 w-6" />
@@ -1022,7 +1022,7 @@ export default function AdminDashboardPage() {
               <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Review platform verification, needs, gifts, and access.</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap max-md:flex-nowrap max-md:overflow-x-auto no-scrollbar max-md:w-full max-md:pb-1 max-md:[&>*]:shrink-0">
             <button
               onClick={() => setIsAnnouncing(true)}
               aria-label="Send an announcement"
@@ -1112,7 +1112,7 @@ export default function AdminDashboardPage() {
 
         {/* --- STATS ROW: what needs an admin's attention right now, nothing
              that's just a total (those live in the Reports tab instead) --- */}
-        <div data-tour="admin-stats" className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-x-6 gap-y-4">
+        <div data-tour="admin-stats" className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-x-6 gap-y-4 max-md:flex max-md:overflow-x-auto no-scrollbar max-md:gap-x-4 max-md:[&>*]:w-[40%] max-md:[&>*]:shrink-0">
           <StatCard icon={AlertTriangle} label="Pending Approvals" value={pendingApprovals} accent="amber" />
           <StatCard icon={ClipboardList} label="Needs Awaiting Review" value={needsAwaitingReview} accent="emerald" />
           <StatCard icon={Gift} label="Pending Gifts" value={pendingGifts} accent="blue" />
@@ -1161,7 +1161,7 @@ export default function AdminDashboardPage() {
             <MessagesView refreshKey={refreshKey} messages={messages} onOpen={item => { setReturnTo("Messages", () => {}); openMessage(item) }} onDeleted={afterDelete} />
           </TabsContent>
           <TabsContent value="users" className={`space-y-6 ${tabMotion}`}>
-            <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Users view">
+            <div className="flex flex-wrap items-center gap-2 max-md:flex-nowrap max-md:overflow-x-auto no-scrollbar max-md:pb-1 max-md:[&>*]:shrink-0" role="group" aria-label="Users view">
               {([
                 { value: "organizations", label: "Organizations", icon: Building2, count: organizations.length },
                 { value: "givers", label: "Givers", icon: Heart, count: profiles.filter(p => p.role === "giver").length },
@@ -3802,13 +3802,13 @@ function StatCard({ icon: Icon, label, value, accent, prefix = "", decimals = 0 
 
   // Flat, like the rest of the dashboard: no box or fill, just a rule above and below.
   return (
-    <div className="flex items-center gap-3 border-y border-slate-200 dark:border-[#233350] py-3">
-      <Icon className={`h-5 w-5 shrink-0 ${accentClasses}`} />
+    <div className="flex items-center gap-3 max-md:gap-2 border-y border-slate-200 dark:border-[#233350] py-3 max-md:py-2">
+      <Icon className={`h-5 w-5 max-md:h-4 max-md:w-4 shrink-0 ${accentClasses}`} />
       <div>
-        <p className="text-2xl font-extrabold leading-none">
+        <p className="text-2xl max-md:text-xl font-extrabold leading-none">
           {typeof value === "number" ? <CountUp value={value} prefix={prefix} decimals={decimals} /> : value}
         </p>
-        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">{label}</p>
+        <p className="text-xs max-md:text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1 max-md:leading-tight">{label}</p>
       </div>
     </div>
   )

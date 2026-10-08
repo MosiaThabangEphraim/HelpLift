@@ -65,7 +65,7 @@ export function LiveActivityFeed() {
   }, [])
 
   return (
-    <div className="flex flex-col h-[380px] md:h-[440px] overflow-hidden">
+    <div className="flex flex-col h-[380px] md:h-[440px] max-md:h-auto max-md:max-h-[380px] overflow-hidden">
       <div className="flex items-center justify-between px-2 pb-3">
         <h3 className="font-bold text-slate-900 dark:text-slate-100">Live activity</h3>
         <span className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">

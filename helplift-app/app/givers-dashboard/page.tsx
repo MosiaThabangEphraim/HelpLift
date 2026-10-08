@@ -840,23 +840,23 @@ export default function GiverDashboardPage() {
 
   return (
     <main className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100">
-      <div className="mx-auto max-w-[2400px] px-4 md:px-10 py-10 md:py-14 space-y-6">
+      <div className="mx-auto max-w-[2400px] px-4 md:px-10 py-6 md:py-14 space-y-6">
 
         {/* Greeting for the time of day, with the clock and date beside it. */}
-        <div className="flex flex-wrap items-center justify-end gap-x-8 gap-y-3">
+        <div className="flex flex-wrap items-center justify-end max-md:flex-nowrap max-md:justify-between gap-x-8 max-md:gap-x-3 gap-y-3">
           <TimeGreeting name={giver?.name} firstNameOnly />
           <AnalogClock />
         </div>
 
         {/* --- HEADER --- */}
-        <header className="flex flex-wrap items-center justify-between gap-5">
+        <header className="flex flex-wrap items-center justify-between gap-5 max-md:gap-4">
           <div className="flex items-center gap-4">
             <UserAvatar src={giver?.avatar_url} name={giver?.name} className="size-14 text-xl shadow-lg shadow-blue-600/20" />
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Giver dashboard</p>
               <h1 className="text-2xl md:text-3xl font-extrabold leading-tight">Welcome, {giver?.name}</h1>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-sm text-slate-500 dark:text-slate-400">{giver?.email}</span>
+                <span className="text-sm text-slate-500 dark:text-slate-400 max-md:truncate max-md:max-w-[45vw]">{giver?.email}</span>
                 <span className="inline-flex items-center rounded bg-slate-100 dark:bg-[#1A2740] px-2 py-0.5 text-[11px] font-bold capitalize">
                   {giver?.account_type} Supporter
                 </span>
@@ -864,7 +864,7 @@ export default function GiverDashboardPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap max-md:flex-nowrap max-md:overflow-x-auto no-scrollbar max-md:w-full max-md:pb-1 max-md:[&>*]:shrink-0">
             <RefreshButton onRefresh={refreshAll} />
             <Link
               href="/"
@@ -948,7 +948,7 @@ export default function GiverDashboardPage() {
         </header>
 
         {/* --- STATS ROW --- */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4 max-md:flex max-md:overflow-x-auto no-scrollbar max-md:gap-x-4 max-md:[&>*]:w-[40%] max-md:[&>*]:shrink-0">
           <StatCard icon={ClipboardList} label="Needs For You" value={stats.openNeeds} accent="blue" />
           <StatCard icon={Users} label="Pending Interests" value={stats.myInterests} accent="emerald" />
           <StatCard icon={Gift} label="Active Gift Pledges" value={stats.myGifts} accent="purple" />
@@ -2209,13 +2209,13 @@ function StatCard({ icon: Icon, label, value, accent }: { icon: React.ComponentT
 
   // Same flat design as the admin dashboard's tiles: no box or fill, just a rule above and below.
   return (
-    <div className="flex items-center gap-3 border-y border-slate-200 dark:border-[#233350] py-3">
-      <Icon className={`h-5 w-5 shrink-0 ${accentClasses}`} />
+    <div className="flex items-center gap-3 max-md:gap-2 border-y border-slate-200 dark:border-[#233350] py-3 max-md:py-2">
+      <Icon className={`h-5 w-5 max-md:h-4 max-md:w-4 shrink-0 ${accentClasses}`} />
       <div>
-        <p className="text-2xl font-extrabold leading-none">
+        <p className="text-2xl max-md:text-xl font-extrabold leading-none">
           <CountUp value={value} />
         </p>
-        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">{label}</p>
+        <p className="text-xs max-md:text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1 max-md:leading-tight">{label}</p>
       </div>
     </div>
   )

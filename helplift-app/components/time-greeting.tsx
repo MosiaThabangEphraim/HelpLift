@@ -109,14 +109,14 @@ export function TimeGreeting({ name, firstNameOnly = false, className = "" }: { 
 
   return (
     <div className={`flex min-w-0 items-center gap-3 animate-in fade-in slide-in-from-left-2 duration-500 ${className}`}>
-      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${period.iconClass}`}>
-        <Icon className="h-6 w-6 animate-[greeting-float_4s_ease-in-out_infinite]" aria-hidden="true" />
+      <span className={`flex h-11 w-11 max-md:h-8 max-md:w-8 shrink-0 items-center justify-center rounded-full ${period.iconClass}`}>
+        <Icon className="h-6 w-6 max-md:h-4 max-md:w-4 animate-[greeting-float_4s_ease-in-out_infinite]" aria-hidden="true" />
       </span>
       <p className="min-w-0 leading-tight">
-        <span className="block truncate text-lg font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
+        <span className="block truncate text-lg max-md:text-sm font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
           {period.greeting}{shownName ? `, ${shownName}` : ""}
         </span>
-        <span className="block truncate text-xs font-semibold text-slate-500 dark:text-slate-400">{line}</span>
+        <span className="block truncate text-xs font-semibold text-slate-500 dark:text-slate-400 max-md:hidden">{line}</span>
       </p>
     </div>
   )

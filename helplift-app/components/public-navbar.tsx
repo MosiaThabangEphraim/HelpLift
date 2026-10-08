@@ -19,6 +19,8 @@ import {
   Palette,
   Sun,
   LayoutDashboard,
+  Menu,
+  X,
 } from "lucide-react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
@@ -54,6 +56,9 @@ export default function PublicNavbar() {
   // otherwise saw "Log In" / "Register" with no indication they're already
   // in - a link straight back to their dashboard instead.
   const [dashboardPath, setDashboardPath] = useState<string | null>(null)
+  // Phones only: the ☰ menu holding the page links and account buttons.
+  const [menuOpen, setMenuOpen] = useState(false)
+  useEffect(() => { setMenuOpen(false) }, [pathname])
 
   useEffect(() => {
     setMounted(true)
@@ -176,7 +181,7 @@ export default function PublicNavbar() {
                 asChild
                 variant="ghost"
                 size="sm"
-                className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded px-2 md:px-4 transition-all overflow-hidden group"
+                className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded px-2 md:px-4 transition-all overflow-hidden group max-md:hidden"
               >
                 <Link href="/verify-email">
                   <ShieldCheck className="w-7 h-7 md:w-4 md:h-4 shrink-0" />
@@ -193,7 +198,7 @@ export default function PublicNavbar() {
                 asChild
                 variant="ghost"
                 size="sm"
-                className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded px-2 md:px-4 transition-all overflow-hidden group"
+                className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded px-2 md:px-4 transition-all overflow-hidden group max-md:hidden"
               >
                 <Link href="/login">
                   <ChevronLeft className="w-7 h-7 md:w-4 md:h-4 shrink-0" />
@@ -243,7 +248,7 @@ export default function PublicNavbar() {
                 size="sm"
                 onClick={() => router.push(dashboardPath)}
                 data-tip="You're signed in - go to your dashboard"
-                className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded px-2 md:px-4 transition-all overflow-hidden group"
+                className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded px-2 md:px-4 transition-all overflow-hidden group max-md:hidden"
               >
                 <LayoutDashboard className="w-7 h-7 md:w-4 md:h-4 shrink-0" />
                 <span className="font-bold max-w-0 md:max-w-[140px] inline-block transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden">
@@ -257,7 +262,7 @@ export default function PublicNavbar() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded px-2 md:px-4 transition-all overflow-hidden group"
+                    className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded px-2 md:px-4 transition-all overflow-hidden group max-md:hidden"
                     onClick={handleLoginRedirect}
                   >
                     <LogIn className="w-7 h-7 md:w-4 md:h-4 shrink-0" />
@@ -273,7 +278,7 @@ export default function PublicNavbar() {
                     variant="ghost"
                     size="sm"
                     onClick={() => router.push("/register")}
-                    className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded px-2 md:px-4 transition-all overflow-hidden group"
+                    className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded px-2 md:px-4 transition-all overflow-hidden group max-md:hidden"
                   >
                     <UserPlus className="w-7 h-7 md:w-4 md:h-4 shrink-0" />
                     <span className="font-bold max-w-0 md:max-w-[100px] inline-block transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden">
@@ -290,7 +295,7 @@ export default function PublicNavbar() {
                 asChild
                 variant="ghost"
                 size="sm"
-                className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded px-2 md:px-4 transition-all overflow-hidden group"
+                className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded px-2 md:px-4 transition-all overflow-hidden group max-md:hidden"
               >
                 <Link href="/">
                   <Home className="w-7 h-7 md:w-4 md:h-4 shrink-0" />
@@ -300,8 +305,75 @@ export default function PublicNavbar() {
                 </Link>
               </Button>
             )}
+
+            {/* Phones: page links and account buttons live in this menu. */}
+            <button
+              type="button"
+              onClick={() => setMenuOpen(open => !open)}
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={menuOpen}
+              className="md:hidden inline-flex h-10 w-10 items-center justify-center rounded bg-slate-900 dark:bg-blue-600 text-white"
+            >
+              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
           </div>
         </div>
+
+        {menuOpen && (
+          <div className="md:hidden bg-background/95 backdrop-blur-xl px-4 pb-4 pt-2 animate-in fade-in slide-in-from-top-2 duration-200">
+            <nav className="grid grid-cols-2 gap-1">
+              {[
+                { href: "/needs", label: "Browse Needs", icon: HeartHandshake, active: isNeedsPage },
+                { href: "/gift-library", label: "Gift Library", icon: Gift, active: isGiftLibraryPage },
+                { href: "/organizations", label: "Organizations", icon: Building2, active: isOrganizationsPage },
+                { href: "/", label: "Home", icon: Home, active: false },
+                ...((isLoginPage || isRegisterPage) ? [{ href: "/verify-email", label: "Verification", icon: ShieldCheck, active: false }] : []),
+                ...(isForgotPasswordPage ? [{ href: "/login", label: "Back to Login", icon: ChevronLeft, active: false }] : []),
+              ].map(({ href, label, icon: Icon, active }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => setMenuOpen(false)}
+                  className={`flex items-center gap-2 rounded px-3 py-3 text-sm font-bold ${active ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted"}`}
+                >
+                  <Icon className="h-4 w-4 shrink-0" /> {label}
+                </Link>
+              ))}
+            </nav>
+            <div className="mt-2 grid gap-2">
+              {dashboardPath ? (
+                <button
+                  type="button"
+                  onClick={() => { setMenuOpen(false); router.push(dashboardPath) }}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/25"
+                >
+                  <LayoutDashboard className="h-4 w-4" /> My Dashboard
+                </button>
+              ) : (
+                <>
+                  {!isLoginPage && (
+                    <button
+                      type="button"
+                      onClick={() => { setMenuOpen(false); handleLoginRedirect() }}
+                      className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/25"
+                    >
+                      <LogIn className="h-4 w-4" /> Log In
+                    </button>
+                  )}
+                  {!isRegisterPage && (
+                    <button
+                      type="button"
+                      onClick={() => { setMenuOpen(false); router.push("/register") }}
+                      className="flex items-center justify-center gap-2 rounded-xl bg-slate-900/5 dark:bg-white/10 px-4 py-3 text-sm font-bold text-foreground"
+                    >
+                      <UserPlus className="h-4 w-4" /> Register
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </header>
     </>
   )
