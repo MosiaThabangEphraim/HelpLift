@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { requireAdmin } from "@/lib/require-admin"
 import { isDeletableKind, loadDeletable, performDelete, previewDelete, DELETABLE } from "@/lib/admin-delete"
 import { logActivity } from "@/lib/activity-log"
+import { needSupporterIds, notifyNeedSupporters, organizationName } from "@/lib/need-notifications"
 
 // Administrators can permanently delete any record of the kinds in
 // lib/admin-delete.ts (needs, gifts, claims, stories, fulfillments, messages,
@@ -45,7 +46,34 @@ export async function DELETE(_request: Request, context: Context) {
 
     const preview = await previewDelete(db, kind, row)
     if (preview.blocked) return NextResponse.json({ message: preview.blocked }, { status: 409 })
+
+    // A deleted need: gather who to tell before its offers are deleted with it.
+    let deletedNeed: { id: string; title: string; organization_id: string; supporters: string[] } | null = null
+    if (kind === "need") {
+      const { data: need } = await db.from("needs").select("id, title, organization_id").eq("id", row.id).maybeSingle()
+      if (need) deletedNeed = { ...need, supporters: await needSupporterIds(db, need.id) }
+    }
+
     await performDelete(db, kind, row)
+
+    if (deletedNeed) {
+      try {
+        const { data: org } = await db.from("organizations").select("profile_id").eq("id", deletedNeed.organization_id).maybeSingle()
+        if (org?.profile_id) {
+          await db.from("notifications").insert({
+            recipient_id: org.profile_id,
+            sender_id: auth.user.id,
+            sender_name: "HelpLift Notifications",
+            type: "need_status_update",
+            title: "Need removed",
+            message: `Your need "${deletedNeed.title}" was removed by a HelpLift administrator. If you have questions, message the HelpLift team from your dashboard.`,
+          })
+        }
+        await notifyNeedSupporters(deletedNeed, await organizationName(db, deletedNeed.organization_id), "deleted", deletedNeed.supporters)
+      } catch (notifyError) {
+        console.warn("Deleted need notification warning:", notifyError)
+      }
+    }
 
     // Accountability: deletions are always recorded, and the activity log
     // itself can't be deleted.

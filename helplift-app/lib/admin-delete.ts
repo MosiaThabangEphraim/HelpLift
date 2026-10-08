@@ -25,6 +25,7 @@ export type DeletableKind =
   | "message"
   | "feedback"
   | "dev-report"
+  | "tip-off"
   | "organization-document"
 
 type Files = { bucket: string; paths: string[] }
@@ -170,6 +171,14 @@ export const DELETABLE: Record<DeletableKind, KindConfig> = {
     describe: row => `"${row.title}"`,
     linked: async (_db, row) => [{ label: "proof files", count: Array.isArray(row.attachments) ? row.attachments.length : 0 }],
     files: async (_db, row) => [{ bucket: "developer-reports", paths: (Array.isArray(row.attachments) ? row.attachments : []).map((file: any) => file.path).filter(Boolean) }],
+  },
+  "tip-off": {
+    table: "tip_offs",
+    label: "tip-off",
+    select: "id, organization_name, attachments",
+    describe: row => `the tip-off about "${row.organization_name}"`,
+    linked: async (_db, row) => [{ label: "evidence files", count: Array.isArray(row.attachments) ? row.attachments.length : 0 }],
+    files: async (_db, row) => [{ bucket: "tip-off-evidence", paths: (Array.isArray(row.attachments) ? row.attachments : []).map((file: any) => file.path).filter(Boolean) }],
   },
   "organization-document": {
     table: "organization_documents",

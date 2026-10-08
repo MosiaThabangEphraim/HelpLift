@@ -44,7 +44,7 @@ export default function PendingVerificationPage() {
   const [status, setStatus] = useState<string | null>(null)
   const [notes, setNotes] = useState<string | null>(null)
   const [documents, setDocuments] = useState<OrgDocument[]>([])
-  const [memberRole, setMemberRole] = useState<"owner" | "manager" | "viewer">("owner")
+  const [memberRole, setMemberRole] = useState<"owner" | "manager" | "coordinator">("owner")
   const [isLoading, setIsLoading] = useState(true)
 
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
@@ -67,7 +67,7 @@ export default function PendingVerificationPage() {
       .maybeSingle()
     const orgField = (membership as any)?.organizations
     const org = Array.isArray(orgField) ? orgField[0] : orgField
-    setMemberRole(((membership as any)?.role as "owner" | "manager" | "viewer") ?? "owner")
+    setMemberRole(((membership as any)?.role as "owner" | "manager" | "coordinator") ?? "owner")
     setStatus(org?.verification_status || "pending")
     setNotes(org?.verification_notes || null)
 
@@ -246,11 +246,11 @@ export default function PendingVerificationPage() {
             <p className="rounded border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-700">
               Message sent - an administrator will get back to you.
             </p>
-          ) : memberRole !== "viewer" ? (
+          ) : (
             <Button onClick={() => setIsMessagingAdmin(true)} variant="outline" className="w-full max-w-md mx-auto">
               <Mail className="w-4 h-4 mr-1.5" /> Message Admin
             </Button>
-          ) : null}
+          )}
 
           <button onClick={logout} className="inline-flex items-center gap-1.5 text-sm font-bold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 mx-auto">
             <LogOut className="w-4 h-4" /> Log out

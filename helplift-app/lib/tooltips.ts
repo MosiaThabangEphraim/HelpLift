@@ -162,8 +162,8 @@ export const TOOLTIP_LABELS: Record<string, string> = {
   "published": "Approved and visible to the public",
   "rejected": "An administrator rejected this",
   "owner": "Full access, including the team, organization profile, banking details and requesting withdrawals",
-  "manager": "Can manage needs, interests, fulfillments, stories and messages",
-  "viewer": "Read-only access",
+  "manager": "Can manage needs, interests, Gift Library claims, stories and messages, and see donations and the wallet",
+  "coordinator": "Handles deliveries, messages and impact stories. No needs, offers, claims or money",
   "owner · account holder": "The original account holder. Can't be demoted or removed",
 
   // --- Dashboard tabs: administrator
@@ -221,7 +221,7 @@ const TRAILING_COUNT = /\s*\(?\d+\+?\)?$/
 const BADGE_LABELS = new Set([
   "awaiting approval", "awaiting admin approval", "high urgency", "standard",
   "pending verification", "awaiting payment", "published", "rejected",
-  "owner", "manager", "viewer", "owner · account holder",
+  "owner", "manager", "coordinator", "owner · account holder",
 ])
 
 export function resolveTooltip(rawLabel: string, area: TooltipArea, interactive = true): string | null {

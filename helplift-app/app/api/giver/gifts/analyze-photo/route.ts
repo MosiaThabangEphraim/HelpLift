@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/staged-uploads"
 import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { createClient } from "@/lib/supabase/server"
+import { notPastFilter } from "@/lib/expiry"
 import { getActiveCategoryNames } from "@/lib/need-categories"
 import { needSimilarity } from "@/lib/need-similarity"
 import { generateStructured } from "@/lib/gemini"
@@ -133,6 +134,7 @@ Rules:
       .from("needs")
       .select("id, title, description, category, location, urgency, organizations(name, logo_url, verification_status)")
       .in("status", ["open", "in_progress"])
+      .or(notPastFilter("due_date"))
       .order("created_at", { ascending: false })
       .limit(300)
 

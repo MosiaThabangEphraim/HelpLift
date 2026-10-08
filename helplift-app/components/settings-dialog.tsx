@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { AtSign, Bell, Bot, Clock, KeyRound, Mail, MousePointerClick, ShieldCheck, SlidersHorizontal, Sparkles, Star, Trash2, Type, UserRound } from "lucide-react"
+import { AtSign, Bell, BookOpen, Bot, Clock, Download, KeyRound, Mail, MousePointerClick, ShieldCheck, SlidersHorizontal, Sparkles, Star, Trash2, Type, UserRound } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -360,6 +360,14 @@ export function SettingsDialog({
                 </button>
               ))}
             </div>
+          </SettingRow>
+
+          <SettingRow icon={<BookOpen className="h-5 w-5" />} title="User manual" description="A step-by-step guide to everything on HelpLift, as a PDF.">
+            <Button asChild variant="outline" size="sm">
+              <a href="/helplift-user-manual.pdf" download="HelpLift User Manual.pdf" data-tip="Download the HelpLift user manual (PDF)">
+                <Download className="h-4 w-4" /> Download
+              </a>
+            </Button>
           </SettingRow>
 
           {onToggleSpotlightOptOut && (

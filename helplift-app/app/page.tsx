@@ -30,6 +30,7 @@ import {
   Banknote,
   Ban,
   Flag,
+  EyeOff,
   HelpCircle,
   Menu,
   X
@@ -43,6 +44,7 @@ import { appendSpeech } from "@/lib/speech-to-text"
 import { activateOnKey } from "@/lib/keyboard"
 import { createClient } from "@/lib/supabase/client"
 import { SupportPlatformDialog } from "@/components/support-platform-dialog"
+import { TipOffDialog } from "@/components/tip-off-dialog"
 import { GuestSupportPlatformDialog } from "@/components/guest-support-platform-dialog"
 import { MonthlySpotlight } from "@/components/monthly-spotlight"
 import { ShareButtons } from "@/components/share-buttons"
@@ -73,6 +75,7 @@ const faqs = [
   { question: "Can I donate to HelpLift without an account?", answer: "Yes - Support The Platform lets anyone donate to HelpLift itself with just a name and email for the receipt. These donations keep the platform running; they don't go to any organization." },
   { question: "Will my personal details be shown publicly?", answer: "No. Organizations' public profiles never show donations or donors, and we never share your contact details. Givers can opt out of being featured as Giver of the Month in Settings. See our Privacy Policy for the full details." },
   { question: "How do I stay safe from scammers?", answer: "HelpLift will never ask you to pay a fee to receive a donation, claim a gift, verify your account, or unlock funds. We will never ask for your password, PIN, or a one-time verification code. All payments happen through the platform's own donation flow - never by direct bank transfer to an individual, WhatsApp, or a \"processing fee\" request. If anyone claiming to be from HelpLift asks you to pay upfront or share login details, it's a scam - please report it to us immediately." },
+  { question: "How do I report an organization anonymously?", answer: "Use the Anonymous tip-off button in the safety section of this page. Tell us which organization it is, what the concern is and what happened, and attach evidence if you have it. We don't save your name, account, IP address or device, and the organization is never told who reported it. The HelpLift team investigates every tip-off." },
   { question: "How do I keep my account secure?", answer: "Use a strong password, and turn on two-factor sign-in in Settings for an emailed code at every sign-in. You can also add a passkey to sign in with your fingerprint, face or device PIN. After repeated wrong passwords, an account is locked until it's unlocked with an emailed code." },
   { question: "Who is Lifty?", answer: "Lifty is HelpLift's AI assistant - the chat button in the corner of every page. Ask it how anything on HelpLift works, or about open needs and organizations, by typing or speaking. It can also read its answers aloud." },
   { question: "Can I use HelpLift on my phone?", answer: "Yes. HelpLift works in any modern browser on phones, tablets and computers, and you can install it like an app from your browser's menu. It also offers larger text, light, dark, high-contrast and grayscale themes, and read-aloud." },
@@ -167,6 +170,8 @@ export default function LandingPage() {
   const [contactEmail, setContactEmail] = useState("")
   const [contactMessage, setContactMessage] = useState("")
   const [contactTopic, setContactTopic] = useState("")
+  // The anonymous tip-off (whistleblower) form in the safety section.
+  const [showTipOff, setShowTipOff] = useState(false)
   // Links like /?topic=account#contact (e.g. "HelpLift Support" on the
   // verification pages) open the contact form with that topic chosen.
   useEffect(() => {
@@ -759,6 +764,7 @@ export default function LandingPage() {
 
         {/* --- SUPPORT THE PLATFORM --- */}
         <SupportPlatformDialog open={showSupportPlatform} onOpenChange={setShowSupportPlatform} />
+        <TipOffDialog open={showTipOff} onOpenChange={setShowTipOff} />
         <GuestSupportPlatformDialog open={showGuestSupportPlatform} onOpenChange={setShowGuestSupportPlatform} />
 
         {platformDonationBanner === "success" && (
@@ -828,7 +834,10 @@ export default function LandingPage() {
 
         {/* --- FAQ / CONTACT --- */}
         <section id="faq" className="max-w-6xl mx-auto px-4 py-10 scroll-mt-24">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Side by side on large screens, both columns the same height: the
+              contact form's message box stretches so Send lines up with the
+              bottom of the FAQ column. */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:items-stretch">
             {/* FAQs */}
             <Reveal className="lg:col-span-7">
               <SectionHeader icon={HelpCircle} eyebrow="FAQs" title="Questions? We've got answers." subtitle="Everything you need to know about HelpLift - and a direct line to us if it isn't here." />
@@ -872,8 +881,8 @@ export default function LandingPage() {
             </Reveal>
 
             {/* Contact */}
-            <Reveal delay={120} className="lg:col-span-5">
-              <div id="contact" className="scroll-mt-24 relative lg:pt-[4.5rem]">
+            <Reveal delay={120} className="lg:col-span-5 lg:flex lg:flex-col">
+              <div id="contact" className="scroll-mt-24 relative lg:flex lg:flex-1 lg:flex-col">
                 <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-600/25">
                   <MessageSquare className="w-5 h-5" />
                 </span>
@@ -893,7 +902,7 @@ export default function LandingPage() {
                   </div>
                 )}
 
-                <form className="mt-5 space-y-4" onSubmit={handleContactSubmit}>
+                <form className="mt-5 space-y-4 lg:flex lg:flex-1 lg:flex-col" onSubmit={handleContactSubmit}>
                   <div>
                     <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">Email address</label>
                     <input
@@ -933,19 +942,19 @@ export default function LandingPage() {
                       />
                     )}
                   </div>
-                  <div>
+                  <div className="lg:flex lg:flex-1 lg:flex-col">
                     <div className="flex items-center justify-between gap-2 mb-1.5">
                       <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Message</label>
                       <GrammarCheckButton text={contactMessage} onTextChange={setContactMessage} />
                     </div>
-                    <div className="relative">
+                    <div className="relative lg:flex lg:flex-1 lg:flex-col">
                       <textarea
                         placeholder="How can we assist you?"
                         rows={4}
                         value={contactMessage}
                         onChange={(e) => setContactMessage(e.target.value)}
                         required
-                        className="w-full resize-none rounded-xl border border-transparent bg-white/80 dark:bg-slate-900/60 px-4 py-3 pr-12 text-sm font-medium text-slate-900 dark:text-slate-100 transition-all focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500"
+                        className="w-full lg:flex-1 lg:min-h-[7rem] resize-none rounded-xl border border-transparent bg-white/80 dark:bg-slate-900/60 px-4 py-3 pr-12 text-sm font-medium text-slate-900 dark:text-slate-100 transition-all focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500"
                       />
                       <MicButton className="top-3 right-3" onText={text => setContactMessage(m => appendSpeech(m, text))} />
                     </div>
@@ -979,6 +988,7 @@ export default function LandingPage() {
                   <p className="mt-4 text-sm md:text-base text-slate-500 dark:text-slate-400 leading-relaxed text-justify-smart">
                     Every payment on HelpLift happens through the platform&apos;s own donation flow. If anyone claiming to be from
                     HelpLift asks you to pay upfront or share your login details, it&apos;s a scam.
+                    Suspect a registered organization of fraud or other illegal activity? Tip us off anonymously and we&apos;ll investigate.
                   </p>
                 </div>
                 <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-6">
@@ -999,6 +1009,7 @@ export default function LandingPage() {
               </div>
 
               <div className="reveal-stagger mt-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex flex-col sm:flex-row gap-3">
                 <a
                   href="#contact"
                   onClick={() => setContactTopic("scam")}
@@ -1008,6 +1019,16 @@ export default function LandingPage() {
                   <Flag className="w-4 h-4" /> Report a scam to us
                   <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                 </a>
+                <button
+                  type="button"
+                  onClick={() => setShowTipOff(true)}
+                  data-tip="Anonymously report a registered organization for fraud, abuse or other illegal or suspicious activity - we'll investigate"
+                  className="btn-shine group inline-flex h-12 items-center gap-2.5 self-start max-md:self-stretch max-md:justify-center rounded-xl bg-gradient-to-r from-orange-500 to-red-500 px-5 text-sm font-bold text-white shadow-lg shadow-orange-500/25 transition-all hover:-translate-y-0.5 hover:shadow-orange-500/40"
+                >
+                  <EyeOff className="w-4 h-4" /> Anonymous tip-off
+                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                </button>
+                </div>
                 <div className="flex flex-col-reverse md:flex-row md:items-center gap-3 md:gap-4">
                   <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed md:max-w-[17rem] md:text-right max-md:text-center">
                     Donations go directly to HelpLift, not to any organization. Your support keeps it running and growing. Thank you! 💙

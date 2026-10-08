@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { notPastFilter } from "@/lib/expiry"
 
 // Cached for five minutes so a busy landing page doesn't hit the database each visit.
 export const revalidate = 300
@@ -19,7 +20,7 @@ export async function GET() {
     const [organizations, givers, openNeeds, fulfilledNeeds, stories, donationCount, donationRows] = await Promise.all([
       count("organizations", q => q.eq("verification_status", "approved")),
       count("givers"),
-      count("needs", q => q.in("status", ["open", "in_progress"])),
+      count("needs", q => q.in("status", ["open", "in_progress"]).or(notPastFilter("due_date"))),
       count("needs", q => q.eq("status", "fulfilled")),
       count("impact_stories", q => q.eq("status", "approved")),
       count("donations", q => q.eq("status", "successful")),

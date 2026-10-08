@@ -1,5 +1,7 @@
-import { NextResponse } from "next/server"
+import { NextResponse, after } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { notPastFilter } from "@/lib/expiry"
+import { expireOverdueItems } from "@/lib/expiry-job"
 
 export async function GET(request: Request) {
   try {
@@ -10,12 +12,16 @@ export async function GET(request: Request) {
     const location = searchParams.get("location")?.trim()
 
     const supabase = await createClient()
+    // Safety net for the daily expiry job, after the response is sent.
+    after(expireOverdueItems)
 
     // Try query with urgency column
     let query = supabase
       .from("needs")
       .select("id, title, description, category, location, latitude, longitude, quantity, target_amount, due_date, status, urgency, created_at, organizations(id, name, type, verification_status, city, province, logo_url), need_attachments(id, storage_path, file_name)")
       .in("status", ["open", "in_progress"])
+      // Needs past their due date come off straight away (lib/expiry.ts).
+      .or(notPastFilter("due_date"))
       .order("created_at", { ascending: false })
 
     if (category && category !== "All") {
@@ -36,6 +42,7 @@ export async function GET(request: Request) {
         .from("needs")
         .select("id, title, description, category, location, latitude, longitude, quantity, target_amount, due_date, status, created_at, organizations(id, name, type, verification_status, city, province, logo_url)")
         .in("status", ["open", "in_progress"])
+        .or(notPastFilter("due_date"))
         .order("created_at", { ascending: false })
 
       if (category && category !== "All") {

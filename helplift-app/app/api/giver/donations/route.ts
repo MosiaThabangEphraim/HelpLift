@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { logUserAction } from "@/lib/activity-log"
 import { createClient } from "@/lib/supabase/server"
+import { isPastDate } from "@/lib/expiry"
 import { getActiveBankAccounts } from "@/lib/bank-accounts"
 import { buildPaymentFields } from "@/lib/payfast"
 import { createOrder } from "@/lib/paypal"
@@ -58,8 +59,9 @@ export async function POST(request: Request) {
       if (!bankAccount) return NextResponse.json({ message: "Select a bank to transfer into." }, { status: 400 })
     }
 
-    const { data: need } = await supabase.from("needs").select("id, title, organization_id, status, target_amount").eq("id", need_id).single()
+    const { data: need } = await supabase.from("needs").select("id, title, organization_id, status, target_amount, due_date").eq("id", need_id).single()
     if (!need || !["open", "in_progress"].includes(need.status)) return NextResponse.json({ message: "This need is not open for donations." }, { status: 400 })
+    if (isPastDate(need.due_date)) return NextResponse.json({ message: "This need's due date has passed, so it no longer accepts donations." }, { status: 400 })
     if (need.target_amount === null || need.target_amount === undefined) {
       return NextResponse.json({ message: "This need does not accept monetary donations." }, { status: 400 })
     }

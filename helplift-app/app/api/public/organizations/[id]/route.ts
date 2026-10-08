@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { notPastFilter } from "@/lib/expiry"
 
 export async function GET(
   request: Request,
@@ -29,6 +30,7 @@ export async function GET(
         .select("id, title, description, category, location, quantity, target_amount, due_date, urgency, status, created_at")
         .eq("organization_id", id)
         .in("status", ["open", "in_progress"])
+        .or(notPastFilter("due_date"))
         .order("created_at", { ascending: false })
 
       needs = orgNeeds || []

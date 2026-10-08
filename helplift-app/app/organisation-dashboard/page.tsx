@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react"
 import { useTabTransition } from "@/lib/use-tab-transition"
+import { isPastDate, todayInSA } from "@/lib/expiry"
 import { CountUp } from "@/components/count-up"
 import { stageFormFiles } from "@/lib/stage-uploads"
 import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
@@ -93,7 +94,7 @@ import { OrganizationAnalytics } from "@/components/analytics/organization-analy
 import { OrganizationWallet } from "@/components/organization-wallet"
 import { UserAvatar } from "@/components/user-avatar"
 import { MessageViewToggle, SentMessages } from "@/components/sent-messages"
-import { getOrgContext, ROLE_LABELS, type OrgRole } from "@/lib/organization-access"
+import { getOrgContext, ROLE_LABELS, roleAtLeast, type OrgRole } from "@/lib/organization-access"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -247,7 +248,7 @@ export default function OrganizationDashboardPage() {
   // Whether a correct password alone signs this account in, or an emailed
   // code is also required (profiles.two_factor_enabled, checked in api/login).
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(true)
-  // Role within the organization (owner/manager/viewer). Only used to tailor the
+  // Role within the organization (owner/manager/coordinator). Only used to tailor the
   // UI; the API routes and database policies are what actually enforce it.
   const [memberRole, setMemberRole] = useState<OrgRole>("owner")
   const [needs, setNeeds] = useState<Need[]>([])
@@ -374,6 +375,8 @@ export default function OrganizationDashboardPage() {
   const [selectedNeed, setSelectedNeed] = useState<Need | null>(null)
   const [reopenNeed, setReopenNeed] = useState<Need | null>(null)
   const [reopenReason, setReopenReason] = useState("")
+  // Needed when the need was closed because its due date passed.
+  const [reopenDueDate, setReopenDueDate] = useState("")
   const [reopenFiles, setReopenFiles] = useState<File[]>([])
   const [isSubmittingReopen, setIsSubmittingReopen] = useState(false)
 
@@ -733,10 +736,11 @@ export default function OrganizationDashboardPage() {
   // organization's motivation up front, same as a reopen request needs, with
   // optional supporting photos/documents (e.g. proof the need has returned)
   // attached the same way the multipart branch already handles them.
-  const requestReopenNeed = async (need: Need, reopen_reason: string, files: File[]) => {
+  const requestReopenNeed = async (need: Need, reopen_reason: string, files: File[], due_date = "") => {
     const formData = new FormData()
     formData.set("status", "reopen_pending")
     formData.set("reopen_reason", reopen_reason)
+    if (due_date) formData.set("due_date", due_date)
     files.forEach(file => formData.append("attachments", file))
 
     let body: FormData
@@ -1323,8 +1327,8 @@ export default function OrganizationDashboardPage() {
               <Home className="w-4 h-4" />
             </Link>
             <ThemeToggle className="h-9 w-9" />
-            {memberRole !== "viewer" && <FeedbackButton />}
-            {memberRole !== "viewer" && (
+            <FeedbackButton />
+            {roleAtLeast(memberRole, "manager") && (
               <button
                 onClick={() => setShowSupportPlatform(true)}
                 data-tip="Donate directly to HelpLift - not to any organization"
@@ -1402,14 +1406,12 @@ export default function OrganizationDashboardPage() {
               <Settings className="h-3.5 w-3.5" /> Settings
             </button>
 
-            {memberRole !== "viewer" && (
             <button
               onClick={() => setIsMessagingAdmin(true)}
               className="inline-flex items-center gap-1.5 rounded-sm border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
             >
               <MessageSquare className="h-3.5 w-3.5" /> Message Admin
             </button>
-            )}
 
             <button
               onClick={logout}
@@ -1423,8 +1425,8 @@ export default function OrganizationDashboardPage() {
         {memberRole !== "owner" && (
           <div className="rounded border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/30 p-4 text-sm font-semibold text-blue-800 dark:text-blue-300">
             You're signed in as a {ROLE_LABELS[memberRole].toLowerCase()} of {organization?.name}.{" "}
-            {memberRole === "viewer"
-              ? "You have read-only access, so actions that change data will be declined, and you can’t message administrators."
+            {memberRole === "coordinator"
+              ? "You handle deliveries (fulfillments and proof), messages and impact stories. Needs, offers, Gift Library claims and the organization’s money are managed by owners and managers."
               : "You can manage needs, interests, fulfillments, stories and messages, and contact administrators. Only owners can edit the organization’s information, manage the team, or request withdrawals."}
           </div>
         )}
@@ -1463,7 +1465,7 @@ export default function OrganizationDashboardPage() {
           <StatCard icon={ClipboardList} label="Open Needs" value={stats.openNeeds} accent="emerald" />
           <StatCard icon={Users} label="Pending Interests" value={stats.pendingInterests} accent="amber" />
           <StatCard icon={PackageCheck} label="Active Fulfillments" value={stats.activeFulfillments} accent="purple" />
-          <StatCard icon={Wallet} label="Pending Withdrawals" value={pendingWithdrawals} accent="pink" />
+          {roleAtLeast(memberRole, "manager") && <StatCard icon={Wallet} label="Pending Withdrawals" value={pendingWithdrawals} accent="pink" />}
           <StatCard icon={Mail} label="Unread Messages" value={unreadMessages} accent="blue" />
         </div>
 
@@ -1473,8 +1475,9 @@ export default function OrganizationDashboardPage() {
             <TabsTrigger value="needs" className="shrink-0 gap-1.5 px-2.5"><ClipboardList className="w-4 h-4" />Needs</TabsTrigger>
             <TabsTrigger value="fulfillments" data-tour="tab-fulfillments" className="shrink-0 gap-1.5 px-2.5"><PackageCheck className="w-4 h-4" />Fulfillments<CountBadge value={stats.activeFulfillments} /></TabsTrigger>
             <TabsTrigger value="interests" data-tour="tab-interests" className="shrink-0 gap-1.5 px-2.5"><Users className="w-4 h-4" />Interests<CountBadge value={stats.pendingInterests} /></TabsTrigger>
-            <TabsTrigger value="donations" data-tour="tab-donations" className="shrink-0 gap-1.5 px-2.5"><Banknote className="w-4 h-4" />Donations<CountBadge value={pendingDonations} /></TabsTrigger>
-            <TabsTrigger value="wallet" data-tour="tab-wallet" className="shrink-0 gap-1.5 px-2.5"><Wallet className="w-4 h-4" />Wallet</TabsTrigger>
+            {/* Money is for managers and owners only. */}
+            {roleAtLeast(memberRole, "manager") && <TabsTrigger value="donations" data-tour="tab-donations" className="shrink-0 gap-1.5 px-2.5"><Banknote className="w-4 h-4" />Donations<CountBadge value={pendingDonations} /></TabsTrigger>}
+            {roleAtLeast(memberRole, "manager") && <TabsTrigger value="wallet" data-tour="tab-wallet" className="shrink-0 gap-1.5 px-2.5"><Wallet className="w-4 h-4" />Wallet</TabsTrigger>}
             <TabsTrigger value="messages" data-tour="tab-messages" className="shrink-0 gap-1.5 px-2.5"><Mail className="w-4 h-4" />Messages<CountBadge value={unreadMessages} /></TabsTrigger>
             <TabsTrigger value="stories" data-tour="tab-stories" className="shrink-0 gap-1.5 px-2.5"><Sparkles className="w-4 h-4" />Impact Stories</TabsTrigger>
             <TabsTrigger value="gifts" data-tour="tab-gifts" className="shrink-0 gap-1.5 px-2.5"><Gift className="w-4 h-4" />Gift Library</TabsTrigger>
@@ -1484,10 +1487,11 @@ export default function OrganizationDashboardPage() {
             <TabsTrigger value="documents" className="hidden" />
           </TabsList>
 
-          {/* Viewers are read-only: a disabled fieldset turns every button, input,
-              select and textarea in the tab contents off. The tab list above and
-              the header (sign out) stay usable. The API and database enforce it too. */}
-          <fieldset disabled={memberRole === "viewer"} className="min-w-0 disabled:opacity-90">
+          {/* Coordinators can see needs, offers and documents but not change them:
+              on those tabs a disabled fieldset turns every button, input, select and
+              textarea off. Deliveries, messages and stories stay usable. The API and
+              database enforce the same rules. */}
+          <fieldset disabled={memberRole === "coordinator" && ["needs", "interests", "documents"].includes(activeTab)} className="min-w-0 disabled:opacity-90">
 
           {/* --- NEEDS TAB --- */}
           <TabsContent value="needs" className={`grid gap-0 lg:grid-cols-[1.1fr_0.9fr] ${tabMotion}`}>
@@ -1598,7 +1602,8 @@ export default function OrganizationDashboardPage() {
                     />
                     <input
                       type="date"
-                      data-tip="The date by which this need should ideally be fulfilled"
+                      data-tip="The date by which this need should ideally be fulfilled - it comes off the Needs board after this date"
+                      min={todayInSA()}
                       value={form.due_date}
                       onChange={e => setForm({ ...form, due_date: e.target.value })}
                       className="field text-slate-400 dark:text-slate-500"
@@ -1790,7 +1795,7 @@ export default function OrganizationDashboardPage() {
                               <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Need closed</span>
                               <button
                                 type="button"
-                                onClick={() => { setReopenReason(""); setReopenFiles([]); setReopenNeed(need) }}
+                                onClick={() => { setReopenReason(""); setReopenFiles([]); setReopenDueDate(""); setReopenNeed(need) }}
                                 data-tip="Ask an administrator to reopen this need - you'll need to explain why"
                                 className="inline-flex items-center gap-1.5 rounded-sm border border-blue-200 dark:border-blue-900 text-blue-700 dark:text-blue-400 px-3 py-1.5 text-xs font-bold hover:bg-blue-50 dark:hover:bg-blue-950/30"
                               >
@@ -1874,7 +1879,7 @@ export default function OrganizationDashboardPage() {
                           {item.status.replace("_", " ")}
                         </span>
 
-                        {item.status === "pending" && memberRole !== "viewer" && (
+                        {item.status === "pending" && (
                           <span
                             role="button"
                             tabIndex={0}
@@ -1888,7 +1893,7 @@ export default function OrganizationDashboardPage() {
                           </span>
                         )}
 
-                        {item.status === "in_progress" && memberRole !== "viewer" && (
+                        {item.status === "in_progress" && (
                           <span
                             role="button"
                             tabIndex={0}
@@ -2194,7 +2199,7 @@ export default function OrganizationDashboardPage() {
                     </div>
                   ))
                 ))}
-                {messageView === "sent" && <SentMessages refreshKey={refreshKey} canReply={memberRole !== "viewer"} />}
+                {messageView === "sent" && <SentMessages refreshKey={refreshKey} canReply />}
               </CardContent>
             </Card>
           </TabsContent>
@@ -2749,7 +2754,7 @@ export default function OrganizationDashboardPage() {
                         type="button"
                         variant="outline"
                         className="text-blue-700 border-blue-200 hover:bg-blue-50 dark:border-blue-900 dark:hover:bg-blue-950/30"
-                        onClick={() => { const n = need; setSelectedNeed(null); setReopenReason(""); setReopenFiles([]); setReopenNeed(n) }}
+                        onClick={() => { const n = need; setSelectedNeed(null); setReopenReason(""); setReopenFiles([]); setReopenDueDate(""); setReopenNeed(n) }}
                       >
                         <RefreshCw className="w-4 h-4" /> Reopen
                       </Button>
@@ -2805,6 +2810,23 @@ export default function OrganizationDashboardPage() {
                 </div>
               </div>
               <div className="space-y-1">
+                <label htmlFor="reopen-due-date" className="text-xs font-bold text-slate-600 dark:text-slate-300">
+                  New due date {reopenNeed && isPastDate(reopenNeed.due_date) ? <span className="text-red-500">*</span> : "(optional)"}
+                </label>
+                <input
+                  id="reopen-due-date"
+                  type="date"
+                  min={todayInSA()}
+                  value={reopenDueDate}
+                  onChange={e => setReopenDueDate(e.target.value)}
+                  data-tip="The new date by which this need should be fulfilled"
+                  className="field"
+                />
+                {reopenNeed && isPastDate(reopenNeed.due_date) && (
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">The old due date has passed, so choose a new one.</p>
+                )}
+              </div>
+              <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-600 dark:text-slate-300">Supporting photos or documents (optional)</label>
                 {reopenFiles.length > 0 && (
                   <ul className="space-y-1.5">
@@ -2854,13 +2876,13 @@ export default function OrganizationDashboardPage() {
                     if (!n) return
                     setIsSubmittingReopen(true)
                     try {
-                      await requestReopenNeed(n, reopenReason.trim(), reopenFiles)
+                      await requestReopenNeed(n, reopenReason.trim(), reopenFiles, reopenDueDate)
                       setReopenNeed(null)
                     } finally {
                       setIsSubmittingReopen(false)
                     }
                   }}
-                  disabled={isSubmittingReopen || !reopenReason.trim()}
+                  disabled={isSubmittingReopen || !reopenReason.trim() || (!!reopenNeed && isPastDate(reopenNeed.due_date) && !reopenDueDate)}
                   data-tip="Send this reopen request to an administrator for approval"
                   className="bg-blue-600 hover:bg-blue-700 text-white"
                 >
@@ -3022,7 +3044,8 @@ export default function OrganizationDashboardPage() {
                 />
                 <input
                   type="date"
-                  data-tip="The date by which this need should ideally be fulfilled"
+                  data-tip="The date by which this need should ideally be fulfilled - it comes off the Needs board after this date"
+                  min={todayInSA()}
                   value={editNeedForm.due_date}
                   onChange={e => setEditNeedForm({ ...editNeedForm, due_date: e.target.value })}
                   className="field text-slate-600 dark:text-slate-300"
@@ -3387,7 +3410,7 @@ export default function OrganizationDashboardPage() {
       )}
 
       <MessageDetailDialog
-        canReply={memberRole !== "viewer"}
+        canReply
         open={!!selectedMessage}
         onOpenChange={(open) => !open && setSelectedMessage(null)}
         message={selectedMessage}
@@ -3603,7 +3626,7 @@ export default function OrganizationDashboardPage() {
                     )}
                   </div>
                 )}
-                {memberRole !== "viewer" && (selectedFulfillment.status === "in_progress" || selectedFulfillment.status === "completed") && (
+                {(selectedFulfillment.status === "in_progress" || selectedFulfillment.status === "completed") && (
                   <div className="space-y-2 rounded border border-dashed border-slate-300 dark:border-[#233350] p-3">
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Add more proof</p>
                     <p className="text-xs text-slate-500 dark:text-slate-400">Attach extra photos, receipts or documents (images or PDFs, up to 10 MB each). The giver is notified.</p>
@@ -3624,7 +3647,7 @@ export default function OrganizationDashboardPage() {
                     </Button>
                   </div>
                 )}
-                {giverInfo?.profile_id && memberRole !== "viewer" && selectedFulfillment.status === "completed" && (
+                {giverInfo?.profile_id && selectedFulfillment.status === "completed" && (
                   <Button
                     type="button"
                     variant="outline"
@@ -3639,7 +3662,7 @@ export default function OrganizationDashboardPage() {
                     <Mail className="w-4 h-4 mr-1.5" /> Thank {giverInfo.name}
                   </Button>
                 )}
-                {giverInfo?.profile_id && memberRole !== "viewer" && (
+                {giverInfo?.profile_id && (
                   <Button
                     type="button"
                     variant="outline"
@@ -3682,7 +3705,7 @@ export default function OrganizationDashboardPage() {
         onOpenChange={(open) => !open && setSelectedGift(null)}
         gift={selectedGift}
         role="organization"
-        canClaim={memberRole !== "viewer" && organization?.verification_status === "approved"}
+        canClaim={roleAtLeast(memberRole, "manager") && organization?.verification_status === "approved"}
         onClaim={async (motivation, documents) => { if (selectedGift) await handleClaimGift(selectedGift.id, motivation, documents) }}
       />
 

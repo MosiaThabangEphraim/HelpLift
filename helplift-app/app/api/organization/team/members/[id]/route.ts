@@ -5,7 +5,7 @@ import { getOrgContext, roleAtLeast, insufficientRoleMessage, INVITABLE_ROLES } 
 import { transferMemberDocuments } from "@/lib/organization-team"
 
 // Change a member's role, or remove them. Owner only. An organization may have
-// any number of owners, managers and viewers; owners can promote/demote anyone
+// any number of owners, managers and coordinators; owners can promote/demote anyone
 // except the original account holder (organizations.profile_id), who is
 // protected because deleting that profile cascades to the organization itself.
 // That protection also guarantees the organization always keeps an owner.

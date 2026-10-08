@@ -2,7 +2,7 @@ import type { KeyboardEvent } from "react"
 
 // Activates a plain element standing in for a real <button> (role="button"
 // tabIndex={0}, used where a disabled <fieldset> would otherwise switch off
-// a real button too - e.g. read-only "viewer" access on a dashboard, or a
+// a real button too - e.g. a role without access on a dashboard, or a
 // whole row that's clickable but also holds its own inner buttons).
 // Wire this to onKeyDown alongside role="button" and tabIndex={0} so Enter
 // and Space work the same way native buttons do - Tab reaching it isn't

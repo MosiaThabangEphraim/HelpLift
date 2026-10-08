@@ -3,9 +3,11 @@ import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/st
 import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { logUserAction } from "@/lib/activity-log"
 import { createClient } from "@/lib/supabase/server"
+import { isPastDate } from "@/lib/expiry"
 import { getOrgContext, roleAtLeast, insufficientRoleMessage } from "@/lib/organization-access"
 import { getActiveCategoryNames } from "@/lib/need-categories"
 import { forwardGeocodePlace } from "@/lib/geolocation"
+import { notifyAdminsOfNeedChange, notifyNeedSupporters } from "@/lib/need-notifications"
 
 const EDITABLE_FIELDS = new Set(["title", "description", "category", "location", "quantity", "target_amount", "due_date", "urgency"])
 // A need can still be edited while it's being worked on, or fixed up after a
@@ -20,13 +22,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (!user) return NextResponse.json({ message: "Authentication required." }, { status: 401 })
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
     if (profile?.role !== "organization") return NextResponse.json({ message: "Organization access required." }, { status: 403 })
-    const orgCtx = await getOrgContext<{ id: any; city: string | null; province: string | null }>(supabase, user.id, "id, city, province")
+    const orgCtx = await getOrgContext<{ id: any; name: string | null; city: string | null; province: string | null }>(supabase, user.id, "id, name, city, province")
     const organization = orgCtx?.organization ?? null
     if (orgCtx && !roleAtLeast(orgCtx.role, "manager")) return NextResponse.json({ message: insufficientRoleMessage(orgCtx.role, "manager") }, { status: 403 })
     if (!organization) return NextResponse.json({ message: "Organization profile not found." }, { status: 404 })
 
     const { id } = await context.params
-    const { data: existing } = await supabase.from("needs").select("id, status").eq("id", id).eq("organization_id", organization.id).single()
+    const { data: existing } = await supabase.from("needs").select("id, status, due_date").eq("id", id).eq("organization_id", organization.id).single()
     if (!existing) return NextResponse.json({ message: "Need not found." }, { status: 404 })
 
     const contentType = request.headers.get("content-type") || ""
@@ -64,6 +66,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
           return NextResponse.json({ message: "Please explain why you'd like to reopen this need." }, { status: 400 })
         }
         update.reopen_reason = reason
+        // A need closed because its due date passed needs a new one, or it
+        // would just be closed again (lib/expiry.ts).
+        const newDueDate = typeof body.due_date === "string" ? body.due_date.trim() : ""
+        if (newDueDate) {
+          if (isPastDate(newDueDate)) return NextResponse.json({ message: "The new due date can't be in the past." }, { status: 400 })
+          update.due_date = newDueDate
+        } else if (isPastDate(existing.due_date)) {
+          return NextResponse.json({ message: "This need's due date has passed. Choose a new due date to reopen it." }, { status: 400 })
+        }
       }
       update.status = body.status
     }
@@ -85,6 +96,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       }
       if (body.title !== undefined && !body.title.trim()) {
         return NextResponse.json({ message: "Title cannot be empty." }, { status: 400 })
+      }
+      if (body.due_date && isPastDate(body.due_date)) {
+        return NextResponse.json({ message: "The due date can't be in the past." }, { status: 400 })
       }
       if (body.description !== undefined && !body.description.trim()) {
         return NextResponse.json({ message: "Description cannot be empty." }, { status: 400 })
@@ -119,6 +133,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       const { data, error } = await supabase.from("needs").update(update).eq("id", id).eq("organization_id", organization.id).select().single()
       if (error) return NextResponse.json({ message: error.message }, { status: 400 })
       need = data
+    }
+
+    // Status changes: admins are told, and so are the givers behind the need
+    // once it has ended (lib/need-notifications.ts).
+    const needTitle = (need as { title?: string }).title
+    if (update.status && update.status !== existing.status && needTitle) {
+      const orgName = organization.name || "An organization"
+      const changed = { id, title: needTitle }
+      await notifyAdminsOfNeedChange(changed, orgName, update.status, update.reopen_reason)
+      if (update.status === "closed" || update.status === "fulfilled") await notifyNeedSupporters(changed, orgName, update.status)
     }
 
     if (attachmentFiles.length > 0) {
@@ -160,7 +184,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     if (!organization) return NextResponse.json({ message: "Organization profile not found." }, { status: 404 })
 
     const { id } = await context.params
-    const { data: existing } = await supabase.from("needs").select("id, status").eq("id", id).eq("organization_id", organization.id).single()
+    const { data: existing } = await supabase.from("needs").select("id, status, due_date").eq("id", id).eq("organization_id", organization.id).single()
     if (!existing) return NextResponse.json({ message: "Need not found." }, { status: 404 })
 
     // Fulfilled/closed is the permanent record of a need that's actually

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { notPastFilter } from "@/lib/expiry"
 
 // Live-data lookups the HelpLift Assistant (app/api/assistant) can call through
 // Gemini function calling. Every query runs with the CALLER's own Supabase
@@ -126,6 +127,7 @@ async function searchNeeds(supabase: SupabaseClient, args: ToolArgs) {
     .from("needs")
     .select(`id, title, description, category, location, quantity, target_amount, due_date, urgency, status, created_at, organizations(${PUBLIC_ORG_COLUMNS}, verification_status)`)
     .in("status", ["open", "in_progress"])
+    .or(notPastFilter("due_date"))
     .order("created_at", { ascending: false })
     .limit(limitOf(args.limit))
 
@@ -174,6 +176,7 @@ async function searchGiftLibrary(supabase: SupabaseClient, args: ToolArgs) {
     .from("gift_offerings")
     .select("id, title, offering_type, description, quantity_or_value, conditions, location, expiry_date, created_at")
     .eq("status", "approved")
+    .or(notPastFilter("expiry_date"))
     .order("created_at", { ascending: false })
     .limit(limitOf(args.limit))
 
@@ -203,7 +206,7 @@ async function searchGiftLibrary(supabase: SupabaseClient, args: ToolArgs) {
 async function openNeedCounts(supabase: SupabaseClient, organizationIds: string[]) {
   const counts = new Map<string, number>()
   if (organizationIds.length === 0) return counts
-  const { data } = await supabase.from("needs").select("organization_id").in("organization_id", organizationIds).in("status", ["open", "in_progress"])
+  const { data } = await supabase.from("needs").select("organization_id").in("organization_id", organizationIds).in("status", ["open", "in_progress"]).or(notPastFilter("due_date"))
   for (const row of data || []) counts.set(row.organization_id, (counts.get(row.organization_id) || 0) + 1)
   return counts
 }
@@ -252,7 +255,7 @@ async function getOrganization(supabase: SupabaseClient, args: ToolArgs) {
 
   const org: any = orgs[0]
   const [needs, stories] = await Promise.all([
-    supabase.from("needs").select("id, title, category, location, urgency, due_date").eq("organization_id", org.id).in("status", ["open", "in_progress"]).order("created_at", { ascending: false }).limit(MAX_LIMIT),
+    supabase.from("needs").select("id, title, category, location, urgency, due_date").eq("organization_id", org.id).in("status", ["open", "in_progress"]).or(notPastFilter("due_date")).order("created_at", { ascending: false }).limit(MAX_LIMIT),
     supabase.from("impact_stories").select("id, title, created_at").eq("organization_id", org.id).eq("status", "approved").order("created_at", { ascending: false }).limit(5),
   ])
 

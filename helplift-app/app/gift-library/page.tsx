@@ -424,7 +424,7 @@ export default function PublicGiftLibraryPage() {
           onOpenChange={(open) => !open && setSelectedGift(null)}
           gift={selectedGiftSummary}
           role="organization"
-          canClaim={orgMemberRole !== "viewer" && orgVerification === "approved"}
+          canClaim={orgMemberRole !== "coordinator" && orgVerification === "approved"}
           onClaim={handleClaimGift}
         />
 

@@ -31,7 +31,7 @@ approve activity so everything on the platform can be trusted. Joining is free.
 Account types:
 - Giver: an individual, business or group that gives.
 - Organization: a school, charity or community group that needs support. Has team
-  members with roles (Owner, Manager, Viewer).
+  members with roles (Owner, Manager, Coordinator).
 - Administrator: HelpLift staff who moderate the platform (invitation only).
 
 ==================================================================
@@ -113,6 +113,12 @@ Notifications:
   interests, donations, approvals/rejections, gift claims, fulfillments, badges,
   feedback and admin announcements. Unread ones are highlighted.
 - Click a notification to mark it read, or use "mark all as read".
+- Need status changes: the organization is notified when an administrator
+  approves, rejects, reopens, marks fulfilled or removes one of its needs, or when
+  a need is closed automatically after its due date. Administrators are notified
+  when an organization closes a need, marks it fulfilled or asks to reopen it.
+  Givers with an open offer on a need, or who donated to it, are notified when it
+  is fulfilled, closed (by the organization or after its due date) or removed.
 - They update live while the page is open and can play a sound (Settings).
 - Each notification is also emailed unless email notifications are turned off.
 - Admins may also post announcements as a banner on the login page or as a public
@@ -122,8 +128,9 @@ Notifications:
 Messages (Messages tab in each dashboard):
 - Send and receive messages between givers, organizations and administrators.
 - Reply in threads, attach files, and switch between Inbox and Sent.
-- Messaging requires an account. Organization Viewers are read-only and cannot send
-  messages.
+- Messaging requires an account. Organization Coordinators can message givers the
+  organization works with and administrators, and reply to anyone, but messaging
+  another organization is for owners and managers.
 
 ==================================================================
 5. NEEDS
@@ -158,6 +165,12 @@ Need lifecycle (for organizations):
   active, but not once fulfilled or closed.
 - Organizations can mark a need fulfilled or close it. To reopen a closed need,
   request a reopen with a written reason; an administrator decides.
+- Due dates: a need stays on the Needs board up to and including its due date
+  (South African time) and comes off the next day - it no longer accepts offers
+  or donations. Open needs past their due date are closed automatically and the
+  organization is notified; to carry on, request a reopen and choose a new due
+  date (required when the old one has passed). Needs already in progress are not
+  closed, so deliveries under way can finish. Due dates can't be in the past.
 
 ==================================================================
 6. INTERESTS & FULFILLMENTS
@@ -185,6 +198,12 @@ Need lifecycle (for organizations):
   offering. An administrator approves one claim, and the giver is notified. The
   approved claim then becomes a fulfillment.
 - Offerings can be listened to (read aloud) and filtered by category.
+- Expiry dates: an offering is listed up to and including its expiry date, then
+  comes off the Gift Library and can no longer be claimed; it is marked expired and
+  the giver is notified (they can pledge it again). Offerings with a claim already
+  in progress are left for the administrator to decide.
+- Money never expires: donations have no end date, and financial pledges (already
+  paid) never expire.
 
 ==================================================================
 8. DONATIONS, RECEIPTS & WALLET
@@ -251,9 +270,16 @@ their HelpLift verification for funders and partners.
 Team roles:
 - Owner: full access, including the team, organization profile, banking details and
   withdrawals. The original account holder can't be removed or demoted.
-- Manager: create and edit needs; handle interests, fulfillments, stories,
-  documents and gift claims.
-- Viewer: read-only access to needs, interests, donations and fulfillments.
+- Manager: create, edit and close needs; accept or decline offers; claim from the
+  Gift Library; handle fulfillments, impact stories and messages; see donations and
+  the wallet (only owners can request withdrawals).
+- Coordinator: handles the day-to-day work with givers - updates fulfillments and
+  uploads proof of delivery, sends and replies to messages (givers the organization
+  works with, and administrators), and creates and edits impact stories (an
+  administrator still approves them). Coordinators can see needs and offers but
+  can't change them, can't claim gifts, message other organizations, delete
+  stories or manage documents and the team, and never see donations, the wallet
+  or banking details.
 
 All dashboards:
 - A short step-by-step tour is shown on your first visit (you can skip it).
@@ -310,6 +336,13 @@ All dashboards:
   a bug, suggest an improvement or report a security issue, with optional
   screenshots or files. Leave a contact email (optional) if you'd like a reply -
   administrators can answer by email.
+- Anonymous tip-off (homepage safety section, "Anonymous tip-off" button): anyone
+  can report a registered organization for fraud, misuse of donations, a fake
+  organization, scams, abuse, corruption or other illegal or suspicious activity,
+  with optional evidence files. Nothing about the sender is saved (no name,
+  account, IP address or device), the organization is never told, and the
+  HelpLift team investigates. A contact email is optional. If someone is in
+  immediate danger, they should call the police (10111) first.
 
 ==================================================================
 14b. ABOUT LIFTY (YOU)

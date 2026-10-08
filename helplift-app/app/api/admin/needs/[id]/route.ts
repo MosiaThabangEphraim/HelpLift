@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { isPastDate } from "@/lib/expiry"
+import { notifyNeedSupporters } from "@/lib/need-notifications"
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
@@ -13,7 +15,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
     const { data: existing } = await supabase
       .from("needs")
-      .select("id, status, organizations(verification_status)")
+      .select("id, status, due_date, organizations(verification_status)")
       .eq("id", id)
       .single()
     if (!existing) return NextResponse.json({ message: "Need not found." }, { status: 404 })
@@ -25,6 +27,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const isReopenRequest = existing.status === "reopen_pending"
     const allowedStatuses = isReopenRequest ? ["open", "closed"] : ["open", "fulfilled", "rejected"]
     if (!allowedStatuses.includes(status)) return NextResponse.json({ message: "Invalid need status." }, { status: 400 })
+
+    if (status === "open" && isPastDate((existing as any).due_date)) {
+      return NextResponse.json({ message: "This need's due date has passed, so it can't be published. Ask the organization to set a new due date." }, { status: 400 })
+    }
 
     if (status === "open") {
       const orgField = (existing as any)?.organizations
@@ -42,7 +48,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       .from("needs")
       .update(update)
       .eq("id", id)
-      .select("id, title, status, organizations(profile_id)")
+      .select("id, title, status, organizations(profile_id, name)")
       .single()
     if (error) return NextResponse.json({ message: error.message }, { status: 400 })
 
@@ -67,6 +73,11 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       }
     } catch (notifyErr) {
       console.warn("Need status notification warning:", notifyErr)
+    }
+    if (status === "fulfilled") {
+      const orgField = (need as any).organizations
+      const orgName = (Array.isArray(orgField) ? orgField[0]?.name : orgField?.name) || "The organization"
+      await notifyNeedSupporters({ id: need.id, title: need.title }, orgName, "fulfilled")
     }
 
     let notifiedGivers = 0

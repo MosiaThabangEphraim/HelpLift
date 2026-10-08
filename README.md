@@ -2,6 +2,8 @@
 
 **Giving made transparent. Impact made real.**
 
+**Live site: [helplift.vercel.app](https://helplift.vercel.app)**
+
 HelpLift connects verified organizations posting community needs with individual and business givers ready to help - through monetary donations, in-kind/financial gift pledges, and direct messaging - with an administrator layer moderating everything in between.
 
 ## Architecture
@@ -95,7 +97,7 @@ Database changes are made by adding a new timestamped file to `supabase/migratio
 
 ## Core features
 
-- **Three account types**: Giver, Organization (with `owner`/`manager`/`viewer` team roles), and Admin.
+- **Three account types**: Giver, Organization (with `owner`/`manager`/`coordinator` team roles), and Admin. Owners have full access, including banking, withdrawals, documents and the team; managers run needs, offers, Gift Library claims and stories and can see donations and the wallet; coordinators handle deliveries (fulfillments and proof), messages and impact stories, with no access to needs, offers, claims or money (`lib/organization-access.ts`, `20261008000500_coordinator_role.sql`).
 - **Needs marketplace**: organizations post needs (draft → admin-approved → open); givers browse, filter "by preference" or "near me" (real distance matching against forward-geocoded need locations), and express interest.
 - **Gift Library**: givers pledge in-kind items or funds; organizations claim pledges, subject to admin review.
 - **Donations**: EFT (with proof-of-payment upload), PayFast, and PayPal, either to a specific need/organization or directly to the platform - with generated receipts.
@@ -103,7 +105,7 @@ Database changes are made by adding a new timestamped file to `supabase/migratio
 - **Admin moderation**: needs/gifts/impact-story approval, need "reopen" requests (with a required motivation), user & organization management (editing names, contact and giver details, roles, suspension and password resets - but never banking details), platform settings, and analytics.
 - **Admin record deletion**: admins can delete most records, with a preview of what else will be removed. Financial records - donations, withdrawals, and needs or accounts that hold them - can never be deleted; accounts with financial history are suspended instead.
 - **Announcements**: messages to users by in-app notification and email, which can also go up as a login page banner or a public homepage notice, each switched on or off from the announcement dialog.
-- **Messaging & notifications**: in-app messaging plus email notifications, with a choice of notification sounds.
+- **Messaging & notifications**: in-app messaging plus email notifications, with a choice of notification sounds. Need status changes reach everyone involved (`lib/need-notifications.ts`): organizations hear about admin decisions and removals, admins hear when an organization closes, fulfils or asks to reopen a need (in the bell, opening the Needs tab), and givers with an open offer or a donation hear when a need is fulfilled, closed (including by the nightly due-date job) or removed.
 - **Lifty, the AI assistant**: a chat assistant available across the site that knows how HelpLift works and can look up live data (open needs, organizations, the signed-in user's own activity - no other users' personal data). Supports voice input and spoken replies, and can be turned off in Settings.
 - **AI need writer**: organizations describe a need in a sentence and get a complete need form filled in, which they review before posting.
 - **Snap to pledge**: givers take or upload a photo of an item and the AI fills in the gift pledge for them.
@@ -115,6 +117,9 @@ Database changes are made by adding a new timestamped file to `supabase/migratio
 - **Security**: Row Level Security on every table, two-factor authentication by emailed code, account lockout after repeated failed logins (unlocked via an emailed verification code), WebAuthn passkeys, rate limiting on sensitive routes, 18+ age confirmation for givers at registration, and database triggers preventing self-privilege-escalation.
 - **Accessibility**: grammar checking, speech-to-text/text-to-speech (including read aloud on announcements), adjustable font size, a Reduce motion setting, optional click sounds, and four themes including high-contrast and grayscale.
 - **Dashboards**: refresh buttons that reload data without losing filters, smooth tab transitions, and an optional analog and digital clock with the date.
+- **Due dates and expiry**: a need is listed up to and including its due date and a Gift Library offering up to its expiry date (South African time). Public lists, Lifty and the homepage counts hide anything past its date straight away (`lib/expiry.ts`), and it can no longer receive offers, donations or claims. `public.expire_overdue_items()` closes open needs past their due date and expires overdue offerings, notifying the organization or giver; it runs daily at 00:05 SAST with pg_cron and is also triggered by the public APIs (`lib/expiry-job.ts`). Needs in progress and offerings with a claim in progress are left alone, reopening an overdue need requires a new due date, and money never expires (donations and financial pledges are skipped).
+- **Anonymous tip-offs**: a homepage form for reporting a registered organization for fraud, abuse or other illegal or suspicious activity, with optional evidence files. Nothing identifying the sender is stored. Admins are notified in-app and investigate from the **Inquiries** tab, which also holds contact-form inquiries.
+- **User manual**: a PDF guide for all users, downloadable from Settings (`public/helplift-user-manual.pdf`, generated by `scripts/generate-user-manual.tsx`). The first-time tour ends by pointing to it and to Lifty.
 - **PWA**: installable, with offline awareness.
 
 ## Getting started
@@ -164,14 +169,38 @@ Run from inside `helplift-app/`:
 | `npm run build` | Production build |
 | `npm run start` | Serve the production build |
 | `npm run lint` | Lint the codebase |
+| `npx tsx scripts/generate-user-manual.tsx` | Rebuild the user manual PDF (`public/helplift-user-manual.pdf`) after editing its text |
 
 ## Deployment
 
-The app is built for [Vercel](https://vercel.com):
+The live site is **[helplift.vercel.app](https://helplift.vercel.app)**, hosted on [Vercel](https://vercel.com).
 
-1. Import the repository and set **Root Directory** to `helplift-app`.
-2. Add the environment variables above, with `NEXT_PUBLIC_SITE_URL` set to the deployed address.
-3. In Supabase, set **Authentication → URL Configuration** (Site URL and redirect URLs) to the deployed address, and point the notification-email database webhook at `/api/webhooks/notification-created`.
-4. Point the PayPal webhook at `/api/public/paypal/webhook` and use its ID for `PAYPAL_WEBHOOK_ID`.
+| Setting | Value |
+|---|---|
+| Hosting | Vercel project `helplift` |
+| Framework preset | Next.js |
+| Root directory | `helplift-app` |
+| Build / install | Vercel defaults (`npm install`, `next build`) |
+| Function region | `dub1` (Dublin), close to the Supabase database |
+| Database, auth and storage | Supabase, region `eu-west-1` (Ireland) |
+| Email | Brevo |
+| Payments | PayFast (ZAR) and PayPal (international, charged in USD) |
 
-Every push to `main` redeploys the site. Database migrations are not applied automatically - apply new ones in Supabase before pushing code that depends on them.
+### Deploying for the first time
+
+1. In Vercel, import the GitHub repository and set **Root Directory** to `helplift-app`.
+2. Under **Settings → Functions**, set the region to `dub1` so the server runs near the database.
+3. Add every environment variable listed above under **Settings → Environment Variables** (Production), with `NEXT_PUBLIC_SITE_URL` set to `https://helplift.vercel.app`. Mark the server keys (service role, Brevo, PayFast, PayPal, Gemini, webhook secret) as sensitive.
+4. Deploy, then configure the outside services to point at the live address:
+   - **Supabase → Authentication → URL Configuration:** Site URL `https://helplift.vercel.app`, and redirect URL `https://helplift.vercel.app/**`.
+   - **Google, LinkedIn and Microsoft OAuth apps:** keep the Supabase callback URL (`https://<project>.supabase.co/auth/v1/callback`) as the authorized redirect.
+   - **Supabase database webhook** for new notifications: `https://helplift.vercel.app/api/webhooks/notification-created`, sending the `NOTIFICATION_WEBHOOK_SECRET`.
+   - **PayFast:** notifications go to `/api/public/payfast/notify` automatically. Switch `PAYFAST_URL` and the merchant keys to live values when leaving the sandbox.
+   - **PayPal:** point the webhook at `https://helplift.vercel.app/api/public/paypal/webhook` and use its ID for `PAYPAL_WEBHOOK_ID`.
+
+### Updating the live site
+
+- Every push to `main` redeploys the site automatically. Other branches get their own preview deployments.
+- Database migrations are **not** applied automatically. Apply new files in `supabase/migrations/` in Supabase before pushing code that depends on them.
+- Changing an environment variable in Vercel only takes effect after a redeploy (**Deployments → ⋯ → Redeploy**).
+- The user manual PDF in `public/` is served as it is, so regenerate it before pushing if its text changed.

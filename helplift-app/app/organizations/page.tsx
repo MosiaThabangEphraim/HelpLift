@@ -62,9 +62,9 @@ export default function OrganizationsDirectoryPage() {
   const [nearMeError, setNearMeError] = useState("")
   const [view, setView] = useState<ListView>("grid")
 
-  // Who is looking. Messaging needs an account, and an organization viewer is
+  // Who is looking. Messaging needs an account, and an organization coordinator is
   // read-only, so they can't send messages.
-  const { signedIn, isViewer } = useCanMessage()
+  const { signedIn, isCoordinator } = useCanMessage()
   const [messaging, setMessaging] = useState<{ id: string; label: string } | null>(null)
   const [needSignIn, setNeedSignIn] = useState<string | null>(null)
 
@@ -319,10 +319,10 @@ export default function OrganizationsDirectoryPage() {
                     </Link>
                     {org.is_own ? (
                       <span className="inline-flex items-center rounded bg-slate-100 dark:bg-[#1A2740] px-3 py-2 text-xs font-bold text-slate-500">Your organization</span>
-                    ) : isViewer ? (
+                    ) : isCoordinator ? (
                       <span
                         aria-disabled="true"
-                        data-tip="Viewers have read-only access and can't send messages. Ask an owner or manager."
+                        data-tip="Coordinators can't message other organizations. Ask an owner or manager."
                         className="inline-flex cursor-not-allowed items-center justify-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] px-4 py-2.5 text-sm font-bold text-slate-400 dark:text-slate-500 opacity-70"
                       >
                         <MessageSquare className="w-4 h-4" /> Message

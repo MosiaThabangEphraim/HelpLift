@@ -49,6 +49,8 @@ import {
   Home,
   Activity,
   Code2,
+  Flag,
+  Inbox,
 } from "lucide-react"
 import {
   Area,
@@ -108,6 +110,7 @@ import { AdminFeedback } from "@/components/admin-feedback"
 import { AdminLoginActivity } from "@/components/admin-login-activity"
 import { AdminLiveActivity } from "@/components/admin-live-activity"
 import { AdminDeveloperReports } from "@/components/admin-developer-reports"
+import { AdminInquiries, type InquiriesView } from "@/components/admin-inquiries"
 import { AdminFulfillmentsView, type AdminFulfillment } from "@/components/admin-fulfillments"
 import { PlatformSettingsAdmin } from "@/components/platform-settings-admin"
 import { MessageDetailDialog } from "@/components/message-detail-dialog"
@@ -160,7 +163,7 @@ type Organization = {
 }
 type Profile = { id: string; full_name: string; email: string; role: "admin" | "organization" | "giver" | string; suspended?: boolean; suspended_reason?: string | null; created_at: string; phone?: string | null; account_type?: string | null }
 type Need = { id: string; title: string; description: string; category: string; urgency?: string; status: "draft" | "open" | "in_progress" | "fulfilled" | "closed" | "rejected" | "reopen_pending"; rejection_reason?: string | null; reopen_reason?: string | null; organizations: { name: string }[] | { name: string } | null; created_at: string; location?: string | null; quantity?: string | null; target_amount?: number | string | null; due_date?: string | null; need_attachments?: { id: string; storage_path: string; file_name: string | null; url: string }[] }
-type AdminMessage = { id: string; title: string; message: string; sender_name?: string | null; sender_role?: string | null; read_at: string | null; created_at: string; attachment_file_name?: string | null; attachmentUrl?: string | null; attachments?: { id: string; file_name: string | null; url: string | null }[] }
+type AdminMessage = { id: string; type?: string; title: string; message: string; sender_name?: string | null; sender_role?: string | null; read_at: string | null; created_at: string; attachment_file_name?: string | null; attachmentUrl?: string | null; attachments?: { id: string; file_name: string | null; url: string | null }[] }
 type OrganizationDocument = { id: string; organization_id: string; file_name: string; document_type: string; signed_url?: string | null }
 type OrgVerificationHistoryEntry = {
   id: string
@@ -268,17 +271,19 @@ export default function AdminDashboardPage() {
   const [selectedNeedDetail, setSelectedNeedDetail] = useState<Need | null>(null)
   const [withdrawals, setWithdrawals] = useState<AdminWithdrawal[]>([])
   const [selectedUserDetail, setSelectedUserDetail] = useState<Profile | null>(null)
-  const [activeTab, setActiveTab] = useState<"needs" | "users" | "gifts" | "messages" | "donations" | "withdrawals" | "stories" | "fulfillments" | "reports" | "feedback" | "security" | "activity" | "dev-reports">("users")
+  const [activeTab, setActiveTab] = useState<"needs" | "users" | "gifts" | "messages" | "donations" | "withdrawals" | "stories" | "fulfillments" | "reports" | "feedback" | "security" | "activity" | "dev-reports" | "inquiries">("users")
   // The Users tab has four views: organizations (verification), givers,
   // administrators (with the invite form) and every account.
   const [usersView, setUsersView] = useState<"organizations" | "givers" | "admins" | "people">("organizations")
   // Smooth tab transitions (lib/use-tab-transition.ts): tab bar first, then the header's buttons.
   const { changeTab, tabMotion } = useTabTransition(
-    ["needs", "gifts", "donations", "withdrawals", "stories", "fulfillments", "users", "messages", "reports", "activity", "security", "feedback", "dev-reports"],
+    ["needs", "gifts", "donations", "withdrawals", "stories", "fulfillments", "users", "messages", "inquiries", "reports", "activity", "security", "feedback", "dev-reports"],
     activeTab,
     setActiveTab
   )
   const openOrganizations = () => { setUsersView("organizations"); changeTab("users") }
+  // The Inquiries tab: anonymous tip-offs or homepage contact-form inquiries.
+  const [inquiriesView, setInquiriesView] = useState<InquiriesView>("tip-offs")
   const [isLoading, setIsLoading] = useState(true)
   // Distinct from the setError(...) alias below - this one gates the whole
   // page (loadData() failing outright, e.g. "not actually an admin"), so it
@@ -510,14 +515,14 @@ export default function AdminDashboardPage() {
         }
       })(),
 
-      // --- Messages sent to admin (direct messages from users/organizations,
-      // plus public "Partner with us" contact-form inquiries)
+      // --- Messages sent to admin (direct messages from users/organizations),
+      // plus contact-form inquiries and tip-off alerts for the Inquiries tab
       (async () => {
         try {
           const { data, error: err } = await supabase
             .from("notifications")
             .select("id, type, title, message, sender_id, sender_name, sender_role, reply_to_snippet, read_at, delivered_at, created_at, attachment_storage_path, attachment_file_name")
-            .in("type", ["message_to_admin", "contact_inquiry", "platform_feedback", "developer_report"])
+            .in("type", ["message_to_admin", "contact_inquiry", "platform_feedback", "developer_report", "tip_off", "need_update"])
             .order("created_at", { ascending: false })
           if (err) throw err
 
@@ -909,7 +914,19 @@ export default function AdminDashboardPage() {
   if (isLoading) return <main className="flex min-h-screen items-center justify-center bg-[#FAFAFA] dark:bg-[#0B1220]"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></main>
   if (loadError && profiles.length === 0) return <main className="flex min-h-screen items-center justify-center bg-[#FAFAFA] dark:bg-[#0B1220] p-6"><div className="rounded border border-red-200 bg-red-50 p-6 text-red-700">{loadError}</div></main>
 
-  const unreadMessages = messages.filter(m => !m.read_at).length
+  // Contact-form inquiries and tip-off alerts live in the Inquiries tab, not Messages.
+  const isInquiry = (m: AdminMessage) => m.type === "contact_inquiry" || m.type === "tip_off"
+  // Organization need updates (closed/fulfilled/reopen asked) only live in the bell.
+  const inboxMessages = messages.filter(m => !isInquiry(m) && m.type !== "need_update")
+  const contactInquiries = messages.filter(m => m.type === "contact_inquiry")
+  const unreadMessages = inboxMessages.filter(m => !m.read_at).length
+  const unreadInquiries = messages.filter(m => isInquiry(m) && !m.read_at).length
+  // Opening the tip-offs list counts as reading their alerts.
+  const openTipOffs = () => {
+    for (const m of messages) if (m.type === "tip_off" && !m.read_at) markMessageRead(m.id)
+    setInquiriesView("tip-offs")
+    changeTab("inquiries")
+  }
   const pendingApprovals = organizations.filter(o => o.verification_status === "pending").length
   // "Pending" for donations means proof is actually on file to review - an
   // EFT donation with no proof uploaded yet has nothing for an admin to act on.
@@ -944,12 +961,16 @@ export default function AdminDashboardPage() {
   }[] = [
     ...messages.map(m => ({
       id: `message-${m.id}`,
-      icon: (m as { type?: string }).type === "developer_report" ? Code2 : Mail,
+      icon: m.type === "developer_report" ? Code2 : m.type === "tip_off" ? Flag : m.type === "need_update" ? ClipboardList : Mail,
       title: m.title,
       subtitle: m.message,
       created_at: m.created_at,
       read: !!m.read_at,
-      onOpen: () => openMessage(m),
+      onOpen: () => {
+        if (m.type === "tip_off") return openTipOffs()
+        if (m.type === "need_update") { if (!m.read_at) markMessageRead(m.id); return changeTab("needs") }
+        openMessage(m)
+      },
     })),
     ...organizations.filter(o => o.verification_status === "pending").map(o => ({
       id: `org-${o.id}`,
@@ -1123,7 +1144,7 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* --- TABS --- */}
-        <Tabs value={activeTab} onValueChange={changeTab} className="gap-6">
+        <Tabs value={activeTab} onValueChange={value => (value === "inquiries" && inquiriesView === "tip-offs" ? openTipOffs() : changeTab(value))} className="gap-6">
           <TabsList className="w-full flex-nowrap justify-start overflow-x-auto">
             <TabsTrigger value="needs" data-tour="tab-needs" className="shrink-0 gap-1.5 px-2.5"><ClipboardList className="w-4 h-4" />Needs<CountBadge value={needsAwaitingReview} /></TabsTrigger>
             <TabsTrigger value="gifts" className="shrink-0 gap-1.5 px-2.5"><Gift className="w-4 h-4" />Gift Library<CountBadge value={pendingGifts} /></TabsTrigger>
@@ -1133,6 +1154,7 @@ export default function AdminDashboardPage() {
             <TabsTrigger value="fulfillments" className="shrink-0 gap-1.5 px-2.5"><PackageCheck className="w-4 h-4" />Fulfillments</TabsTrigger>
             <TabsTrigger value="users" data-tour="tab-users" className="shrink-0 gap-1.5 px-2.5"><Users className="w-4 h-4" />Users<CountBadge value={pendingApprovals} /></TabsTrigger>
             <TabsTrigger value="messages" className="shrink-0 gap-1.5 px-2.5"><Mail className="w-4 h-4" />Messages<CountBadge value={unreadMessages} /></TabsTrigger>
+            <TabsTrigger value="inquiries" data-tip="Anonymous tip-offs and contact-form inquiries from the website" className="shrink-0 gap-1.5 px-2.5"><Inbox className="w-4 h-4" />Inquiries<CountBadge value={unreadInquiries} /></TabsTrigger>
             <TabsTrigger value="reports" data-tour="tab-reports" className="shrink-0 gap-1.5 px-2.5"><BarChart3 className="w-4 h-4" />Reports</TabsTrigger>
           </TabsList>
 
@@ -1158,7 +1180,21 @@ export default function AdminDashboardPage() {
             <StoriesView stories={stories} onReview={reviewStory} onDeleted={afterDelete} />
           </TabsContent>
           <TabsContent value="messages" className={tabMotion}>
-            <MessagesView refreshKey={refreshKey} messages={messages} onOpen={item => { setReturnTo("Messages", () => {}); openMessage(item) }} onDeleted={afterDelete} />
+            <MessagesView refreshKey={refreshKey} messages={inboxMessages} onOpen={item => { setReturnTo("Messages", () => {}); openMessage(item) }} onDeleted={afterDelete} />
+          </TabsContent>
+          <TabsContent value="inquiries" className={tabMotion}>
+            <AdminInquiries
+              refreshKey={refreshKey}
+              view={inquiriesView}
+              onViewChange={view => (view === "tip-offs" ? openTipOffs() : setInquiriesView(view))}
+              inquiries={contactInquiries}
+              onOpenInquiry={item => { setReturnTo("Inquiries", () => {}); openMessage(item as AdminMessage) }}
+              onDeleted={afterDelete}
+              onOpenOrganization={id => {
+                const org = organizations.find(o => o.id === id)
+                if (org) setSelectedOrgDetail(org)
+              }}
+            />
           </TabsContent>
           <TabsContent value="users" className={`space-y-6 ${tabMotion}`}>
             <div className="flex flex-wrap items-center gap-2 max-md:flex-nowrap max-md:overflow-x-auto no-scrollbar max-md:pb-1 max-md:[&>*]:shrink-0" role="group" aria-label="Users view">
@@ -2573,11 +2609,11 @@ function WithdrawalsView({
 const ROLE_HELP: Record<string, string> = {
   owner: "Full control of the organization, including its profile, documents, team, and requesting withdrawals.",
   manager: "Manages needs, donations and messages, but can't edit organization details.",
-  viewer: "Read-only access.",
+  coordinator: "Handles deliveries (fulfillments and proof), messages and impact stories. Can't change needs, offers or claims, or see money.",
 }
 
 // Role editing for one person. Platform role (admin / giver) is saved with the form; an
-// organization member's team role (owner / manager / viewer) is saved straight away.
+// organization member's team role (owner / manager / coordinator) is saved straight away.
 function RoleFields({ profile }: { profile: Profile }) {
   const isOrgAccount = profile.role === "organization"
   const [membership, setMembership] = useState<{ organization_name: string; role: string; is_primary_owner: boolean } | null>(null)
@@ -2642,7 +2678,7 @@ function RoleFields({ profile }: { profile: Profile }) {
             <select id="edit-team-role" value={teamRole} onChange={e => setTeamRole(e.target.value)} className={selectClass} disabled={membership.is_primary_owner}>
               <option value="owner">Owner</option>
               <option value="manager">Manager</option>
-              <option value="viewer">Viewer</option>
+              <option value="coordinator">Coordinator</option>
             </select>
             <Button type="button" variant="outline" onClick={saveTeamRole} disabled={saving || teamRole === membership.role || membership.is_primary_owner}>
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Update"}

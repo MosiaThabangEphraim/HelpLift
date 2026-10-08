@@ -15,7 +15,7 @@ type PendingInvite = { id: string; email: string; role: OrgRole; expires_at: str
 const ROLE_HELP: Record<OrgRole, string> = {
   owner: "Full access, including managing the team, organization profile, banking details and requesting withdrawals.",
   manager: "Create and edit needs; handle interests, fulfillments, stories, documents and gift claims.",
-  viewer: "Read-only access to needs, interests, donations and fulfillments.",
+  coordinator: "Handles deliveries (fulfillments and proof), messages and impact stories. Can't change needs, offers or claims, or see money.",
 }
 
 const selectClass =
@@ -164,7 +164,7 @@ export function OrganizationTeam({ refreshKey = 0 }: { refreshKey?: number }) {
               <select id="invite-role" value={role} onChange={e => setRole(e.target.value as any)} className={`${selectClass} w-full`}>
                 <option value="owner">Owner</option>
                 <option value="manager">Manager</option>
-                <option value="viewer">Viewer</option>
+                <option value="coordinator">Coordinator</option>
               </select>
               <p className="text-xs text-slate-500 dark:text-slate-400">{ROLE_HELP[role]}</p>
             </div>
@@ -207,7 +207,7 @@ export function OrganizationTeam({ refreshKey = 0 }: { refreshKey?: number }) {
                         >
                           <option value="owner">Owner</option>
                           <option value="manager">Manager</option>
-                          <option value="viewer">Viewer</option>
+                          <option value="coordinator">Coordinator</option>
                         </select>
                         {!member.is_you && (
                           <button

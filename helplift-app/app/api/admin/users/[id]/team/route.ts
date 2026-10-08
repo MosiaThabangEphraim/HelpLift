@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { INVITABLE_ROLES, ROLE_LABELS, type OrgRole } from "@/lib/organization-access"
 
 // Lets an administrator see and change a person's role inside their organization
-// (owner / manager / viewer). Platform roles (admin / giver) are changed through
+// (owner / manager / coordinator). Platform roles (admin / giver) are changed through
 // PATCH /api/admin/users/[id].
 
 async function requireAdmin() {
@@ -50,7 +50,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (error || !user) return error!
     const { id } = await context.params
     const { role } = await request.json()
-    if (!INVITABLE_ROLES.includes(role)) return NextResponse.json({ message: "Role must be owner, manager or viewer." }, { status: 400 })
+    if (!INVITABLE_ROLES.includes(role)) return NextResponse.json({ message: "Role must be owner, manager or coordinator." }, { status: 400 })
 
     const admin = createAdminClient()
     const membership = await loadMembership(admin, id)

@@ -3,6 +3,7 @@ import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/st
 import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { logUserAction } from "@/lib/activity-log"
 import { createClient } from "@/lib/supabase/server"
+import { isPastDate } from "@/lib/expiry"
 import { getOrgContext, roleAtLeast, insufficientRoleMessage } from "@/lib/organization-access"
 
 // Submits a claim on an offering - one of possibly several at once. The
@@ -49,12 +50,16 @@ export async function POST(
 
     const { data: gift, error: lookupError } = await supabase
       .from("gift_offerings")
-      .select("id, status, giver_id, title")
+      .select("id, status, giver_id, title, expiry_date")
       .eq("id", id)
       .single()
 
     if (lookupError || !gift) {
       return NextResponse.json({ message: "Gift offering not found." }, { status: 404 })
+    }
+
+    if (isPastDate(gift.expiry_date)) {
+      return NextResponse.json({ message: "This offering has reached its expiry date and can no longer be claimed." }, { status: 400 })
     }
 
     if (gift.status !== "approved") {

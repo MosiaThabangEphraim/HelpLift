@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { getOrgContext } from "@/lib/organization-access"
+import { getOrgContext, insufficientRoleMessage, roleAtLeast } from "@/lib/organization-access"
 import { getWalletSummary } from "@/lib/wallet"
 import { getWithdrawalLimits } from "@/lib/platform-settings"
 
 // The organization's wallet: available balance plus its full withdrawal
-// history. Any team member (viewer+) may see it; only owners may request a
+// history. Managers and owners may see it (coordinators never see money); only owners may request a
 // withdrawal (see POST /api/organization/withdrawals).
 export async function GET() {
   try {
@@ -15,6 +15,7 @@ export async function GET() {
 
     const ctx = await getOrgContext<{ id: string; verification_status: string }>(supabase, user.id, "id, verification_status")
     if (!ctx) return NextResponse.json({ message: "Organization profile not found." }, { status: 404 })
+    if (!roleAtLeast(ctx.role, "manager")) return NextResponse.json({ message: insufficientRoleMessage(ctx.role, "manager") }, { status: 403 })
 
     const [summary, limits, { data: withdrawals, error }] = await Promise.all([
       getWalletSummary(supabase, ctx.organization.id),

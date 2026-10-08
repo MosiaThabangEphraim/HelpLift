@@ -1,5 +1,7 @@
-import { NextResponse } from "next/server"
+import { NextResponse, after } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { notPastFilter } from "@/lib/expiry"
+import { expireOverdueItems } from "@/lib/expiry-job"
 
 export async function GET(request: Request) {
   try {
@@ -9,6 +11,8 @@ export async function GET(request: Request) {
     const location = searchParams.get("location")?.trim().toLowerCase()
 
     const supabase = await createClient()
+    // Safety net for the daily expiry job, after the response is sent.
+    after(expireOverdueItems)
     const { data: { user } } = await supabase.auth.getUser()
 
     // Donor email is only useful (and only appropriate) once someone is
@@ -20,6 +24,8 @@ export async function GET(request: Request) {
       .from("gift_offerings")
       .select(`id, title, offering_type, description, quantity_or_value, conditions, location, expiry_date, status, created_at, givers(${giverFields}), gift_offering_photos(id, storage_path, file_name)`)
       .eq("status", "approved")
+      // Offerings past their expiry date come off straight away (lib/expiry.ts).
+      .or(notPastFilter("expiry_date"))
       .order("created_at", { ascending: false })
 
     if (type && type !== "all" && ["goods", "services", "financial"].includes(type)) {

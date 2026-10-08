@@ -3,6 +3,7 @@ import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/st
 import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { logUserAction } from "@/lib/activity-log"
 import { createClient } from "@/lib/supabase/server"
+import { isPastDate } from "@/lib/expiry"
 import { getActiveCategoryNames } from "@/lib/need-categories"
 import { getOrgContext, roleAtLeast, insufficientRoleMessage } from "@/lib/organization-access"
 import { forwardGeocodePlace } from "@/lib/geolocation"
@@ -45,6 +46,7 @@ export async function POST(request: Request) {
     }
 
     const urgency = ["low", "medium", "high"].includes(body.urgency) ? body.urgency : "medium"
+    if (isPastDate(body.due_date)) return NextResponse.json({ message: "The due date can't be in the past." }, { status: 400 })
 
     const insertPayload: Record<string, any> = {
       organization_id: organization.id,

@@ -15,7 +15,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
     const orgCtx = await getOrgContext<{ id: any }>(supabase, user.id, "id")
     const org = orgCtx?.organization ?? null
-    if (orgCtx && !roleAtLeast(orgCtx.role, "manager")) return NextResponse.json({ message: insufficientRoleMessage(orgCtx.role, "manager") }, { status: 403 })
+    if (orgCtx && !roleAtLeast(orgCtx.role, "coordinator")) return NextResponse.json({ message: insufficientRoleMessage(orgCtx.role, "coordinator") }, { status: 403 })
     if (!org) return NextResponse.json({ message: "Organization access required." }, { status: 403 })
 
     const { id } = await context.params

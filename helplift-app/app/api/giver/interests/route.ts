@@ -3,6 +3,7 @@ import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/st
 import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { logUserAction } from "@/lib/activity-log"
 import { createClient } from "@/lib/supabase/server"
+import { isPastDate } from "@/lib/expiry"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 export async function POST(request: Request) {
@@ -37,8 +38,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Photos must be smaller than 10 MB each." }, { status: 400 })
     }
 
-    const { data: need } = await supabase.from("needs").select("id, title, organization_id").eq("id", need_id).in("status", ["open", "in_progress"]).single()
+    const { data: need } = await supabase.from("needs").select("id, title, organization_id, due_date").eq("id", need_id).in("status", ["open", "in_progress"]).single()
     if (!need) return NextResponse.json({ message: "This need is not open for support." }, { status: 400 })
+    if (isPastDate(need.due_date)) return NextResponse.json({ message: "This need's due date has passed, so it no longer accepts offers." }, { status: 400 })
 
     const { data: interest, error } = await supabase.from("support_interests").insert({ need_id, giver_id: giver.id, message: message || null }).select().single()
     if (error) return NextResponse.json({ message: error.code === "23505" ? "You have already expressed interest in this need." : error.message }, { status: 400 })

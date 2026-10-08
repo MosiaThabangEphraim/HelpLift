@@ -21,7 +21,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Feedback is for givers and organizations." }, { status: 403 })
     }
 
-    // Organization viewers are read-only and can't contact the administrators.
     let senderName = profile.full_name || profile.email || "A HelpLift user"
     if (profile.role === "organization") {
       const { data: membership } = await supabase
@@ -29,9 +28,6 @@ export async function POST(request: Request) {
         .select("role, organizations(name)")
         .eq("profile_id", user.id)
         .maybeSingle()
-      if (membership?.role === "viewer") {
-        return NextResponse.json({ message: "Viewers can't contact the administrators. Ask an owner or manager to send feedback." }, { status: 403 })
-      }
       const orgField = (membership as any)?.organizations
       const orgName = Array.isArray(orgField) ? orgField[0]?.name : orgField?.name
       if (orgName) senderName = `${orgName} (${profile.full_name || "team member"})`

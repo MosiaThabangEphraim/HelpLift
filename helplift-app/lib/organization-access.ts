@@ -1,14 +1,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 // Roles inside an organization (see 20260920000100_organization_team_roles.sql).
-// Higher roles include everything below them.
-export type OrgRole = "owner" | "manager" | "viewer"
+// Higher roles include everything below them:
+//   coordinator - deliveries (fulfillments and proof), messages and impact stories
+//   manager     - + needs, offers, Gift Library claims, donations and the wallet
+//   owner       - + banking, withdrawals, documents, the profile and the team
+export type OrgRole = "owner" | "manager" | "coordinator"
 
-export const ORG_ROLES: OrgRole[] = ["owner", "manager", "viewer"]
+export const ORG_ROLES: OrgRole[] = ["owner", "manager", "coordinator"]
 // Every role can be assigned: an organization may have several owners.
-export const INVITABLE_ROLES: OrgRole[] = ["owner", "manager", "viewer"]
+export const INVITABLE_ROLES: OrgRole[] = ["owner", "manager", "coordinator"]
 
-const RANK: Record<OrgRole, number> = { owner: 3, manager: 2, viewer: 1 }
+const RANK: Record<OrgRole, number> = { owner: 3, manager: 2, coordinator: 1 }
 
 export function roleAtLeast(role: OrgRole | null | undefined, min: OrgRole) {
   return !!role && RANK[role] >= RANK[min]
@@ -17,13 +20,13 @@ export function roleAtLeast(role: OrgRole | null | undefined, min: OrgRole) {
 export const ROLE_LABELS: Record<OrgRole, string> = {
   owner: "Owner",
   manager: "Manager",
-  viewer: "Viewer",
+  coordinator: "Coordinator",
 }
 
 export type OrgContext<T = Record<string, any>> = { organization: T; role: OrgRole }
 
 // Resolves the signed-in user's organization through organization_members,
-// so owners, managers and viewers all work. `columns` is the organizations
+// so owners, managers and coordinators all work. `columns` is the organizations
 // column list to select (defaults to just the id).
 export async function getOrgContext<T = { id: string }>(
   supabase: SupabaseClient,

@@ -78,7 +78,7 @@ export function MessageDetailDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
   message: MessageDetail | null
-  /** Pass false where the signed-in user isn't allowed to send messages (e.g. an organization viewer). */
+  /** Pass false where the signed-in user isn't allowed to send messages. */
   canReply?: boolean
 }) {
   const [isReplying, setIsReplying] = useState(false)

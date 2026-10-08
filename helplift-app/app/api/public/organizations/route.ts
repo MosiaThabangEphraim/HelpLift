@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { notPastFilter } from "@/lib/expiry"
 
 // Directory of organizations. Only approved (verified) organizations are ever
 // visible here: the database's row-level security shows other people's
@@ -27,6 +28,7 @@ export async function GET() {
         .from("needs")
         .select("organization_id")
         .in("status", ["open", "in_progress"])
+        .or(notPastFilter("due_date"))
       for (const row of needRows || []) openNeeds[row.organization_id] = (openNeeds[row.organization_id] || 0) + 1
     } catch (needsErr) {
       console.warn("Organization directory needs count warning:", needsErr)

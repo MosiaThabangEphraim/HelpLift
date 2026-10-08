@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     if (profile?.role !== "organization") return NextResponse.json({ message: "Organization access required." }, { status: 403 })
     const ctx = await getOrgContext<{ id: string; name: string; city: string | null; province: string | null }>(supabase, user.id, "id, name, city, province")
     if (!ctx?.organization) return NextResponse.json({ message: "Organization not found." }, { status: 404 })
-    // Same bar as creating a need: viewers are read-only.
+    // Same bar as creating a need: managers and owners only.
     if (!roleAtLeast(ctx.role, "manager")) return NextResponse.json({ message: insufficientRoleMessage(ctx.role, "manager") }, { status: 403 })
 
     const body = await request.json().catch(() => ({}))

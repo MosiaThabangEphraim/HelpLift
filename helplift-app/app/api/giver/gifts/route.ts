@@ -3,6 +3,7 @@ import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/st
 import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { logUserAction } from "@/lib/activity-log"
 import { createClient } from "@/lib/supabase/server"
+import { isPastDate } from "@/lib/expiry"
 
 export async function GET() {
   try {
@@ -83,6 +84,7 @@ export async function POST(request: Request) {
     }
 
     const type = ["goods", "services", "financial"].includes(offering_type) ? offering_type : "goods"
+    if (isPastDate(expiry_date)) return NextResponse.json({ message: "The expiry date can't be in the past." }, { status: 400 })
 
     const { data: gift, error } = await supabase
       .from("gift_offerings")

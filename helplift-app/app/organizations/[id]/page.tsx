@@ -87,7 +87,7 @@ export default function OrganizationPublicProfilePage() {
   const [stories, setStories] = useState<Story[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState("")
-  const { signedIn, isViewer } = useCanMessage()
+  const { signedIn, isCoordinator } = useCanMessage()
   const [isMessaging, setIsMessaging] = useState(false)
   const [showSignInPrompt, setShowSignInPrompt] = useState(false)
 
@@ -219,10 +219,10 @@ export default function OrganizationPublicProfilePage() {
                 </p>
                 {org.is_own ? (
                   <p className="mt-3 text-xs font-bold text-slate-400">This is your organization's public profile.</p>
-                ) : isViewer ? (
+                ) : isCoordinator ? (
                   <span
                     aria-disabled="true"
-                    data-tip="Viewers have read-only access and can't send messages. Ask an owner or manager."
+                    data-tip="Coordinators can't message other organizations. Ask an owner or manager."
                     className="mt-3 inline-flex cursor-not-allowed items-center gap-1.5 rounded border border-slate-200 dark:border-slate-700 px-4 py-2 text-sm font-bold text-slate-400 opacity-70"
                   >
                     <MessageSquare className="w-4 h-4" /> Message

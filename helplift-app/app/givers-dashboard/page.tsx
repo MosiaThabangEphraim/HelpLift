@@ -1,6 +1,7 @@
 "use client"
 import { FormEvent, useEffect, useMemo, useState } from "react"
 import { useTabTransition } from "@/lib/use-tab-transition"
+import { notPastFilter, todayInSA } from "@/lib/expiry"
 import { CountUp } from "@/components/count-up"
 import { stageFormFiles } from "@/lib/stage-uploads"
 import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
@@ -365,6 +366,8 @@ export default function GiverDashboardPage() {
         .from("needs")
         .select("id, title, description, category, location, latitude, longitude, quantity, target_amount, due_date, urgency, status, organizations(id, name, verification_status, profile_id, city, province, logo_url)")
         .in("status", ["open", "in_progress"])
+        // Hide needs past their due date (lib/expiry.ts).
+        .or(notPastFilter("due_date"))
         .order("created_at", { ascending: false }),
       supabase
         .from("support_interests")
@@ -1693,7 +1696,8 @@ export default function GiverDashboardPage() {
                   />
                   <input
                     type="date"
-                    data-tip="The date after which this offering is no longer available"
+                    data-tip="The last day this offering is available - it comes off the Gift Library after this date"
+                    min={todayInSA()}
                     value={giftForm.expiry_date}
                     onChange={e => setGiftForm({ ...giftForm, expiry_date: e.target.value })}
                     className="p-3 bg-slate-50 dark:bg-[#1A2740] border border-slate-200 dark:border-[#233350] rounded text-xs outline-none focus:border-purple-500 text-slate-600 dark:text-slate-300"
