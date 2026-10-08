@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from "react"
 import { stageFormFiles } from "@/lib/stage-uploads"
 import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
-import { Bell, Check, Globe, Loader2, Megaphone, MonitorSmartphone, Paperclip, X } from "lucide-react"
+import { Bell, Check, ChevronDown, Globe, Loader2, Megaphone, MonitorSmartphone, Paperclip, X } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input"
 import { MicButton } from "@/components/mic-button"
 import { GrammarCheckButton } from "@/components/grammar-check-button"
 import { appendSpeech } from "@/lib/speech-to-text"
+import { createClient } from "@/lib/supabase/client"
 
 type Target = "givers" | "organizations" | "both"
 type Channel = "notification" | "banner" | "homepage"
@@ -71,6 +72,8 @@ export function AnnouncementComposeDialog({
   // What's live right now - the login banner and the homepage notice.
   const [live, setLive] = useState<Record<LiveKey, LiveSetting | null>>({ login_banner: null, homepage_notice: null })
   const [savingLive, setSavingLive] = useState<LiveKey | null>(null)
+  // A "Live now" item opened to show its full current text and attachments.
+  const [openLive, setOpenLive] = useState<LiveKey | null>(null)
   const [liveError, setLiveError] = useState("")
 
   const loadLive = async () => {
@@ -179,7 +182,7 @@ export function AnnouncementComposeDialog({
         ) : (
           <form onSubmit={handleSubmit} className="space-y-3 pt-2">
             {/* Live now: turn the public banners off/on without sending anything. */}
-            <div className="space-y-2 rounded border border-slate-200 dark:border-[#233350] p-3">
+            <div className="space-y-2 rounded bg-slate-50 dark:bg-slate-800/40 p-3">
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Live now</p>
               {([
                 { key: "homepage_notice", label: "Homepage public notice", icon: Globe },
@@ -188,17 +191,30 @@ export function AnnouncementComposeDialog({
                 const setting = live[item.key]
                 const hasMessage = !!setting?.message?.trim()
                 const Icon = item.icon
+                const isOpen = openLive === item.key && hasMessage
                 return (
-                  <div key={item.key} className="flex items-center gap-3">
+                  <div key={item.key}>
+                  <div className="flex items-center gap-3">
                     <Icon className="h-4 w-4 shrink-0 text-blue-600" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-bold">{item.label}</p>
-                      <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">
+                    {/* Click to see the full text that's live right now. */}
+                    <button
+                      type="button"
+                      onClick={() => setOpenLive(isOpen ? null : item.key)}
+                      disabled={!hasMessage}
+                      aria-expanded={isOpen}
+                      data-tip={hasMessage ? (isOpen ? "Hide the full text" : "Show the full text and attachments") : undefined}
+                      className="group min-w-0 flex-1 text-left disabled:cursor-default"
+                    >
+                      <span className="flex items-center gap-1 text-xs font-bold">
+                        {item.label}
+                        {hasMessage && <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />}
+                      </span>
+                      <span className={`block text-[11px] text-slate-500 dark:text-slate-400 ${isOpen ? "" : "truncate"} ${hasMessage ? "group-hover:text-blue-600" : ""}`}>
                         {!hasMessage
                           ? "Nothing set yet - send an announcement to it below."
                           : `${setting?.enabled ? "On" : "Off"} - "${setting?.title || setting?.message}"`}
-                      </p>
-                    </div>
+                      </span>
+                    </button>
                     {savingLive === item.key && <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />}
                     <Switch
                       checked={!!setting?.enabled}
@@ -207,6 +223,28 @@ export function AnnouncementComposeDialog({
                       aria-label={`${item.label} ${setting?.enabled ? "on" : "off"}`}
                       data-tip={!hasMessage ? "Send an announcement to it first" : setting?.enabled ? "Turn off - hide it now" : "Turn back on with its last message"}
                     />
+                  </div>
+                  {isOpen && setting && (
+                    <div className="ml-7 mt-2 space-y-2 rounded bg-white dark:bg-slate-900/60 p-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                      {setting.title && <p className="text-sm font-bold text-slate-900 dark:text-slate-100 break-words">{setting.title}</p>}
+                      <p className="whitespace-pre-line break-words text-sm leading-relaxed text-slate-600 dark:text-slate-300">{setting.message}</p>
+                      {setting.attachments?.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {setting.attachments.map(file => (
+                            <a
+                              key={file.path}
+                              href={createClient().storage.from("login-banner-attachments").getPublicUrl(file.path).data.publicUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex max-w-full items-center gap-1.5 rounded bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:underline"
+                            >
+                              <Paperclip className="h-3 w-3 shrink-0" /> <span className="truncate">{file.name}</span>
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   </div>
                 )
               })}
