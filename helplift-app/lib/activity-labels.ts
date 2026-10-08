@@ -72,8 +72,6 @@ const LABELS: { method: string; pattern: RegExp; label: string }[] = [
   { method: "POST", pattern: /^\/api\/public\/donations\/platform$/, label: "Started a donation to HelpLift" },
   { method: "PATCH", pattern: /^\/api\/public\/donations\/platform\/\[id\]$/, label: "Updated a donation to HelpLift" },
   { method: "POST", pattern: /^\/api\/public\/donations\/platform\/\[id\]\/cancel$/, label: "Cancelled a donation to HelpLift" },
-  { method: "POST", pattern: /^\/api\/register\/choose-role$/, label: "Chose their account type" },
-  { method: "POST", pattern: /^\/api\/register\/complete$/, label: "Finished registration" },
 ]
 
 // UUIDs, numeric ids and long tokens become [id].

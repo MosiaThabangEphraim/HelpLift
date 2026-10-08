@@ -47,6 +47,7 @@ function LoginContent() {
   const [showUnlockedBanner, setShowUnlockedBanner] = useState(false)
   const [twoFactorAttempt, setTwoFactorAttempt] = useState<{ email: string; attemptToken: string } | null>(null)
   const [showVerifiedBanner, setShowVerifiedBanner] = useState(false)
+  const [showNoAccount, setShowNoAccount] = useState(false)
   const [adminBanner, setAdminBanner] = useState<{ message: string; updatedAt: string; attachments: { name: string; url: string }[] } | null>(null)
   const [passkeySupported, setPasskeySupported] = useState(false)
   const [isPasskeyLoading, setIsPasskeyLoading] = useState(false)
@@ -68,7 +69,10 @@ function LoginContent() {
   useEffect(() => {
     const callbackError = searchParams.get("error")
     if (callbackError) {
-      setErrorMsg(CALLBACK_ERRORS[callbackError] || "Sign-in didn't complete. Please try again.")
+      // Continuing with Google/LinkedIn/Microsoft before registering gets its
+      // own friendly card (below) rather than a red error.
+      if (callbackError === "no_account") setShowNoAccount(true)
+      else setErrorMsg(CALLBACK_ERRORS[callbackError] || "Sign-in didn't complete. Please try again.")
       window.history.replaceState({}, "", "/login")
     }
   }, [searchParams])
@@ -304,7 +308,7 @@ function LoginContent() {
                   {adminBanner.attachments.map((a, i) =>
                     /\.(png|jpe?g|gif|webp|svg)$/i.test(a.name) ? (
                       <a key={i} href={a.url} target="_blank" rel="noopener noreferrer">
-                        <img src={a.url} alt={a.name} className="h-16 w-16 rounded object-cover border border-blue-200 dark:border-blue-900" />
+                        <img src={a.url} alt={a.name} className="h-16 w-16 rounded-xl object-cover shadow-sm" />
                       </a>
                     ) : (
                       <a
@@ -312,7 +316,7 @@ function LoginContent() {
                         href={a.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1.5 text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900"
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 px-3 py-1.5 text-xs font-semibold text-blue-700 dark:text-blue-300 transition-colors hover:bg-blue-100 dark:hover:bg-blue-900"
                       >
                         <Paperclip className="h-3.5 w-3.5 shrink-0" />
                         <span className="max-w-[140px] truncate">{a.name}</span>
@@ -349,26 +353,26 @@ function LoginContent() {
       />
 
       {adminBanner && (
-        <div className="w-full max-w-xl mb-6 p-4 rounded bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900 text-blue-700 dark:text-blue-300 text-sm space-y-3">
-          <div className="flex items-start gap-3">
-            <Megaphone className="h-5 w-5 shrink-0 mt-0.5" />
-            <p className="flex-1 font-semibold whitespace-pre-line">{adminBanner.message}</p>
+        <div className="w-full max-w-xl mb-6 space-y-3 animate-in fade-in slide-in-from-top-2 duration-500">
+          <div className="flex items-start gap-4">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-600/25"><Megaphone className="h-5 w-5" /></span>
+            <p className="flex-1 pt-2 text-sm font-semibold text-slate-700 dark:text-slate-200 whitespace-pre-line">{adminBanner.message}</p>
             <ReadAloudButton text={adminBanner.message} label="Listen to this announcement" iconOnly className="shrink-0" />
             <button
               type="button"
               onClick={dismissAdminBanner}
               aria-label="Dismiss"
-              className="shrink-0 rounded p-1 text-blue-400 hover:text-blue-600 dark:hover:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900/60"
+              className="shrink-0 rounded p-1 text-slate-400 transition-colors hover:text-slate-700 dark:hover:text-slate-200"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
           {adminBanner.attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2 pl-8">
+            <div className="flex flex-wrap gap-2 pl-14">
               {adminBanner.attachments.map((a, i) =>
                 /\.(png|jpe?g|gif|webp|svg)$/i.test(a.name) ? (
                   <a key={i} href={a.url} target="_blank" rel="noopener noreferrer">
-                    <img src={a.url} alt={a.name} className="h-16 w-16 rounded object-cover border border-blue-200 dark:border-blue-900" />
+                    <img src={a.url} alt={a.name} className="h-16 w-16 rounded-xl object-cover shadow-sm" />
                   </a>
                 ) : (
                   <a
@@ -376,7 +380,7 @@ function LoginContent() {
                     href={a.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded border border-blue-200 dark:border-blue-900 bg-white dark:bg-blue-950/60 px-2.5 py-1.5 text-xs font-semibold hover:bg-blue-100 dark:hover:bg-blue-900"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 px-3 py-1.5 text-xs font-semibold text-blue-700 dark:text-blue-300 transition-colors hover:bg-blue-100 dark:hover:bg-blue-900"
                   >
                     <Paperclip className="h-3.5 w-3.5 shrink-0" />
                     <span className="max-w-[140px] truncate">{a.name}</span>
@@ -391,18 +395,62 @@ function LoginContent() {
       {/* Form */}
       <form onSubmit={handleLogin} className="w-full max-w-xl space-y-6">
         {showVerifiedBanner && (
-          <div className="p-4 rounded bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900 flex items-center gap-3 text-emerald-700 dark:text-emerald-300 text-sm font-bold">
-            <CheckCircle2 className="h-5 w-5 shrink-0" /> Your email has been verified. You can now sign in.
+          <div role="status" className="flex items-center gap-4 py-1 animate-in fade-in slide-in-from-top-2 duration-500">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 text-white shadow-lg shadow-emerald-600/25"><CheckCircle2 className="h-5 w-5" /></span>
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Your email has been verified. You can now sign in.</p>
           </div>
         )}
         {showUnlockedBanner && (
-          <div className="p-4 rounded bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900 flex items-center gap-3 text-emerald-700 dark:text-emerald-300 text-sm font-bold">
-            <CheckCircle2 className="h-5 w-5 shrink-0" /> Account unlocked. Enter your password to sign in.
+          <div role="status" className="flex items-center gap-4 py-1 animate-in fade-in slide-in-from-top-2 duration-500">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 text-white shadow-lg shadow-emerald-600/25"><CheckCircle2 className="h-5 w-5" /></span>
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Account unlocked. Enter your password to sign in.</p>
           </div>
         )}
         {errorMsg && (
-          <div className="p-4 rounded bg-red-50 border border-red-100 flex items-center gap-3 text-red-700 text-sm font-bold">
-            <AlertCircle className="h-5 w-5" /> {errorMsg}
+          <div role="alert" className="flex items-center gap-4 py-1 animate-in fade-in slide-in-from-top-2 duration-500">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500 to-red-600 text-white shadow-lg shadow-red-600/25"><AlertCircle className="h-5 w-5" /></span>
+            <p className="text-sm font-semibold text-red-600 dark:text-red-400">{errorMsg}</p>
+          </div>
+        )}
+
+        {/* Continued with Google/LinkedIn/Microsoft before registering. Same
+            look as the homepage: no box or outline - a gradient icon tile, a
+            bold title, plain text and the gradient button. */}
+        {showNoAccount && (
+          <div role="alert" className="relative flex items-start gap-4 py-2 pr-8 animate-in fade-in slide-in-from-top-2 duration-500">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-600/25">
+              <UserPlus className="h-5 w-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-bold text-slate-900 dark:text-slate-100">No account found</p>
+              <p className="mt-1 text-sm leading-relaxed text-slate-500 dark:text-slate-400 text-justify-smart">
+                There&apos;s no account for that email yet. Register first, then you can sign in with Google, LinkedIn or Microsoft.
+              </p>
+              <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-3">
+                <Link
+                  href="/register"
+                  className="btn-shine group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:-translate-y-0.5 hover:shadow-blue-600/40"
+                >
+                  Create an account
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setShowNoAccount(false)}
+                  className="text-sm font-bold text-blue-600 transition-colors hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  Try another account
+                </button>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowNoAccount(false)}
+              aria-label="Dismiss"
+              className="absolute top-1 right-0 rounded p-1 text-slate-400 transition-colors hover:text-slate-700 dark:hover:text-slate-200"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
         )}
 

@@ -50,9 +50,9 @@ Register (/register):
 - Passwords must meet the strength rules shown as a live checklist on the form.
 - You must agree to the Terms (/terms) and Privacy Policy (/privacy).
 - Verify your email address via the link emailed to you (/verify-email).
-- You can also register with Google (or sign in with Google, Microsoft or LinkedIn).
-  New Google sign-ups finish on a "Finish signing up" page (/register/complete)
-  where they choose giver or organization and complete their details.
+- Accounts are created with the registration form only. Once registered, people
+  can also sign in with Google, Microsoft or LinkedIn using the same email; these
+  can't be used to create a new account.
 
 Organization verification:
 - New organizations are reviewed by an administrator before they can use the

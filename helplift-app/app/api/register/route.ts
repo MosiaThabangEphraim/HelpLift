@@ -4,6 +4,7 @@ import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { createClient } from "@/lib/supabase/server"
 import { isPasswordValid, isValidEmail } from "@/lib/password"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { cleanUpUnfinishedSignups } from "@/lib/unfinished-signups"
 import { checkProfilePicture, saveProfilePicture } from "@/lib/profile-picture"
 
 const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024
@@ -70,6 +71,10 @@ export async function POST(req: Request) {
         { status: 400 }
       )
     }
+
+    // Remove sign-ups abandoned more than 30 minutes ago - this frees the
+    // email if this person started with Google/LinkedIn/Microsoft earlier.
+    await cleanUpUnfinishedSignups()
 
     const supabase = await createClient()
     const { data, error } = await supabase.auth.signUp({

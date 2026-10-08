@@ -11,9 +11,6 @@ import { ArrowRight, Building2, HandHeart, HeartHandshake, FileText, AlertCircle
 import { PasswordRequirements } from "@/components/password-requirements"
 import { isPasswordValid, isValidEmail } from "@/lib/password"
 import { useNeedCategories } from "@/lib/use-need-categories"
-import { GoogleSignInButton } from "@/components/google-sign-in-button"
-import { LinkedInSignInButton } from "@/components/linkedin-sign-in-button"
-import { MicrosoftSignInButton } from "@/components/microsoft-sign-in-button"
 import { TermsAgreementCheckbox } from "@/components/terms-agreement-checkbox"
 import { AgeConfirmationCheckbox } from "@/components/age-confirmation-checkbox"
 import { BackButton } from "@/components/back-button"
@@ -203,19 +200,9 @@ export default function RegisterPage() {
             <TermsAgreementCheckbox checked={agreedToTerms} onCheckedChange={setAgreedToTerms} />
             {role === "giver" && <AgeConfirmationCheckbox checked={confirmedAdult} onCheckedChange={setConfirmedAdult} />}
           </div>
-          <GoogleSignInButton label="Sign up with Google" intent={role === "organization" ? "org" : "giver"} onError={setErrorMsg} disabled={!agreementsMet} />
-          <LinkedInSignInButton label="Sign up with LinkedIn" intent={role === "organization" ? "org" : "giver"} onError={setErrorMsg} disabled={!agreementsMet} />
-          <MicrosoftSignInButton label="Sign up with Microsoft" intent={role === "organization" ? "org" : "giver"} onError={setErrorMsg} disabled={!agreementsMet} />
           <p className="text-center text-xs text-slate-400 dark:text-slate-500">
-            {role === "organization"
-              ? "Google/LinkedIn/Microsoft verify your email. You'll then add your organization's details and documents, and choose a password."
-              : "Google/LinkedIn/Microsoft verify your email. You'll then add your details and choose a password."}
+            Once registered, you can also sign in with Google, LinkedIn or Microsoft using the same email.
           </p>
-          <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-wider text-slate-400">
-            <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-            or fill in the form
-            <span className="h-px flex-1 bg-slate-200 dark:bg-slate-800" />
-          </div>
         </div>
       )}
 

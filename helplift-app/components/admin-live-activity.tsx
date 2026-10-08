@@ -47,7 +47,6 @@ const PAGE_NAMES: Record<string, string> = {
   "/gift-library": "Gift Library",
   "/organizations": "Organizations directory",
   "/profile": "Profile",
-  "/register/complete": "Finish registration",
   "/pending-verification": "Pending verification",
   "/suspended": "Suspended page",
   "/developers": "Developers page",

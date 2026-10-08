@@ -22,6 +22,28 @@ function areaFor(pathname: string): TooltipArea {
   return "site"
 }
 
+// "gift library" -> "Gift library"
+const sentence = (label: string) => label.charAt(0).toUpperCase() + label.slice(1)
+
+// A generic tooltip for buttons, links and tabs that have no wording in
+// lib/tooltips.ts. Labels and summaries (form fields, expanders) are skipped -
+// their text already explains them.
+function fallbackTip(node: Element, rawLabel: string): string | null {
+  const label = rawLabel.replace(/\s+/g, " ").trim()
+  if (!label || label.length > 40 || /^[\d\s.,:/+-]+$/.test(label)) return null
+  if (node.matches("label, summary")) return null
+  if (node.matches("[role='tab']")) return `Show ${label}`
+  if (node.matches("a[href]")) {
+    const href = node.getAttribute("href") || ""
+    if (href.startsWith("mailto:")) return `Email ${href.slice(7)}`
+    if (href.startsWith("tel:")) return `Call ${href.slice(4)}`
+    if (node.getAttribute("target") === "_blank") return `Open ${label} in a new tab`
+    if (href.startsWith("#")) return `Jump to ${label}`
+    return `Go to ${label}`
+  }
+  return sentence(label)
+}
+
 function findTip(start: EventTarget | null, area: TooltipArea): { el: Element; text: string } | null {
   let node = start instanceof Element ? start : null
   for (let depth = 0; node && depth < MAX_DEPTH && node !== document.body; depth += 1, node = node.parentElement) {
@@ -39,6 +61,12 @@ function findTip(start: EventTarget | null, area: TooltipArea): { el: Element; t
       const found = label ? resolveTooltip(label, area, interactive) : null
       if (found) return { el: node, text: found }
       if (interactive && aria && !text) return { el: node, text: aria }
+      // Nothing written for this one: fall back to a short description built
+      // from its own label, so every button and link has a tooltip.
+      if (interactive) {
+        const fallback = fallbackTip(node, aria || text)
+        if (fallback) return { el: node, text: fallback }
+      }
     }
     // The first interactive element is the target; never borrow a parent's tip.
     if (interactive) return null

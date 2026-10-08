@@ -2,9 +2,9 @@ import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { setSignupRole } from "@/lib/google-signup"
 import { methodFromProvider, recordLoginAttempt } from "@/lib/login-audit"
 import { logActivity } from "@/lib/activity-log"
+import { cleanUpUnfinishedSignups } from "@/lib/unfinished-signups"
 
 // Where Google and LinkedIn both send the person back to (through Supabase) -
 // one callback for every OAuth provider, since almost nothing here is
@@ -17,11 +17,12 @@ import { logActivity } from "@/lib/activity-log"
 //     (see lib/oauth-intent.ts) - "org" / "giver" when they had already picked
 //     a type on the Register page, "admin" from the admin portal, none from
 //     the normal Login page.
-//   * A BRAND-NEW account from any provider is created by the database as a
-//     giver whose registration is not complete. Either way they go to
-//     /register/complete to fill in the rest of the normal registration and
-//     choose a password. If they hadn't picked giver/organization yet (no
-//     intent), that page asks first.
+//   * Google, LinkedIn and Microsoft are for SIGNING IN only. Supabase creates
+//     an account as soon as someone approves the provider, so when there was
+//     no account for that email, the brand-new one is deleted straight away
+//     and the person is asked to register first - nothing is kept. (People who
+//     registered with their email can still use a provider with the same
+//     address: Supabase links it to their existing account.)
 //   * Existing accounts just sign in and land on their dashboard.
 //   * Administrators can only sign in from the admin portal, and only if an
 //     admin account already exists for that email. No provider can create one.
@@ -66,6 +67,9 @@ export async function GET(request: Request) {
     const code = searchParams.get("code")
     if (searchParams.get("error") || !code) return fail("oauth")
 
+    // Remove sign-ups abandoned more than 30 minutes ago (not this person's).
+    await cleanUpUnfinishedSignups()
+
     const supabase = await createClient()
     const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
     if (exchangeError) {
@@ -85,7 +89,15 @@ export async function GET(request: Request) {
       await supabase.auth.signOut()
       return fail("profile")
     }
-    const isNewSignUp = profile.registration_complete === false
+    // Did this sign-in just create the account? New provider accounts are
+    // flagged unfinished (registration_complete = false - see
+    // 20261008000100_unfinished_signup_cleanup.sql). As a fallback (e.g. before
+    // that migration), an account created moments ago with no email-and-password
+    // login is new too: everyone who registered with the form has one, so a
+    // real account is never mistaken for a new one.
+    const hasEmailLogin = (user.identities || []).some(identity => identity.provider === "email")
+    const createdJustNow = Date.now() - new Date(user.created_at).getTime() < 10 * 60 * 1000
+    const isNewSignUp = profile.registration_complete === false || (createdJustNow && !hasEmailLogin)
 
     // --- Administrators: admin portal only, existing accounts only ------------
     if (intent === "admin") {
@@ -107,17 +119,13 @@ export async function GET(request: Request) {
       return fail("admin")
     }
 
-    // --- New OAuth sign-up: finish registration ---------------------------------
+    // --- No account yet: providers can't create one ------------------------------
     if (isNewSignUp) {
-      if (intent === "org" || intent === "giver") {
-        const roleError = await setSignupRole(createAdminClient(), user, profile, intent === "org" ? "organization" : "giver")
-        if (roleError) {
-          console.warn("OAuth sign-up account type failed:", roleError)
-          return fail("oauth")
-        }
-      }
-      await audit("success", "New sign-up - sent to finish registration")
-      return NextResponse.redirect(`${base}/register/complete`)
+      await audit("unknown_account", `No account - ${method} can only be used to sign in`)
+      const { error: deleteError } = await createAdminClient().auth.admin.deleteUser(user.id)
+      if (deleteError) console.warn("OAuth sign-in: could not remove the unregistered account:", deleteError.message)
+      await supabase.auth.signOut()
+      return failTo("/login", "no_account")
     }
 
     // --- Existing account: straight to the dashboard -----------------------------

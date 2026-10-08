@@ -1,9 +1,8 @@
 import { UPLOAD_LIMITS } from "@/lib/upload-limits"
 
 // The optional picture chosen while registering: a giver's display picture or
-// an organization's logo. Used by app/api/register (email sign-up) and
-// app/api/register/complete (Google/LinkedIn/Microsoft sign-up). Saved with the
-// service role because at email sign-up there's no session yet. Both can be
+// an organization's logo. Used by app/api/register (the registration form).
+// Saved with the service role because at sign-up there's no session yet. Both can be
 // changed later from the dashboards (app/api/giver/avatar,
 // app/api/organization/profile).
 

@@ -10,7 +10,6 @@ const roleHome: Record<UserRole, string> = {
 }
 
 const protectedRoutes: { prefix: string; roles?: UserRole[] }[] = [
-  { prefix: "/register/complete", roles: ["giver", "organization"] },
   { prefix: "/givers-dashboard", roles: ["giver"] },
   { prefix: "/organisation-dashboard", roles: ["organization"] },
   { prefix: "/admin-dashboard", roles: ["admin"] },
@@ -95,15 +94,11 @@ export async function proxy(request: NextRequest) {
     if (matchedRoute.roles && !matchedRoute.roles.includes(role)) {
       return NextResponse.redirect(new URL(roleHome[role], request.url))
     }
-    // A giver or organization that signed up with Google must finish registration
-    // (details and a password) before using the site; once finished, the completion page is
-    // no longer available.
-    const onCompletionPage = pathname.startsWith("/register/complete")
-    if ((role === "giver" || role === "organization") && profile?.registration_complete === false && !onCompletionPage) {
-      return NextResponse.redirect(new URL("/register/complete", request.url))
-    }
-    if (onCompletionPage && profile?.registration_complete !== false) {
-      return NextResponse.redirect(new URL(roleHome[role], request.url))
+    // Google/LinkedIn/Microsoft are sign-in only. An unfinished account a
+    // provider created for someone who never registered is normally deleted at
+    // sign-in (app/auth/callback); if one is ever still signed in, remove it.
+    if ((role === "giver" || role === "organization") && profile?.registration_complete === false) {
+      return NextResponse.redirect(new URL("/auth/unfinished", request.url))
     }
     if (
       role === "organization" &&

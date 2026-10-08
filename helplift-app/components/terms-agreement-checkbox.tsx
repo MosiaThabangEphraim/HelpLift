@@ -2,11 +2,8 @@
 
 import Link from "next/link"
 
-// Required on every path that creates an account - the manual registration
-// form, the OAuth buttons on /register, and /register/complete (where an
-// OAuth sign-up actually finishes creating theirs - the only checkpoint that
-// covers someone who started from /login instead of /register, since /register's
-// own checkbox never sees them). Opens in a new tab so filling out a long
+// Required on the registration form (/register) - the only way to create an
+// account (Google/LinkedIn/Microsoft are sign-in only). Opens in a new tab so filling out a long
 // registration form isn't lost just to go read it.
 export function TermsAgreementCheckbox({
   checked,

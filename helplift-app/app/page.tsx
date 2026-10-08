@@ -163,6 +163,12 @@ export default function LandingPage() {
   const [contactEmail, setContactEmail] = useState("")
   const [contactMessage, setContactMessage] = useState("")
   const [contactTopic, setContactTopic] = useState("")
+  // Links like /?topic=account#contact (e.g. "HelpLift Support" on the
+  // verification pages) open the contact form with that topic chosen.
+  useEffect(() => {
+    const topic = new URLSearchParams(window.location.search).get("topic")
+    if (topic && CONTACT_TOPICS.some(entry => entry.id === topic)) setContactTopic(topic)
+  }, [])
   const [contactOtherTopic, setContactOtherTopic] = useState("")
   const [isSendingContact, setIsSendingContact] = useState(false)
   const [contactFeedback, setContactFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null)

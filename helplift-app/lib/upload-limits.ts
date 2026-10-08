@@ -22,7 +22,7 @@ const DOCS = ["pdf", "png", "jpg", "jpeg"]
 const OFFICE = ["pdf", "doc", "docx", "xls", "xlsx", "txt", "png", "jpg", "jpeg", "webp", "gif"]
 
 export const UPLOAD_LIMITS = {
-  /** Organization verification documents at registration (/register, /register/complete). */
+  /** Organization verification documents at registration (/register). */
   registrationDocuments: { maxFiles: 10, maxMB: 10, extensions: DOCS, kinds: "PDF, PNG or JPG" },
   /** One verification document at a time (dashboard Documents, /pending-verification). */
   organizationDocument: { maxFiles: 1, maxMB: 10, extensions: DOCS, kinds: "PDF, PNG or JPG" },

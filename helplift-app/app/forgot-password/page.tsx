@@ -122,7 +122,7 @@ export default function ForgotPasswordPage() {
 
               <div className="mt-12 text-center">
                 <p className="text-xs text-muted-foreground/60 leading-relaxed italic">
-                  Need organization verification assistance? Contact <span className="text-primary font-bold cursor-pointer hover:underline">HelpLift Support</span>.
+                  Need help? Contact <Link href="/?topic=account#contact" className="text-primary font-bold hover:underline">HelpLift Support</Link>.
                 </p>
               </div>
             </div>
@@ -164,12 +164,6 @@ export default function ForgotPasswordPage() {
         )}
       </main>
 
-      {/* FOOTER STRIP */}
-      <footer className="w-full py-8 text-center mt-auto">
-         <p className="text-[10px] text-muted-foreground/40 uppercase tracking-[0.2em]">
-            HelpLift Community Ecosystem • POPIA & GDPR Compliant
-         </p>
-      </footer>
     </div>
   )
 }

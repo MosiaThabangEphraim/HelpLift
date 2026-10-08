@@ -342,9 +342,9 @@ export default function AdminDashboardPage() {
       (async () => {
         try {
           const orgColumns = "id, profile_id, name, type, registration_number, contact_name, contact_role, contact_email, verification_status, verification_notes, phone, address, city, province, mission, bank_name, bank_account_holder, bank_account_number, bank_branch_code, bank_account_type, logo_url, created_at"
-          // profiles(registration_complete): a Google sign-up isn't a real
-          // registration until /register/complete is finished (see
-          // 20260920001000_google_signup_completion.sql) - hide those placeholder
+          // profiles(registration_complete): an account a Google/LinkedIn/
+          // Microsoft sign-in created for someone who never registered isn't a
+          // real registration (it's deleted - see app/auth/callback) - hide those placeholder
           // orgs until then. Falls back to no filtering if that migration hasn't
           // been applied yet.
           let { data, error: err } = await supabase
@@ -389,8 +389,8 @@ export default function AdminDashboardPage() {
           }
 
           const withGiverDetails = (data || [])
-            // A Google sign-up that hasn't finished /register/complete yet isn't a
-            // real account to moderate - same rule as organizations above.
+            // An unfinished account left by a provider sign-in isn't a real
+            // account to moderate - same rule as organizations above.
             .filter((profile: any) => profile.registration_complete !== false)
             .map((profile) => ({
               ...profile,

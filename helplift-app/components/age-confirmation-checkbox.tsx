@@ -1,9 +1,8 @@
 "use client"
 
-// Givers must be 18 or older. Required wherever a giver account is created -
-// the manual form and OAuth buttons on /register, and /register/complete (where
-// an OAuth sign-up actually finishes, including one started from /login). The
-// API routes enforce it too, so skipping the checkbox client-side doesn't help.
+// Givers must be 18 or older. Required on the registration form (/register) -
+// the only way to create an account. The API route enforces it too, so
+// skipping the checkbox client-side doesn't help.
 export function AgeConfirmationCheckbox({
   checked,
   onCheckedChange,
