@@ -608,7 +608,7 @@ export function PlatformSettingsAdmin() {
                   onClick={() => toggleBankActive(account)}
                   disabled={busyBankId === account.id}
                   data-tip={account.is_active ? "Hide this account from new donations, without affecting past ones" : "Offer this account to donors again"}
-                  className="rounded border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold hover:bg-slate-50 dark:hover:bg-[#1A2740] disabled:opacity-50"
+                  className="btn-pill btn-pill--neutral disabled:opacity-50"
                 >
                   {busyBankId === account.id ? <Loader2 className="w-3 h-3 animate-spin" /> : account.is_active ? "Retire" : "Reactivate"}
                 </button>
@@ -618,9 +618,9 @@ export function PlatformSettingsAdmin() {
                   disabled={busyBankId === account.id}
                   aria-label="Delete"
                   data-tip="Permanently delete this account - only works if no donation has ever used it"
-                  className="p-1.5 rounded text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-50"
+                  className="btn-delete"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -667,25 +667,25 @@ export function PlatformSettingsAdmin() {
               <div className="flex items-center gap-2 shrink-0">
                 {renamingId === category.id ? (
                   <>
-                    <button type="button" onClick={() => saveRename(category)} disabled={busyCategoryId === category.id} data-tip="Save this name - needs already using the old name are updated too" className="rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50">
+                    <button type="button" onClick={() => saveRename(category)} disabled={busyCategoryId === category.id} data-tip="Save this name - needs already using the old name are updated too" className="btn-pill btn-pill--blue disabled:opacity-50">
                       {busyCategoryId === category.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
                     </button>
                     <button type="button" onClick={() => setRenamingId(null)} data-tip="Discard this rename" className="text-xs font-bold text-slate-500">Cancel</button>
                   </>
                 ) : (
                   <>
-                    <button type="button" onClick={() => { setRenamingId(category.id); setRenameValue(category.name) }} data-tip="Rename this category" className="rounded border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold hover:bg-slate-50 dark:hover:bg-[#1A2740]">Rename</button>
+                    <button type="button" onClick={() => { setRenamingId(category.id); setRenameValue(category.name) }} data-tip="Rename this category" className="btn-pill btn-pill--neutral">Rename</button>
                     <button
                       type="button"
                       onClick={() => toggleCategoryActive(category)}
                       disabled={busyCategoryId === category.id}
                       data-tip={category.is_active ? "Hide this category from new needs, without affecting needs that already use it" : "Offer this category again"}
-                      className="rounded border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold hover:bg-slate-50 dark:hover:bg-[#1A2740] disabled:opacity-50"
+                      className="btn-pill btn-pill--neutral disabled:opacity-50"
                     >
                       {busyCategoryId === category.id ? <Loader2 className="w-3 h-3 animate-spin" /> : category.is_active ? "Retire" : "Reactivate"}
                     </button>
-                    <button type="button" onClick={() => deleteCategory(category)} disabled={busyCategoryId === category.id} aria-label="Delete" data-tip="Permanently delete this category - only works if no need uses it" className="p-1.5 rounded text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-50">
-                      <Trash2 className="w-3.5 h-3.5" />
+                    <button type="button" onClick={() => deleteCategory(category)} disabled={busyCategoryId === category.id} aria-label="Delete" data-tip="Permanently delete this category - only works if no need uses it" className="btn-delete">
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </>
                 )}

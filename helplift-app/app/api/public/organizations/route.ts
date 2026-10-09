@@ -34,9 +34,25 @@ export async function GET() {
       console.warn("Organization directory needs count warning:", needsErr)
     }
 
+    // Each organization's latest timeline post, for the directory card.
+    const latestPosts: Record<string, { id: string; post_type: string; title: string | null; body: string; created_at: string }> = {}
+    try {
+      const { data: postRows } = await supabase
+        .from("org_timeline_posts")
+        .select("id, organization_id, post_type, title, body, created_at")
+        .order("created_at", { ascending: false })
+        .limit(1000)
+      for (const row of postRows || []) {
+        if (!latestPosts[row.organization_id]) latestPosts[row.organization_id] = { id: row.id, post_type: row.post_type, title: row.title, body: row.body.slice(0, 220), created_at: row.created_at }
+      }
+    } catch (postsErr) {
+      console.warn("Organization directory timeline warning:", postsErr)
+    }
+
     const list = (organizations || []).map(({ profile_id, ...org }) => ({
       ...org,
       open_needs: openNeeds[org.id] || 0,
+      latest_post: latestPosts[org.id] || null,
       ...(user ? { message_recipient_id: profile_id, is_own: profile_id === user.id } : {}),
     }))
     return NextResponse.json({ success: true, organizations: list, signedIn: !!user })

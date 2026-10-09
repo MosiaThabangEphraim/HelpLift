@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { StatTile } from "@/components/analytics/chart-parts"
 import { RefreshButton } from "@/components/refresh-button"
 import { AdminDeleteButton } from "@/components/admin-delete-button"
+import { MobileFilterSelect } from "@/components/mobile-filter-select"
 import { TIP_OFF_STATUSES, tipOffCategoryLabel, type TipOffStatus } from "@/lib/tip-offs"
 
 // Admin Inquiries tab: everything sent in from outside the dashboards.
@@ -172,7 +173,7 @@ function TipOffItem({ tipOff, onSaved, onRemoved, onOpenOrganization }: {
               className="field min-h-16 text-xs"
             />
             <div className="flex items-center gap-3">
-              <button type="button" disabled={saving} onClick={() => save({ admin_notes: notes })} className="rounded bg-slate-900 dark:bg-slate-100 px-3 py-1.5 text-xs font-bold text-white dark:text-slate-900 disabled:opacity-50">
+              <button type="button" disabled={saving} onClick={() => save({ admin_notes: notes })} className="btn-pill btn-pill--dark-solid disabled:opacity-50">
                 {saving && !savingStatus ? <span className="inline-flex items-center gap-1.5"><Loader2 className="h-3 w-3 animate-spin" /> Saving...</span> : "Save notes"}
               </button>
               {message && <span className="text-xs font-semibold text-slate-500">{message}</span>}
@@ -240,7 +241,13 @@ function TipOffs({ refreshKey, onOpenOrganization }: { refreshKey: number; onOpe
           <RefreshButton onRefresh={load} />
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-center gap-2 max-md:flex-nowrap max-md:overflow-x-auto no-scrollbar max-md:pb-1 max-md:[&>*]:shrink-0">
+          <MobileFilterSelect
+            label="Show"
+            value={statusFilter}
+            options={[{ value: "open", label: "Open" }, { value: "all", label: "All" }, ...TIP_OFF_STATUSES.map(s => ({ value: s.value, label: s.label }))]}
+            onChange={value => setStatusFilter(value as typeof statusFilter)}
+          />
+          <div className="max-md:hidden flex flex-wrap items-center gap-2">
             {(["open", "all", ...TIP_OFF_STATUSES.map(s => s.value)] as const).map(value => (
               <button key={value} type="button" onClick={() => setStatusFilter(value)} aria-pressed={statusFilter === value} className={chipClass(statusFilter === value)}>
                 {value === "open" ? "Open" : value === "all" ? "All" : TIP_OFF_STATUSES.find(s => s.value === value)?.label}

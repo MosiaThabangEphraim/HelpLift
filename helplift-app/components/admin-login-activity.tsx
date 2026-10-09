@@ -1,11 +1,21 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { AlertTriangle, Download, Loader2, Search } from "lucide-react"
+import { AlertTriangle, Download, Loader2, Search, Trash2, X } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { StatTile } from "@/components/analytics/chart-parts"
 import { RefreshButton } from "@/components/refresh-button"
 import { downloadCsv, toCsv } from "@/lib/csv"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 // Admin Security tab: every sign-in attempt (successful or not) across all
 // methods and both portals - from app/api/admin/login-attempts.
@@ -78,6 +88,12 @@ export function AdminLoginActivity({ refreshKey = 0 }: { refreshKey?: number }) 
   const [days, setDays] = useState("7")
   const [search, setSearch] = useState("")
   const [query, setQuery] = useState("")
+  // An exact date/time range (datetime-local values); when set it replaces "Last N days".
+  const [from, setFrom] = useState("")
+  const [to, setTo] = useState("")
+  const [confirmClear, setConfirmClear] = useState(false)
+  const [isClearing, setIsClearing] = useState(false)
+  const [notice, setNotice] = useState("")
   // True while a filter change (or refresh) is fetching - shown on the chosen
   // filter and by dimming the table, so it's clear the click registered.
   const [isLoading, setIsLoading] = useState(true)
@@ -86,6 +102,8 @@ export function AdminLoginActivity({ refreshKey = 0 }: { refreshKey?: number }) 
     setIsLoading(true)
     try {
       const params = new URLSearchParams({ result, days, q: query })
+      if (from) params.set("from", new Date(from).toISOString())
+      if (to) params.set("to", new Date(to).toISOString())
       const res = await fetch(`/api/admin/login-attempts?${params}`)
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.message || "Could not load login activity.")
@@ -98,7 +116,24 @@ export function AdminLoginActivity({ refreshKey = 0 }: { refreshKey?: number }) 
     } finally {
       setIsLoading(false)
     }
-  }, [result, days, query])
+  }, [result, days, query, from, to])
+
+  const clearLog = async () => {
+    setIsClearing(true)
+    setError("")
+    try {
+      const res = await fetch("/api/admin/login-attempts", { method: "DELETE" })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.message || "Could not clear the login history.")
+      setNotice(`Cleared ${data.removed ?? 0} ${data.removed === 1 ? "entry" : "entries"}.`)
+      await load()
+    } catch (err: any) {
+      setError(err.message || "Could not clear the login history.")
+    } finally {
+      setIsClearing(false)
+      setConfirmClear(false)
+    }
+  }
 
   useEffect(() => { load() }, [load, refreshKey])
 
@@ -162,12 +197,22 @@ export function AdminLoginActivity({ refreshKey = 0 }: { refreshKey?: number }) 
             <CardDescription>Every sign-in attempt - password, Google, Microsoft, LinkedIn and passkeys, on both portals. Kept for 90 days.</CardDescription>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => { setNotice(""); setConfirmClear(true) }}
+              disabled={isClearing || !attempts?.length}
+              data-tip="Delete the whole login history"
+              className="btn-delete btn-delete--label h-9"
+            >
+              {isClearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              Clear log
+            </button>
             <RefreshButton onRefresh={load} />
             <button
               type="button"
               onClick={exportCsv}
               disabled={!attempts?.length}
-              className="inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740] disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 btn-pill btn-pill--neutral disabled:opacity-50"
             >
               <Download className="h-3.5 w-3.5" /> Export CSV
             </button>
@@ -181,12 +226,45 @@ export function AdminLoginActivity({ refreshKey = 0 }: { refreshKey?: number }) 
                 {value === "all" ? "All" : value === "failed" ? "Failed" : "Successful"}
               </button>
             ))}
-            <select value={days} onChange={e => setDays(e.target.value)} disabled={isLoading} aria-label="Time period" className="disabled:opacity-60 rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-2.5 py-1.5 text-xs font-semibold">
+            <select value={days} onChange={e => setDays(e.target.value)} disabled={isLoading || !!from || !!to} aria-label="Time period" data-tip={from || to ? "Using the From/To range instead" : undefined} className="disabled:opacity-60 rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-2.5 py-1.5 text-xs font-semibold">
               <option value="1">Last 24 hours</option>
               <option value="7">Last 7 days</option>
               <option value="30">Last 30 days</option>
               <option value="90">Last 90 days</option>
             </select>
+            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+              <label className="flex items-center gap-1.5">
+                From
+                <input
+                  type="datetime-local"
+                  value={from}
+                  max={to || undefined}
+                  onChange={e => setFrom(e.target.value)}
+                  aria-label="From date and time"
+                  className="rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-2 py-1 text-xs text-slate-700 dark:text-slate-200"
+                />
+              </label>
+              <label className="flex items-center gap-1.5">
+                To
+                <input
+                  type="datetime-local"
+                  value={to}
+                  min={from || undefined}
+                  onChange={e => setTo(e.target.value)}
+                  aria-label="To date and time"
+                  className="rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#0B1220] px-2 py-1 text-xs text-slate-700 dark:text-slate-200"
+                />
+              </label>
+              {(from || to) && (
+                <button
+                  type="button"
+                  onClick={() => { setFrom(""); setTo("") }}
+                  className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                >
+                  <X className="h-3 w-3" /> Clear dates
+                </button>
+              )}
+            </div>
             {isLoading && attempts !== null && (
               <span role="status" className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading...
@@ -203,7 +281,8 @@ export function AdminLoginActivity({ refreshKey = 0 }: { refreshKey?: number }) 
             </div>
           </div>
 
-          {error && <p className="text-sm font-semibold text-red-600 dark:text-red-400">{error} (Has the 20261006000100_login_attempts.sql migration been applied?)</p>}
+          {error && <p className="text-sm font-semibold text-red-600 dark:text-red-400">{error}</p>}
+          {notice && <p role="status" className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{notice}</p>}
 
           {attempts === null || (isLoading && attempts.length === 0) ? (
             <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-blue-600" /></div>
@@ -260,6 +339,27 @@ export function AdminLoginActivity({ refreshKey = 0 }: { refreshKey?: number }) 
           )}
         </CardContent>
       </Card>
+      <AlertDialog open={confirmClear} onOpenChange={open => { if (!isClearing) setConfirmClear(open) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear the whole login history?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes every sign-in attempt in the log, not just the ones shown by the current filters. It can&apos;t be undone, and the clearing itself will be recorded in Live activity.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isClearing}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={e => { e.preventDefault(); clearLog() }}
+              disabled={isClearing}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {isClearing && <Loader2 className="h-4 w-4 animate-spin" />}
+              Clear everything
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

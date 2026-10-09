@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server"
-import { createAdminClient } from "@/lib/supabase/admin"
+import { fileUrl } from "@/lib/file-links"
 import { requireAdmin } from "@/lib/require-admin"
 
 // Developer reports for the admin Dev reports tab, newest first, each proof
-// file with a short-lived (1 hour) signed link from the private bucket.
+// file with a permanent link (lib/file-links.ts) that signs a fresh URL when opened.
 export async function GET() {
   try {
     const auth = await requireAdmin()
@@ -15,12 +15,10 @@ export async function GET() {
       .order("created_at", { ascending: false })
       .limit(300)
     if (error) return NextResponse.json({ message: error.message, reports: [] }, { status: 400 })
-
-    const storage = createAdminClient().storage.from("developer-reports")
     const reports = await Promise.all((data || []).map(async report => {
       const files = Array.isArray(report.attachments) ? report.attachments : []
       const attachments = await Promise.all(files.map(async (file: any) => {
-        const { data: signed } = await storage.createSignedUrl(file.path, 3600)
+        const signed = { signedUrl: fileUrl("developer-reports", file.path) }
         return { name: file.name, type: file.type, size: file.size, url: signed?.signedUrl || null }
       }))
       return { ...report, attachments }

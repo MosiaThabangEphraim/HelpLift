@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState, FormEvent } from "react"
+import { fileUrl } from "@/lib/file-links"
 import { useTabTransition } from "@/lib/use-tab-transition"
 import { AdminDeleteButton } from "@/components/admin-delete-button"
 import { stageFormFiles } from "@/lib/stage-uploads"
@@ -13,6 +14,8 @@ import { recordSignOut } from "@/components/activity-tracker"
 import { showFeedback } from "@/lib/inline-feedback"
 import {
   Building2,
+  Check,
+  ChevronDown,
   CheckCircle2,
   ClipboardList,
   Loader2,
@@ -50,6 +53,7 @@ import {
   Activity,
   Code2,
   Flag,
+  RefreshCw,
   Inbox,
 } from "lucide-react"
 import {
@@ -111,6 +115,8 @@ import { AdminLoginActivity } from "@/components/admin-login-activity"
 import { AdminLiveActivity } from "@/components/admin-live-activity"
 import { AdminDeveloperReports } from "@/components/admin-developer-reports"
 import { AdminInquiries, type InquiriesView } from "@/components/admin-inquiries"
+import { DashboardSearch, platformSettingsSearchItems, settingsSearchItems, themeSearchItem, type DashboardSearchItem } from "@/components/dashboard-search"
+import { MobileAttentionGrid, MobileSectionHeading, MobileSectionNav, type MobileSection } from "@/components/mobile-section-nav"
 import { AdminFulfillmentsView, type AdminFulfillment } from "@/components/admin-fulfillments"
 import { PlatformSettingsAdmin } from "@/components/platform-settings-admin"
 import { MessageDetailDialog } from "@/components/message-detail-dialog"
@@ -543,7 +549,7 @@ export default function AdminDashboardPage() {
           const withAttachments = await Promise.all((data || []).map(async (item) => {
             let attachmentUrl: string | null = null
             const signedUrlPromise = item.attachment_storage_path
-              ? supabase.storage.from("message-attachments").createSignedUrl(item.attachment_storage_path, 60 * 60)
+              ? Promise.resolve({ data: { signedUrl: fileUrl("message-attachments", item.attachment_storage_path) } })
               : Promise.resolve({ data: null })
             const attachmentRowsPromise = supabase
               .from("notification_attachments")
@@ -553,7 +559,7 @@ export default function AdminDashboardPage() {
             const [{ data: signed }, { data: attachmentRows }] = await Promise.all([signedUrlPromise, attachmentRowsPromise])
             attachmentUrl = signed?.signedUrl || null
             const attachments = await Promise.all((attachmentRows || []).map(async (row) => {
-              const { data: rowSigned } = await supabase.storage.from("message-attachments").createSignedUrl(row.storage_path, 60 * 60)
+              const rowSigned = { signedUrl: fileUrl("message-attachments", row.storage_path) }
               return { id: row.id, file_name: row.file_name, url: rowSigned?.signedUrl || null }
             }))
             return { ...item, attachmentUrl, attachments }
@@ -657,8 +663,10 @@ export default function AdminDashboardPage() {
   const updateGift = async (id: string, status: "approved" | "rejected", rejection_reason?: string) => {
     if (status === "rejected" && rejection_reason === undefined) {
       setRejectDialog({
-        title: "Reject gift offering",
-        description: "The giver will be told their offering was rejected. You can add a message explaining why.",
+        title: gifts.find(g => g.id === id)?.status === "approved" ? "Remove from the Gift Library" : "Reject gift offering",
+        description: gifts.find(g => g.id === id)?.status === "approved"
+          ? "The offering comes out of the Gift Library and the giver is told. You can add a message explaining why."
+          : "The giver will be told their offering was rejected. You can add a message explaining why.",
         run: reason => updateGift(id, status, reason),
       })
       return
@@ -922,6 +930,7 @@ export default function AdminDashboardPage() {
   const unreadMessages = inboxMessages.filter(m => !m.read_at).length
   const unreadInquiries = messages.filter(m => isInquiry(m) && !m.read_at).length
   // Opening the tip-offs list counts as reading their alerts.
+  const selectSection = (value: string) => (value === "inquiries" && inquiriesView === "tip-offs" ? openTipOffs() : changeTab(value))
   const openTipOffs = () => {
     for (const m of messages) if (m.type === "tip_off" && !m.read_at) markMessageRead(m.id)
     setInquiriesView("tip-offs")
@@ -941,6 +950,64 @@ export default function AdminDashboardPage() {
   // listing awaiting approval - both need an admin's attention.
   const pendingGifts = gifts.filter(g => g.status === "pending" || g.claims.some(c => c.status === "pending")).length
   const pendingStories = stories.filter(s => s.status === "pending").length
+  // The Users tab's groups: chips on desktop, a dropdown on phones.
+  const usersViewOptions = [
+    { value: "organizations", label: "Organizations", icon: Building2, count: organizations.length, gradient: "from-blue-500 to-indigo-600", hint: "Verification and documents" },
+    { value: "givers", label: "Givers", icon: Heart, count: profiles.filter(p => p.role === "giver").length, gradient: "from-pink-500 to-rose-600", hint: "Individuals, businesses and groups" },
+    { value: "admins", label: "Admins", icon: ShieldCheck, count: profiles.filter(p => p.role === "admin").length, gradient: "from-slate-600 to-slate-800", hint: "The HelpLift team and invitations" },
+    { value: "people", label: "All users", icon: Users, count: profiles.length, gradient: "from-emerald-500 to-teal-600", hint: "Every account on HelpLift" },
+  ] as const
+  // Phones: a bottom bar + "More" sheet instead of the long tab row (components/mobile-section-nav.tsx).
+  const mobilePrimarySections: MobileSection[] = [
+    { id: "users", label: "Users", icon: Users, count: pendingApprovals, gradient: "from-blue-500 to-indigo-600", hint: "Organizations, givers and admins" },
+    { id: "needs", label: "Needs", icon: ClipboardList, count: needsAwaitingReview, gradient: "from-emerald-500 to-teal-600", hint: "Review, approve and reopen needs" },
+    { id: "donations", label: "Donations", icon: Banknote, count: pendingDonations, gradient: "from-amber-500 to-orange-500", hint: "Confirm EFT proof of payment" },
+    { id: "messages", label: "Messages", icon: Mail, count: unreadMessages, gradient: "from-sky-500 to-blue-600", hint: "Messages sent to the HelpLift team" },
+  ]
+  const mobileMoreSections: MobileSection[] = [
+    { id: "gifts", label: "Gift Library", icon: Gift, count: pendingGifts, gradient: "from-purple-500 to-fuchsia-600", hint: "Pledges and claims to review" },
+    { id: "withdrawals", label: "Withdrawals", icon: Wallet, count: pendingWithdrawals, gradient: "from-pink-500 to-rose-600", hint: "Pay out organizations" },
+    { id: "stories", label: "Impact Stories", icon: FileText, count: pendingStories, gradient: "from-violet-500 to-purple-600", hint: "Approve stories before they go live" },
+    { id: "fulfillments", label: "Fulfillments", icon: PackageCheck, gradient: "from-teal-500 to-cyan-600", hint: "Every delivery and its proof" },
+    { id: "inquiries", label: "Inquiries", icon: Inbox, count: unreadInquiries, gradient: "from-orange-500 to-red-500", hint: "Tip-offs and contact-form messages" },
+    { id: "reports", label: "Reports", icon: BarChart3, gradient: "from-indigo-500 to-blue-600", hint: "Totals, visits and charts" },
+    { id: "activity", label: "Live activity", icon: Activity, gradient: "from-emerald-500 to-green-600", hint: "Who's online and what they're doing" },
+    { id: "security", label: "Security", icon: ShieldCheck, gradient: "from-slate-600 to-slate-800", hint: "Every sign-in attempt" },
+    { id: "feedback", label: "Feedback", icon: Star, gradient: "from-amber-400 to-yellow-500", hint: "Ratings and ideas from users" },
+    { id: "dev-reports", label: "Dev reports", icon: Code2, gradient: "from-slate-500 to-blue-700", hint: "Bugs and ideas from the Developers page" },
+  ]
+  // Desktop "search anything" (components/dashboard-search.tsx): sections, actions and settings.
+  const openAdminSettings = () => { setSettingsMode("menu"); setSettingsMessage(""); setIsSettingsOpen(true) }
+  const openPlatformSettings = () => { setSettingsMessage(""); setSettingsMode("platform"); setIsSettingsOpen(true) }
+  const openUsersView = (view: typeof usersView) => { setUsersView(view); selectSection("users") }
+  const searchItems: DashboardSearchItem[] = [
+    ...[...mobilePrimarySections, ...mobileMoreSections].map(section => ({
+      id: `section-${section.id}`,
+      label: section.label,
+      group: "Sections" as const,
+      icon: section.icon,
+      hint: section.hint,
+      onSelect: () => selectSection(section.id),
+    })),
+    { id: "action-announce", label: "Send an announcement", group: "Actions", icon: Megaphone, keywords: "announcement banner notice broadcast email users login homepage", onSelect: () => setIsAnnouncing(true) },
+    { id: "action-settings", label: "Open Settings", group: "Actions", icon: Settings, keywords: "settings preferences options", onSelect: openAdminSettings },
+    { id: "action-refresh", label: "Refresh the dashboard", group: "Actions", icon: RefreshCw, keywords: "reload refresh update", onSelect: () => { refreshAll() } },
+    { id: "action-invite-admin", label: "Invite an administrator", group: "Actions", icon: Users, keywords: "invite admin add administrator team", onSelect: () => { setUsersView("admins"); selectSection("users") } },
+    { id: "action-organizations", label: "Review organizations", group: "Actions", icon: Building2, keywords: "verify approve organizations documents pending", onSelect: openOrganizations },
+    { id: "action-tip-offs", label: "Anonymous tip-offs", group: "Actions", icon: Flag, keywords: "tip off whistleblower report fraud", onSelect: () => openTipOffs() },
+    themeSearchItem,
+    { id: "action-home", label: "Go to the homepage", group: "Actions", icon: Home, keywords: "home homepage website", onSelect: () => router.push("/") },
+    ...settingsSearchItems(openAdminSettings, { editProfile: false, loginEmail: true, platform: true, emailNotifications: false, giverSpotlight: false, deleteAccount: false }),
+    // Inside other screens: Platform settings, the Users groups, Inquiries and announcements.
+    ...platformSettingsSearchItems(openPlatformSettings),
+    { id: "users-organizations", label: "Organizations (verification)", group: "Sections", icon: Building2, hint: "Users - organizations", keywords: "organizations verify approve documents pending", onSelect: () => openUsersView("organizations") },
+    { id: "users-givers", label: "Givers", group: "Sections", icon: Heart, hint: "Users - givers", keywords: "givers donors individuals businesses", onSelect: () => openUsersView("givers") },
+    { id: "users-admins", label: "Administrators", group: "Sections", icon: ShieldCheck, hint: "Users - admins and invitations", keywords: "admins administrators invite team", onSelect: () => openUsersView("admins") },
+    { id: "users-all", label: "All users", group: "Sections", icon: Users, hint: "Users - every account", keywords: "all users accounts people", onSelect: () => openUsersView("people") },
+    { id: "inquiries-contact", label: "Contact inquiries", group: "Sections", icon: Mail, hint: "Inquiries - homepage contact form", keywords: "contact form inquiry questions", onSelect: () => { setInquiriesView("contact"); selectSection("inquiries") } },
+    { id: "announce-banner", label: "Login page banner", group: "Actions", icon: Megaphone, hint: "Send an announcement", keywords: "login banner announcement notice", onSelect: () => setIsAnnouncing(true) },
+    { id: "announce-homepage", label: "Homepage notice", group: "Actions", icon: Megaphone, hint: "Send an announcement", keywords: "homepage notice announcement banner", onSelect: () => setIsAnnouncing(true) },
+  ]
   const totalDonated = donations.filter(d => d.status === "successful").reduce((sum, d) => sum + Number(d.amount || 0), 0)
 
   // The bell combines actual messages with everything else sitting in a
@@ -1022,11 +1089,12 @@ export default function AdminDashboardPage() {
   const unreadNotifications = notificationItems.filter(item => !item.read).length
 
   return (
-    <main className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100">
+    <main className="admin-readable min-h-screen bg-[#FAFAFA] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100 max-md:pb-24">
       <div className="mx-auto max-w-[2400px] px-4 md:px-10 py-6 md:py-14 space-y-6">
 
         {/* Greeting for the time of day, with the clock and date beside it. */}
         <div className="flex flex-wrap items-center justify-end max-md:flex-nowrap max-md:justify-between gap-x-8 max-md:gap-x-3 gap-y-3">
+          <DashboardSearch items={searchItems} placeholder="Search sections, actions and settings..." />
           <TimeGreeting name={profiles.find(p => p.email === ownEmail)?.full_name} firstNameOnly />
           <AnalogClock />
         </div>
@@ -1043,7 +1111,7 @@ export default function AdminDashboardPage() {
               <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Review platform verification, needs, gifts, and access.</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap max-md:flex-nowrap max-md:overflow-x-auto no-scrollbar max-md:w-full max-md:pb-1 max-md:[&>*]:shrink-0">
+          <div className="flex items-center gap-2 flex-wrap mobile-toolbar">
             <button
               onClick={() => setIsAnnouncing(true)}
               aria-label="Send an announcement"
@@ -1057,7 +1125,7 @@ export default function AdminDashboardPage() {
               data-tip="See who's online and what everyone is doing right now"
               onClick={() => changeTab("activity")}
               aria-pressed={activeTab === "activity"}
-              className={`inline-flex items-center gap-2 rounded border px-4 py-2 text-sm font-semibold transition-colors ${
+              className={`max-md:hidden inline-flex items-center gap-2 rounded border px-4 py-2 text-sm font-semibold transition-colors ${
                 activeTab === "activity"
                   ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
                   : "border-slate-200 dark:border-[#233350] text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
@@ -1080,7 +1148,7 @@ export default function AdminDashboardPage() {
                 onClick={() => changeTab(tab)}
                 aria-pressed={activeTab === tab}
                 data-tip={tip}
-                className={`inline-flex items-center gap-2 rounded border px-4 py-2 text-sm font-semibold transition-colors ${
+                className={`max-md:hidden inline-flex items-center gap-2 rounded border px-4 py-2 text-sm font-semibold transition-colors ${
                   activeTab === tab
                     ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
                     : "border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
@@ -1125,15 +1193,27 @@ export default function AdminDashboardPage() {
               <Home className="w-4 h-4" />
             </Link>
             <ThemeToggle className="h-9 w-9" />
-            <button onClick={logout} className="inline-flex items-center gap-2 rounded bg-slate-900 dark:bg-slate-100 px-4 py-2 text-sm font-semibold text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white">
-              <LogOut className="h-4 w-4" /> Sign out
+            <button onClick={logout} aria-label="Sign out" className="inline-flex items-center gap-2 rounded bg-slate-900 dark:bg-slate-100 px-4 py-2 max-md:h-9 max-md:w-9 max-md:justify-center max-md:px-0 text-sm font-semibold text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white">
+              <LogOut className="h-4 w-4" /> <span className="max-md:hidden">Sign out</span>
             </button>
           </div>
         </header>
 
         {/* --- STATS ROW: what needs an admin's attention right now, nothing
              that's just a total (those live in the Reports tab instead) --- */}
-        <div data-tour="admin-stats" className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-x-6 gap-y-4 max-md:flex max-md:overflow-x-auto no-scrollbar max-md:gap-x-4 max-md:[&>*]:w-[40%] max-md:[&>*]:shrink-0">
+        <MobileAttentionGrid
+          onSelect={selectSection}
+          items={[
+            { id: "users", label: "Approvals", value: pendingApprovals, icon: AlertTriangle, tone: "text-amber-600" },
+            { id: "needs", label: "Needs", value: needsAwaitingReview, icon: ClipboardList, tone: "text-emerald-600" },
+            { id: "gifts", label: "Gifts", value: pendingGifts, icon: Gift, tone: "text-purple-600" },
+            { id: "donations", label: "Donations", value: pendingDonations, icon: Banknote, tone: "text-amber-600" },
+            { id: "withdrawals", label: "Withdrawals", value: pendingWithdrawals, icon: Wallet, tone: "text-pink-600" },
+            { id: "stories", label: "Stories", value: pendingStories, icon: FileText, tone: "text-violet-600" },
+            { id: "messages", label: "Messages", value: unreadMessages, icon: Mail, tone: "text-blue-600" },
+          ]}
+        />
+        <div data-tour="admin-stats" className="max-md:hidden grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-x-6 gap-y-4">
           <StatCard icon={AlertTriangle} label="Pending Approvals" value={pendingApprovals} accent="amber" />
           <StatCard icon={ClipboardList} label="Needs Awaiting Review" value={needsAwaitingReview} accent="emerald" />
           <StatCard icon={Gift} label="Pending Gifts" value={pendingGifts} accent="blue" />
@@ -1144,8 +1224,10 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* --- TABS --- */}
-        <Tabs value={activeTab} onValueChange={value => (value === "inquiries" && inquiriesView === "tip-offs" ? openTipOffs() : changeTab(value))} className="gap-6">
-          <TabsList className="w-full flex-nowrap justify-start overflow-x-auto">
+        <Tabs value={activeTab} onValueChange={selectSection} className="gap-6 max-md:gap-4">
+          <MobileSectionHeading section={[...mobilePrimarySections, ...mobileMoreSections].find(section => section.id === activeTab)} />
+          <MobileSectionNav primary={mobilePrimarySections} more={mobileMoreSections} active={activeTab} onSelect={selectSection} />
+          <TabsList className="w-full flex-nowrap max-xl:flex-wrap max-xl:gap-y-1 justify-start overflow-x-auto max-md:hidden">
             <TabsTrigger value="needs" data-tour="tab-needs" className="shrink-0 gap-1.5 px-2.5"><ClipboardList className="w-4 h-4" />Needs<CountBadge value={needsAwaitingReview} /></TabsTrigger>
             <TabsTrigger value="gifts" className="shrink-0 gap-1.5 px-2.5"><Gift className="w-4 h-4" />Gift Library<CountBadge value={pendingGifts} /></TabsTrigger>
             <TabsTrigger value="donations" data-tour="tab-donations" className="shrink-0 gap-1.5 px-2.5"><Banknote className="w-4 h-4" />Donations<CountBadge value={pendingDonations} /></TabsTrigger>
@@ -1174,7 +1256,7 @@ export default function AdminDashboardPage() {
             <AdminFeedback refreshKey={refreshKey} />
           </TabsContent>
           <TabsContent value="fulfillments" className={tabMotion}>
-            <AdminFulfillmentsView fulfillments={fulfillments} onDelete={deleteFulfillmentRecord} />
+            <AdminFulfillmentsView fulfillments={fulfillments} onDelete={deleteFulfillmentRecord} onChanged={loadData} />
           </TabsContent>
           <TabsContent value="stories" className={tabMotion}>
             <StoriesView stories={stories} onReview={reviewStory} onDeleted={afterDelete} />
@@ -1197,13 +1279,54 @@ export default function AdminDashboardPage() {
             />
           </TabsContent>
           <TabsContent value="users" className={`space-y-6 ${tabMotion}`}>
-            <div className="flex flex-wrap items-center gap-2 max-md:flex-nowrap max-md:overflow-x-auto no-scrollbar max-md:pb-1 max-md:[&>*]:shrink-0" role="group" aria-label="Users view">
-              {([
-                { value: "organizations", label: "Organizations", icon: Building2, count: organizations.length },
-                { value: "givers", label: "Givers", icon: Heart, count: profiles.filter(p => p.role === "giver").length },
-                { value: "admins", label: "Admins", icon: ShieldCheck, count: profiles.filter(p => p.role === "admin").length },
-                { value: "people", label: "All users", icon: Users, count: profiles.length },
-              ] as const).map(option => (
+            {/* Phones: one dropdown to pick the group. */}
+            {(() => {
+              const current = usersViewOptions.find(option => option.value === usersView) || usersViewOptions[0]
+              return (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label={`Showing ${current.label}. Change group`}
+                      className="md:hidden flex w-full items-center gap-3 rounded-2xl bg-white dark:bg-[#121B2E] px-3 py-2.5 text-left shadow-sm"
+                    >
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${current.gradient} text-white`}>
+                        <current.icon className="h-4 w-4" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[11px] font-semibold text-slate-500 dark:text-slate-400">Showing</span>
+                        <span className="block truncate text-sm font-bold">{current.label} <span className="font-semibold text-slate-400">({current.count})</span></span>
+                      </span>
+                      {current.value === "organizations" && <CountBadge value={pendingApprovals} />}
+                      <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" sideOffset={6} className="md:hidden w-(--radix-dropdown-menu-trigger-width) rounded-2xl border-0 p-1.5 shadow-xl">
+                    {usersViewOptions.map(option => (
+                      <DropdownMenuItem
+                        key={option.value}
+                        onSelect={() => setUsersView(option.value)}
+                        className={`flex items-center gap-3 rounded-xl px-2.5 py-2 ${usersView === option.value ? "bg-blue-50 dark:bg-blue-950/50" : ""}`}
+                      >
+                        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${option.gradient} text-white`}>
+                          <option.icon className="h-4 w-4" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-bold">{option.label}</span>
+                          <span className="block text-[11px] text-slate-500 dark:text-slate-400">{option.hint}</span>
+                        </span>
+                        {option.value === "organizations" && <CountBadge value={pendingApprovals} />}
+                        <span className="text-xs font-semibold text-slate-400">{option.count}</span>
+                        {usersView === option.value && <Check className="h-4 w-4 text-blue-600" />}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )
+            })()}
+
+            <div className="max-md:hidden flex flex-wrap items-center gap-2" role="group" aria-label="Users view">
+              {usersViewOptions.map(option => (
                 <button
                   key={option.value}
                   type="button"
@@ -1586,6 +1709,7 @@ export default function AdminDashboardPage() {
       />
 
       <OrganizationDetailDialog
+        onDeleted={async () => { setSelectedOrgDetail(null); await afterDelete() }}
         open={!!selectedOrgDetail}
         onOpenChange={(open) => !open && setSelectedOrgDetail(null)}
         organization={selectedOrgDetail}
@@ -1749,11 +1873,12 @@ function OrganizationsView({ organizations, documents, onUpdate, onEdit, onMessa
           <article key={org.id} role="button" tabIndex={0} onClick={() => onSelect(org)} onKeyDown={activateOnKey} className="row cursor-pointer">
             <div>
               <h3 className="font-bold text-base">{org.name}</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 break-all">
+              <p className="text-sm text-slate-500 dark:text-slate-400 break-all max-md:hidden">
                 {org.type} · {org.contact_email} · {orgDocuments.length} document{orgDocuments.length === 1 ? "" : "s"} · Registered {new Date(org.created_at).toLocaleDateString()}
               </p>
+              <p className="md:hidden truncate text-sm text-slate-500 dark:text-slate-400">{org.type} · {[org.city, org.province].filter(Boolean).join(", ") || org.contact_email}</p>
               {(org.city || org.province || org.phone) && (
-                <p className="text-[11px] text-slate-400 mt-0.5">
+                <p className="max-md:hidden text-[11px] text-slate-400 mt-0.5">
                   {[org.city, org.province].filter(Boolean).join(", ")}
                   {org.phone ? ` · Tel: ${org.phone}` : ""}
                 </p>
@@ -1762,42 +1887,42 @@ function OrganizationsView({ organizations, documents, onUpdate, onEdit, onMessa
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setViewingDocsOrg(org) }}
-                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:underline bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 rounded"
+                  className="max-md:hidden mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:underline bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 rounded"
                 >
                   <FileText className="w-3.5 h-3.5" /> View Documents ({orgDocuments.length})
                 </button>
               )}
               {org.verification_notes && (
-                <p className="mt-2 text-xs italic text-amber-700 dark:text-amber-400">Last note: {org.verification_notes}</p>
+                <p className="mt-2 text-xs italic text-amber-700 dark:text-amber-400 max-md:line-clamp-1">Last note: {org.verification_notes}</p>
               )}
             </div>
             <div className="flex items-center gap-2 flex-wrap justify-end" onClick={(e) => e.stopPropagation()}>
               <button
                 type="button"
                 onClick={() => onEdit(org)}
-                className="inline-flex items-center gap-1 rounded border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                className="max-md:hidden inline-flex items-center gap-1 btn-pill btn-pill--neutral"
               >
                 <Pencil className="w-3 h-3" /> Edit
               </button>
               <button
                 type="button"
                 onClick={() => onMessage(org)}
-                className="inline-flex items-center gap-1 rounded border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                className="max-md:hidden inline-flex items-center gap-1 btn-pill btn-pill--neutral"
               >
                 <MessageSquare className="w-3 h-3" /> Message
               </button>
-              <span className="rounded bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-xs font-bold capitalize">{org.verification_status.replace(/_/g, " ")}</span>
+              <span className="rounded-full bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-xs font-bold capitalize">{org.verification_status.replace(/_/g, " ")}</span>
               {(org.verification_status === "pending" || org.verification_status === "more_info_requested") && (
                 <>
                   <button
                     onClick={() => run(org.id, "approve", () => onUpdate(org.id, "approved"))}
                     disabled={busy?.id === org.id}
-                    className="inline-flex items-center gap-1.5 rounded bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+                    className="inline-flex items-center gap-1.5 btn-pill btn-pill--green disabled:opacity-60"
                   >
                     {busy?.id === org.id && busy.action === "approve" && <Loader2 className="w-3 h-3 animate-spin" />}
                     Approve
                   </button>
-                  <button onClick={() => onUpdate(org.id, "rejected")} disabled={busy?.id === org.id} className="rounded bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-60">Reject</button>
+                  <button onClick={() => onUpdate(org.id, "rejected")} disabled={busy?.id === org.id} className="btn-pill btn-pill--red disabled:opacity-60">Reject</button>
                   {requestingInfoId === org.id ? (
                     <div className="flex items-center gap-2 w-full mt-2 basis-full">
                       <input
@@ -1813,14 +1938,14 @@ function OrganizationsView({ organizations, documents, onUpdate, onEdit, onMessa
                           run(org.id, "info", async () => { await onUpdate(org.id, "more_info_requested", notes); setRequestingInfoId(null); setInfoNotes("") })
                         }}
                         disabled={busy?.id === org.id}
-                        className="inline-flex items-center gap-1.5 rounded bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 shrink-0 disabled:opacity-60"
+                        className="inline-flex items-center gap-1.5 btn-pill btn-pill--amber-solid shrink-0 disabled:opacity-60"
                       >
                         {busy?.id === org.id && busy.action === "info" && <Loader2 className="w-3 h-3 animate-spin" />}
                         Send request
                       </button>
                     </div>
                   ) : (
-                    <button onClick={() => setRequestingInfoId(org.id)} className="rounded border border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-400 px-3 py-1.5 text-xs font-bold hover:bg-amber-50 dark:hover:bg-amber-950/30">Request Info</button>
+                    <button onClick={() => setRequestingInfoId(org.id)} className="btn-pill btn-pill--amber">Request Info</button>
                   )}
                 </>
               )}
@@ -1872,7 +1997,7 @@ function OrganizationsView({ organizations, documents, onUpdate, onEdit, onMessa
 }
 
 function OrganizationDetailDialog({
-  open, onOpenChange, organization, documents, history, onEdit, onMessage, onUpdate,
+  open, onOpenChange, organization, documents, history, onEdit, onMessage, onUpdate, onDeleted,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -1882,6 +2007,7 @@ function OrganizationDetailDialog({
   onEdit: (org: Organization) => void
   onMessage: (org: Organization) => void
   onUpdate: (id: string, status: Organization["verification_status"], verification_notes?: string) => Promise<void> | void
+  onDeleted?: () => Promise<void> | void
 }) {
   const [showRequestInfo, setShowRequestInfo] = useState(false)
   const [infoNotes, setInfoNotes] = useState("")
@@ -1896,7 +2022,11 @@ function OrganizationDetailDialog({
   if (!organization) return null
   const orgDocuments = documents.filter(d => d.organization_id === organization.id)
   const orgHistory = history.filter(h => h.organization_id === organization.id)
-  const canModerate = organization.verification_status === "pending" || organization.verification_status === "more_info_requested"
+  // Every status can be changed: pending ones reviewed, approved ones revoked
+  // (e.g. after a confirmed tip-off) and rejected ones reconsidered.
+  const canModerate = true
+  const isApproved = organization.verification_status === "approved"
+  const isRejected = organization.verification_status === "rejected"
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -2030,12 +2160,13 @@ function OrganizationDetailDialog({
           </div>
 
           <DialogFooter className="pt-2 gap-2 flex-wrap">
-            <Button type="button" variant="outline" onClick={() => onMessage(organization)}>
-              <MessageSquare className="w-4 h-4" /> Message
-            </Button>
-            <Button type="button" variant="outline" onClick={() => onEdit(organization)}>
-              <Pencil className="w-4 h-4" /> Edit
-            </Button>
+            <AdminDeleteButton kind="organization" id={organization.id} iconOnly={false} label="Delete organization" className="mr-auto h-9" onDeleted={() => onDeleted?.()} />
+            <button type="button" onClick={() => onMessage(organization)} className="btn-pill btn-pill--neutral h-9">
+              <MessageSquare /> Message
+            </button>
+            <button type="button" onClick={() => onEdit(organization)} className="btn-pill btn-pill--neutral h-9">
+              <Pencil /> Edit
+            </button>
           </DialogFooter>
 
           {canModerate && (
@@ -2058,25 +2189,24 @@ function OrganizationDetailDialog({
               )}
               <DialogFooter className="pt-2 gap-2 flex-wrap">
                 {showRequestInfo ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => infoNotes.trim() && onUpdate(organization.id, "more_info_requested", infoNotes.trim())}
-                    className="text-amber-700 border-amber-300 hover:bg-amber-50 dark:border-amber-800 dark:hover:bg-amber-950/30"
-                  >
+                  <button type="button" onClick={() => infoNotes.trim() && onUpdate(organization.id, "more_info_requested", infoNotes.trim())} className="btn-pill btn-pill--amber-solid h-9">
                     Send request
-                  </Button>
+                  </button>
                 ) : (
-                  <Button type="button" variant="outline" onClick={() => setShowRequestInfo(true)} className="text-amber-700 border-amber-300 hover:bg-amber-50 dark:border-amber-800 dark:hover:bg-amber-950/30">
+                  <button type="button" onClick={() => setShowRequestInfo(true)} className="btn-pill btn-pill--amber h-9">
                     Request Info
-                  </Button>
+                  </button>
                 )}
-                <Button type="button" variant="outline" onClick={() => onUpdate(organization.id, "rejected")} className="text-red-600 border-red-200 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/30">
-                  Reject
-                </Button>
-                <Button type="button" onClick={() => onUpdate(organization.id, "approved")} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                  Approve
-                </Button>
+                {!isRejected && (
+                  <button type="button" onClick={() => onUpdate(organization.id, "rejected")} data-tip={isApproved ? "Remove this organization's verification - its needs come off the platform until it's approved again" : undefined} className="btn-pill btn-pill--red h-9">
+                    {isApproved ? "Revoke verification" : "Reject"}
+                  </button>
+                )}
+                {!isApproved && (
+                  <button type="button" onClick={() => onUpdate(organization.id, "approved")} className="btn-pill btn-pill--green h-9">
+                    {isRejected ? "Reconsider & approve" : "Approve"}
+                  </button>
+                )}
               </DialogFooter>
             </div>
           )}
@@ -2091,6 +2221,9 @@ function NeedsView({ needs, onUpdate, onDelete, onSelect }: { needs: Need[]; onU
   const [sort, setSort] = useState("newest")
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState("")
+  // Closing a live need (open or in progress), with an optional reason for the organization.
+  const [closingId, setClosingId] = useState<string | null>(null)
+  const [closeReason, setCloseReason] = useState("")
   const [busy, setBusy] = useState<{ id: string; action: string } | null>(null)
   const run = async (id: string, action: string, fn: () => void | Promise<void>) => {
     setBusy({ id, action })
@@ -2162,19 +2295,19 @@ function NeedsView({ needs, onUpdate, onDelete, onSelect }: { needs: Need[]; onU
             </div>
             <p className="text-sm text-slate-500 dark:text-slate-400">{firstOf(need.organizations)?.name || "Organization"} · {need.category}</p>
             {need.status === "rejected" && need.rejection_reason && (
-              <p className="mt-1 text-xs italic text-red-700 dark:text-red-400">Reason: {need.rejection_reason}</p>
+              <p className="mt-1 text-xs italic text-red-700 dark:text-red-400 max-md:line-clamp-1">Reason: {need.rejection_reason}</p>
             )}
             {isReopenRequest && need.reopen_reason && (
-              <p className="mt-1 text-xs italic text-purple-700 dark:text-purple-400">Motivation: {need.reopen_reason}</p>
+              <p className="mt-1 text-xs italic text-purple-700 dark:text-purple-400 max-md:line-clamp-1">Motivation: {need.reopen_reason}</p>
             )}
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end" onClick={e => e.stopPropagation()}>
-            <span className="rounded bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-xs font-bold capitalize">{need.status.replace(/_/g, " ")}</span>
+            <span className="rounded-full bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-xs font-bold capitalize">{need.status.replace(/_/g, " ")}</span>
             {canModerate && (
               <button
                 onClick={() => run(need.id, "approve", () => onUpdate(need.id, "open"))}
                 disabled={busy?.id === need.id}
-                className="inline-flex items-center gap-1.5 rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 btn-pill btn-pill--blue disabled:opacity-60"
               >
                 {busy?.id === need.id && busy.action === "approve" && <Loader2 className="w-3 h-3 animate-spin" />}
                 {isReopenRequest ? "Approve reopen" : "Approve & Publish"}
@@ -2195,14 +2328,48 @@ function NeedsView({ needs, onUpdate, onDelete, onSelect }: { needs: Need[]; onU
                       run(need.id, "reject", async () => { await onUpdate(need.id, isReopenRequest ? "closed" : "rejected", reason); setRejectingId(null); setRejectReason("") })
                     }}
                     disabled={busy?.id === need.id}
-                    className="inline-flex items-center gap-1.5 rounded bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 shrink-0 disabled:opacity-60"
+                    className="inline-flex items-center gap-1.5 btn-pill btn-pill--red-solid shrink-0 disabled:opacity-60"
                   >
                     {busy?.id === need.id && busy.action === "reject" && <Loader2 className="w-3 h-3 animate-spin" />}
                     {isReopenRequest ? "Confirm decline" : "Confirm reject"}
                   </button>
                 </div>
               ) : (
-                <button onClick={() => setRejectingId(need.id)} disabled={busy?.id === need.id} className="rounded border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 px-3 py-1.5 text-xs font-bold hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-60">{isReopenRequest ? "Decline" : "Reject"}</button>
+                <button onClick={() => setRejectingId(need.id)} disabled={busy?.id === need.id} className="btn-pill btn-pill--red disabled:opacity-60">{isReopenRequest ? "Decline" : "Reject"}</button>
+              )
+            )}
+            {(need.status === "open" || need.status === "in_progress") && (
+              closingId === need.id ? (
+                <div className="flex items-center gap-2 w-full mt-2 basis-full">
+                  <input
+                    value={closeReason}
+                    onChange={e => setCloseReason(e.target.value)}
+                    placeholder="Why is it being closed? (optional, shared with the organization)"
+                    className="field flex-1 text-xs py-2"
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => {
+                      const reason = closeReason.trim() || undefined
+                      run(need.id, "close", async () => { await onUpdate(need.id, "closed", reason); setClosingId(null); setCloseReason("") })
+                    }}
+                    disabled={busy?.id === need.id}
+                    className="inline-flex items-center gap-1.5 btn-pill btn-pill--dark-solid shrink-0 disabled:opacity-60"
+                  >
+                    {busy?.id === need.id && busy.action === "close" && <Loader2 className="w-3 h-3 animate-spin" />}
+                    Confirm close
+                  </button>
+                  <button onClick={() => { setClosingId(null); setCloseReason("") }} className="text-xs font-bold text-slate-500 shrink-0">Cancel</button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setClosingId(need.id)}
+                  disabled={busy?.id === need.id}
+                  data-tip="Close this need so it stops taking offers and donations. The organization and its givers are notified."
+                  className="inline-flex items-center gap-1.5 btn-pill btn-pill--neutral disabled:opacity-60"
+                >
+                  <XCircle className="w-3.5 h-3.5" /> Close need
+                </button>
               )
             )}
             <AdminDeleteButton kind="need" id={need.id} onDeleted={() => onDelete(need.id)} />
@@ -2281,7 +2448,7 @@ function GiftsView({ gifts, onUpdate, onSelect, onDeleted }: { gifts: AdminGift[
               <img
                 src={gift.photos[0].url}
                 alt={gift.title}
-                className="w-16 h-16 object-cover rounded border border-slate-200 dark:border-[#233350] shrink-0"
+                className="w-16 h-16 max-md:w-12 max-md:h-12 object-cover rounded border border-slate-200 dark:border-[#233350] shrink-0"
               />
             )}
             <div className="space-y-1 min-w-0">
@@ -2291,8 +2458,8 @@ function GiftsView({ gifts, onUpdate, onSelect, onDeleted }: { gifts: AdminGift[
                 {gift.offering_type}
               </span>
             </div>
-            <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">{gift.description}</p>
-            <p className="text-xs text-slate-400">Pledged by: {gift.givers?.name || "Giver"} ({gift.givers?.email || "No email"})</p>
+            <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 max-md:hidden">{gift.description}</p>
+            <p className="text-xs text-slate-400 max-md:truncate">Pledged by: {gift.givers?.name || "Giver"}<span className="max-md:hidden"> ({gift.givers?.email || "No email"})</span></p>
             {gift.status === "claimed" && gift.organizations?.name && (
               <p className="text-xs font-semibold text-blue-600 dark:text-blue-400">Claimed by: {gift.organizations.name}</p>
             )}
@@ -2315,7 +2482,7 @@ function GiftsView({ gifts, onUpdate, onSelect, onDeleted }: { gifts: AdminGift[
                 <span data-tip="This pledge is approved automatically once its donation is confirmed - it isn't reviewed here" className="rounded bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
                   Awaiting payment
                 </span>
-                <button onClick={() => onUpdate(gift.id, "rejected")} disabled={busy?.id === gift.id} data-tip="Cancel this pledge, e.g. if it was abandoned and will never be paid" className="rounded bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-60">Cancel</button>
+                <button onClick={() => onUpdate(gift.id, "rejected")} disabled={busy?.id === gift.id} data-tip="Cancel this pledge, e.g. if it was abandoned and will never be paid" className="btn-pill btn-pill--red disabled:opacity-60">Cancel</button>
               </>
             )}
             {gift.status === "pending" && gift.offering_type !== "financial" && (
@@ -2323,15 +2490,26 @@ function GiftsView({ gifts, onUpdate, onSelect, onDeleted }: { gifts: AdminGift[
                 <button
                   onClick={() => run(gift.id, "approve", () => onUpdate(gift.id, "approved"))}
                   disabled={busy?.id === gift.id}
-                  className="inline-flex items-center gap-1.5 rounded bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+                  className="inline-flex items-center gap-1.5 btn-pill btn-pill--green disabled:opacity-60"
                 >
                   {busy?.id === gift.id && busy.action === "approve" && <Loader2 className="w-3 h-3 animate-spin" />}
                   Approve
                 </button>
-                <button onClick={() => onUpdate(gift.id, "rejected")} disabled={busy?.id === gift.id} className="rounded bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-60">Reject</button>
+                <button onClick={() => onUpdate(gift.id, "rejected")} disabled={busy?.id === gift.id} className="btn-pill btn-pill--red disabled:opacity-60">Reject</button>
               </>
             )}
-            <AdminDeleteButton kind="gift" id={gift.id} onDeleted={onDeleted} />
+            {gift.status === "approved" && gift.offering_type !== "financial" && (
+              <button
+                onClick={() => onUpdate(gift.id, "rejected")}
+                disabled={busy?.id === gift.id}
+                data-tip="Take this offering out of the Gift Library. The giver is told, with your reason."
+                className="btn-pill btn-pill--neutral disabled:opacity-60"
+              >
+                <XCircle /> Remove from library
+              </button>
+            )}
+            {/* Financial pledges are money, so they're never deleted (lib/admin-delete.ts). */}
+            {gift.offering_type !== "financial" && <AdminDeleteButton kind="gift" id={gift.id} onDeleted={onDeleted} />}
           </div>
         </article>
         )
@@ -2428,7 +2606,7 @@ function DonationsView({ donations, onSelect, onDeleted }: { donations: AdminDon
               {item.is_platform_donation && <span className="rounded bg-pink-50 px-2 py-0.5 text-[10px] font-bold text-pink-700">Platform Support</span>}
             </h3>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              {item.is_platform_donation ? "HelpLift" : orgName || "General Fund"} · {donorName || "Donor"} ({donorEmail}) · Ref: {item.reference_code}
+              {item.is_platform_donation ? "HelpLift" : orgName || "General Fund"} · {donorName || "Donor"}<span className="max-md:hidden"> ({donorEmail}) · Ref: {item.reference_code}</span>
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -2485,7 +2663,7 @@ function WithdrawalProofUpload({ withdrawal, onUploadProof }: { withdrawal: Admi
         type="button"
         onClick={submit}
         disabled={!file || isUploading}
-        className="inline-flex items-center gap-1.5 rounded bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+        className="inline-flex items-center gap-1.5 btn-pill btn-pill--green disabled:opacity-50"
       >
         {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UploadCloud className="w-3.5 h-3.5" />}
         Attach proof & mark paid
@@ -2590,12 +2768,12 @@ function WithdrawalsView({
                   <button
                     onClick={() => run(w.id, "approve", () => onReview(w.id, "approved"))}
                     disabled={busy?.id === w.id}
-                    className="inline-flex items-center gap-1.5 rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-60"
+                    className="inline-flex items-center gap-1.5 btn-pill btn-pill--blue disabled:opacity-60"
                   >
                     {busy?.id === w.id && busy.action === "approve" && <Loader2 className="w-3 h-3 animate-spin" />}
                     Approve
                   </button>
-                  <button onClick={() => onReview(w.id, "rejected")} disabled={busy?.id === w.id} className="rounded border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 px-3 py-1.5 text-xs font-bold hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-60">Decline</button>
+                  <button onClick={() => onReview(w.id, "rejected")} disabled={busy?.id === w.id} className="btn-pill btn-pill--red disabled:opacity-60">Decline</button>
                 </>
               )}
             </div>
@@ -2745,38 +2923,41 @@ function UsersView({ profiles, onEdit, onMessage, onSelect }: { profiles: Profil
           tabIndex={0}
           onClick={() => onSelect(profile)}
           onKeyDown={activateOnKey}
-          className="row cursor-pointer hover:border-blue-300 dark:hover:border-blue-800 transition-colors"
+          className="row row-compact cursor-pointer hover:border-blue-300 dark:hover:border-blue-800 transition-colors"
         >
-          <div>
-            <h3 className="font-bold flex items-center gap-2">
+          <div className="min-w-0">
+            <h3 className="font-bold flex items-center gap-2 max-md:truncate">
               {profile.full_name}
               {profile.suspended && (
                 <span className="rounded bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-400 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">Suspended</span>
               )}
             </h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 break-all">
-              {profile.email}
-              {profile.phone && ` · ${profile.phone}`}
-              {profile.account_type && ` · ${profile.account_type} account`}
-              {` · Joined ${new Date(profile.created_at).toLocaleDateString()}`}
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              <span className="break-all max-md:block max-md:truncate max-md:break-normal">{profile.email}</span>
+              {profile.phone && <span className="max-md:hidden"> · {profile.phone}</span>}
+              <span className="max-md:hidden"> · </span>
+              <span className="max-md:hidden">
+                {profile.account_type && <span className="capitalize">{profile.account_type} account · </span>}
+                Joined {new Date(profile.created_at).toLocaleDateString()}
+              </span>
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onEdit(profile) }}
-              className="inline-flex items-center gap-1 rounded border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+              className="max-md:hidden inline-flex items-center gap-1 btn-pill btn-pill--neutral"
             >
               <Pencil className="w-3 h-3" /> Edit
             </button>
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onMessage(profile) }}
-              className="inline-flex items-center gap-1 rounded border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+              className="max-md:hidden inline-flex items-center gap-1 btn-pill btn-pill--neutral"
             >
               <MessageSquare className="w-3 h-3" /> Message
             </button>
-            <span className="rounded bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-xs font-bold capitalize">{profile.role}</span>
+            <span className="rounded-full bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-xs font-bold capitalize">{profile.role}</span>
           </div>
         </article>
       ))}
@@ -3004,7 +3185,7 @@ function SiteVisitsPanel({ refreshKey = 0 }: { refreshKey?: number }) {
               key={preset.label}
               type="button"
               onClick={() => setRange(quickVisitRange(preset.days))}
-              className="rounded bg-slate-100 dark:bg-[#1A2740] px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350]"
+              className="btn-pill btn-pill--neutral"
             >
               {preset.label}
             </button>
@@ -3649,7 +3830,7 @@ function StoriesView({ stories, onReview, onDeleted }: { onDeleted: () => void |
                   <button
                     onClick={() => run(story.id, "approve", () => onReview(story.id, "approved"))}
                     disabled={busy?.id === story.id}
-                    className="inline-flex items-center gap-1.5 rounded bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+                    className="inline-flex items-center gap-1.5 btn-pill btn-pill--green disabled:opacity-60"
                   >
                     {busy?.id === story.id && busy.action === "approve" && <Loader2 className="w-3 h-3 animate-spin" />}
                     Approve &amp; Publish
@@ -3659,7 +3840,7 @@ function StoriesView({ stories, onReview, onDeleted }: { onDeleted: () => void |
                   <button
                     onClick={() => story.status === "approved" ? run(story.id, "unpublish", () => onReview(story.id, "rejected")) : onReview(story.id, "rejected")}
                     disabled={busy?.id === story.id}
-                    className="inline-flex items-center gap-1.5 rounded border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 px-3 py-1.5 text-xs font-bold hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-60"
+                    className="inline-flex items-center gap-1.5 btn-pill btn-pill--red disabled:opacity-60"
                   >
                     {busy?.id === story.id && busy.action === "unpublish" && <Loader2 className="w-3 h-3 animate-spin" />}
                     {story.status === "approved" ? "Unpublish" : "Reject"}

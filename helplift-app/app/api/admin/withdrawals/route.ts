@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { fileUrl } from "@/lib/file-links"
 import { createClient } from "@/lib/supabase/server"
 
 async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
@@ -30,7 +31,7 @@ export async function GET() {
     const withProofUrls = await Promise.all(
       (data || []).map(async (w: any) => {
         if (!w.proof_storage_path) return { ...w, proof_url: null }
-        const { data: signed } = await supabase.storage.from("withdrawal-proofs").createSignedUrl(w.proof_storage_path, 3600)
+        const signed = { signedUrl: fileUrl("withdrawal-proofs", w.proof_storage_path) }
         return { ...w, proof_url: signed?.signedUrl || null }
       })
     )

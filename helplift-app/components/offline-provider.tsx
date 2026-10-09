@@ -107,6 +107,7 @@ export function OfflineProvider() {
       role="status"
       aria-live="polite"
       data-no-tip
+      data-above-mobile-nav
       className={`fixed bottom-4 left-1/2 z-[9998] flex max-w-[92vw] -translate-x-1/2 items-center gap-2 rounded px-4 py-2.5 text-xs font-semibold shadow-lg ${
         online ? "bg-emerald-600 text-white" : "bg-amber-400 text-slate-900"
       }`}

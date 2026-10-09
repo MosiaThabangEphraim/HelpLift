@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { AtSign, Bell, BookOpen, Bot, Clock, Download, KeyRound, Mail, MousePointerClick, ShieldCheck, SlidersHorizontal, Sparkles, Star, Trash2, Type, UserRound } from "lucide-react"
+import { AtSign, Bell, BookOpen, Bot, Clock, Mic, Download, KeyRound, Mail, MousePointerClick, ShieldCheck, SlidersHorizontal, Sparkles, Star, Trash2, Type, UserRound } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -25,6 +25,7 @@ import {
 } from "@/lib/notification-sound"
 import { getFontSizeLevel, setFontSizeLevel, type FontSizeLevel } from "@/lib/font-size"
 import { isAssistantEnabled, setAssistantEnabled } from "@/lib/assistant-preference"
+import { isWakeWordEnabled, isWakeWordSupported, setWakeWordEnabled } from "@/lib/wake-word"
 import { getReduceMotion, setReduceMotion } from "@/lib/reduce-motion"
 import { isClickSoundEnabled, playClickSound, setClickSoundEnabled } from "@/lib/click-sounds"
 import { isClockShown, setClockShown } from "@/lib/clock-preference"
@@ -50,7 +51,7 @@ function SettingRow({
   danger?: boolean
 }) {
   return (
-    <div className={`flex h-full items-center gap-4 rounded border p-4 ${danger ? "border-red-200 dark:border-red-900/60" : "border-slate-200 dark:border-[#233350]"}`}>
+    <div data-setting={title.replace(/"/g, "")} className={`flex h-full items-center gap-4 rounded border p-4 transition-shadow ${danger ? "border-red-200 dark:border-red-900/60" : "border-slate-200 dark:border-[#233350]"}`}>
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded ${danger ? "bg-red-50 dark:bg-red-950/40 text-red-600" : "bg-slate-100 dark:bg-[#1A2740] text-slate-600 dark:text-slate-300"}`}>
         {icon}
       </div>
@@ -108,6 +109,8 @@ export function SettingsDialog({
   const [soundChoice, setSoundChoice] = useState<NotificationSoundId>("chime")
   const [fontSize, setFontSize] = useState<FontSizeLevel>("normal")
   const [assistantOn, setAssistantOn] = useState(true)
+  const [wakeOn, setWakeOn] = useState(false)
+  const [wakeSupported, setWakeSupported] = useState(true)
   const [reduceMotion, setReduceMotionState] = useState(false)
   const [clickSounds, setClickSounds] = useState(false)
   const [clockOn, setClockOn] = useState(true)
@@ -118,6 +121,8 @@ export function SettingsDialog({
       setSoundChoice(getNotificationSoundChoice())
       setFontSize(getFontSizeLevel())
       setAssistantOn(isAssistantEnabled())
+    setWakeOn(isWakeWordEnabled())
+    setWakeSupported(isWakeWordSupported())
       setReduceMotionState(getReduceMotion())
       setClickSounds(isClickSoundEnabled())
       setClockOn(isClockShown())
@@ -160,6 +165,12 @@ export function SettingsDialog({
     setAssistantOn(next)
     setAssistantEnabled(next)
     logClientAction("Changed settings", `Lifty assistant turned ${next ? "on" : "off"}`)
+  }
+
+  const changeWake = (next: boolean) => {
+    setWakeOn(next)
+    setWakeWordEnabled(next)
+    logClientAction("Changed settings", `"Hey Lifty" turned ${next ? "on" : "off"}`)
   }
 
   const changeSound = (next: boolean) => {
@@ -217,7 +228,7 @@ export function SettingsDialog({
             </SettingRow>
           )}
 
-          <div className="md:col-span-2">
+          <div className="md:col-span-2" data-setting="Passkeys">
             <PasskeySettings open={open} />
           </div>
 
@@ -297,6 +308,26 @@ export function SettingsDialog({
               onCheckedChange={changeAssistant}
               aria-label="Lifty (AI assistant)"
               data-tip={assistantOn ? "Hide Lifty on every page" : "Show Lifty again"}
+            />
+          </SettingRow>
+
+          <SettingRow
+            icon={<Mic className="h-5 w-5" />}
+            title={'"Hey Lifty"'}
+            description={
+              !wakeSupported
+                ? "Not available in this browser. Use Chrome or Edge on a computer or Android phone."
+                : wakeOn
+                  ? "Say \"Hey Lifty\" and Lifty opens and listens - no clicking. The microphone listens only while HelpLift is open and Lifty is closed; in Chrome and Edge your browser's speech service processes the audio."
+                  : "Off. Turn on to open Lifty hands-free by saying \"Hey Lifty\". Your browser will ask to use the microphone."
+            }
+          >
+            <Switch
+              checked={wakeOn && wakeSupported}
+              onCheckedChange={changeWake}
+              disabled={!wakeSupported || !assistantOn}
+              aria-label="Hey Lifty voice wake"
+              data-tip={!assistantOn ? "Turn Lifty on first" : wakeOn ? "Stop listening for \"Hey Lifty\"" : "Listen for \"Hey Lifty\""}
             />
           </SettingRow>
 
@@ -392,9 +423,9 @@ export function SettingsDialog({
           {onDeleteAccount && (
             <div className="md:col-span-2">
             <SettingRow danger icon={<Trash2 className="h-5 w-5" />} title="Delete account" description="Permanently delete your account and its data. This can't be undone.">
-              <Button type="button" variant="outline" size="sm" onClick={withReturn(onDeleteAccount)} className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/40">
-                Delete
-              </Button>
+              <button type="button" onClick={withReturn(onDeleteAccount)} className="btn-delete btn-delete--label h-9">
+                <Trash2 className="h-4 w-4" /> Delete
+              </button>
             </SettingRow>
             </div>
           )}

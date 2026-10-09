@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { fileUrl } from "@/lib/file-links"
 import { createClient } from "@/lib/supabase/server"
 import { getOrgContext, insufficientRoleMessage, roleAtLeast } from "@/lib/organization-access"
 import { getWalletSummary } from "@/lib/wallet"
@@ -31,7 +32,7 @@ export async function GET() {
     const withProofUrls = await Promise.all(
       (withdrawals || []).map(async (w) => {
         if (!w.proof_storage_path) return { ...w, proof_url: null }
-        const { data } = await supabase.storage.from("withdrawal-proofs").createSignedUrl(w.proof_storage_path, 3600)
+        const data = { signedUrl: fileUrl("withdrawal-proofs", w.proof_storage_path) }
         return { ...w, proof_url: data?.signedUrl || null }
       })
     )

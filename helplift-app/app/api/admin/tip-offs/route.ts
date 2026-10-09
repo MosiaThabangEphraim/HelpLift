@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server"
-import { createAdminClient } from "@/lib/supabase/admin"
+import { fileUrl } from "@/lib/file-links"
 import { requireAdmin } from "@/lib/require-admin"
-import { TIP_OFF_BUCKET } from "@/lib/tip-offs"
 
 // Tip-offs for the admin Inquiries tab, newest first, each evidence file with
-// a short-lived (1 hour) signed link from the private bucket.
+// a permanent link (lib/file-links.ts) that signs a fresh URL when opened.
 export async function GET() {
   try {
     const auth = await requireAdmin()
@@ -16,12 +15,10 @@ export async function GET() {
       .order("created_at", { ascending: false })
       .limit(300)
     if (error) return NextResponse.json({ message: error.message, tipOffs: [] }, { status: 400 })
-
-    const storage = createAdminClient().storage.from(TIP_OFF_BUCKET)
     const tipOffs = await Promise.all((data || []).map(async tipOff => {
       const files = Array.isArray(tipOff.attachments) ? tipOff.attachments : []
       const attachments = await Promise.all(files.map(async (file: any) => {
-        const { data: signed } = await storage.createSignedUrl(file.path, 3600)
+        const signed = { signedUrl: fileUrl("tip-off-evidence", file.path) }
         return { name: file.name, type: file.type, size: file.size, url: signed?.signedUrl || null }
       }))
       return { ...tipOff, attachments }

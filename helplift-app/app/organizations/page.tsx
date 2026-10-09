@@ -19,7 +19,8 @@ import { MessageComposeDialog } from "@/components/message-compose-dialog"
 import { useCanMessage } from "@/hooks/use-can-message"
 import { BackButton } from "@/components/back-button"
 import { getCurrentPosition, reverseGeocodePlaceNames } from "@/lib/geolocation"
-import { LocateFixed } from "lucide-react"
+import { LocateFixed, Newspaper } from "lucide-react"
+import { timelinePostTypeLabel } from "@/lib/org-timeline"
 import { ViewToggle, type ListView } from "@/components/view-toggle"
 
 type DirectoryOrganization = {
@@ -34,6 +35,8 @@ type DirectoryOrganization = {
   verification_status: string
   created_at: string
   open_needs: number
+  /** The organization's latest timeline post, if any. */
+  latest_post?: { id: string; post_type: string; title: string | null; body: string; created_at: string } | null
   // Present only for signed-in visitors.
   message_recipient_id?: string
   is_own?: boolean
@@ -308,6 +311,21 @@ export default function OrganizationsDirectoryPage() {
                       </p>
                     )}
                     {org.mission && <p className="text-sm text-slate-600 dark:text-slate-300 line-clamp-3 leading-relaxed">{org.mission}</p>}
+                    {org.latest_post && (
+                      <Link
+                        href={`/organizations/${org.id}#post-${org.latest_post.id}`}
+                        data-tip="Read the latest post on this organization's timeline"
+                        className="block rounded-xl bg-blue-50/70 dark:bg-blue-950/30 p-3 transition-colors hover:bg-blue-50 dark:hover:bg-blue-950/50"
+                      >
+                        <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">
+                          <Newspaper className="h-3.5 w-3.5" /> Latest {timelinePostTypeLabel(org.latest_post.post_type).toLowerCase()}
+                          <span className="font-semibold normal-case tracking-normal text-slate-400">· {new Date(org.latest_post.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}</span>
+                        </span>
+                        <span className="mt-1 block text-sm text-slate-700 dark:text-slate-200 line-clamp-2">
+                          {org.latest_post.title ? <strong>{org.latest_post.title}: </strong> : null}{org.latest_post.body}
+                        </span>
+                      </Link>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2">

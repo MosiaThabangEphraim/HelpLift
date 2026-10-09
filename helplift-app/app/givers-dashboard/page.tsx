@@ -1,11 +1,14 @@
 "use client"
 import { FormEvent, useEffect, useMemo, useState } from "react"
+import { fileUrl } from "@/lib/file-links"
 import { useTabTransition } from "@/lib/use-tab-transition"
 import { notPastFilter, todayInSA } from "@/lib/expiry"
 import { CountUp } from "@/components/count-up"
 import { stageFormFiles } from "@/lib/stage-uploads"
 import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { useRouter } from "next/navigation"
+import { DashboardSearch, settingsSearchItems, themeSearchItem, type DashboardSearchItem } from "@/components/dashboard-search"
+import { MobileAttentionGrid, MobileSectionHeading, MobileSectionNav, type MobileAction, type MobileSection } from "@/components/mobile-section-nav"
 import Link from "next/link"
 import { showFeedback } from "@/lib/inline-feedback"
 import {
@@ -40,6 +43,7 @@ import {
   LocateFixed,
   MapPin,
   Home,
+  Building2,
 } from "lucide-react"
 import { getCurrentPosition, haversineKm, NEAR_ME_RADIUS_KM, reverseGeocodePlaceNames } from "@/lib/geolocation"
 import { ViewToggle, type ListView } from "@/components/view-toggle"
@@ -384,7 +388,7 @@ export default function GiverDashboardPage() {
     setNeeds((openNeeds || []) as unknown as Need[])
     const interestsWithPhotoUrls = await Promise.all((submittedInterests || []).map(async (item: any) => {
       const photos = await Promise.all((item.support_interest_photos || []).map(async (p: any) => {
-        const { data: signed } = await supabase.storage.from("support-interest-photos").createSignedUrl(p.storage_path, 3600)
+        const signed = { signedUrl: fileUrl("support-interest-photos", p.storage_path) }
         return { id: p.id, file_name: p.file_name, url: signed?.signedUrl || null }
       }))
       const { support_interest_photos, ...rest } = item
@@ -465,13 +469,13 @@ export default function GiverDashboardPage() {
 
       if (rows && rows.length > 0) {
         const withUrls = await Promise.all(rows.map(async (row) => {
-          const { data } = await supabase.storage.from("fulfillment-proofs").createSignedUrl(row.storage_path, 3600)
+          const data = { signedUrl: fileUrl("fulfillment-proofs", row.storage_path) }
           return { id: row.id, fileName: row.file_name, signedUrl: data?.signedUrl || null }
         }))
         setProofGallery(withUrls)
         setProofSignedUrl(null)
       } else if (selectedFulfillment.proof_storage_path) {
-        const { data } = await supabase.storage.from("fulfillment-proofs").createSignedUrl(selectedFulfillment.proof_storage_path, 3600)
+        const data = { signedUrl: fileUrl("fulfillment-proofs", selectedFulfillment.proof_storage_path) }
         setProofSignedUrl(data?.signedUrl || null)
         setProofGallery([])
       } else {
@@ -816,6 +820,54 @@ export default function GiverDashboardPage() {
   const unreadMessages = messages.filter(m => !m.read_at).length
   const pendingDonations = donations.filter(d => d.status === "pending").length
 
+  // Phones: a bottom bar + "More" sheet instead of the long tab row (components/mobile-section-nav.tsx).
+  const mobilePrimarySections: MobileSection[] = [
+    { id: "needs", label: "Needs", icon: ClipboardList, gradient: "from-blue-500 to-indigo-600", hint: "Needs matched to your causes and location" },
+    { id: "interests", label: "Interests", icon: Users, count: stats.myInterests, gradient: "from-emerald-500 to-teal-600", hint: "Your offers to help" },
+    { id: "donations", label: "Donations", icon: Banknote, count: pendingDonations, gradient: "from-amber-500 to-orange-500", hint: "Your donations and receipts" },
+    { id: "messages", label: "Messages", icon: Mail, count: unreadMessages, gradient: "from-sky-500 to-blue-600", hint: "Conversations with organizations and HelpLift" },
+  ]
+  const mobileMoreSections: MobileSection[] = [
+    { id: "gifts", label: "Gift Library", icon: Gift, gradient: "from-purple-500 to-fuchsia-600", hint: "Your pledges to the Gift Library" },
+    { id: "fulfillments", label: "Fulfillments", icon: PackageCheck, count: stats.activeFulfillments, gradient: "from-teal-500 to-cyan-600", hint: "Your deliveries and their proof" },
+    { id: "analytics", label: "Analytics", icon: BarChart3, gradient: "from-indigo-500 to-blue-600", hint: "Your giving over time" },
+  ]
+  const mobileActions: MobileAction[] = [
+    { id: "pledge", label: "Pledge a Gift", icon: Gift, gradient: "from-purple-500 to-violet-600", onClick: () => setShowGiftModal(true), hint: "Pledge goods, a service or funds" },
+    { id: "badges", label: "Badges", icon: Star, gradient: "from-amber-400 to-yellow-500", onClick: () => setShowBadges(true), hint: "Your badges and the leaderboard" },
+    { id: "organizations", label: "Organizations", icon: Building2, gradient: "from-blue-500 to-cyan-600", onClick: () => router.push("/organizations"), hint: "Browse verified organizations" },
+    { id: "message-admin", label: "Message Admin", icon: MessageSquare, gradient: "from-slate-600 to-slate-800", onClick: () => setIsMessagingAdmin(true), hint: "Message the HelpLift team" },
+    { id: "support", label: "Support HelpLift", icon: Heart, gradient: "from-pink-500 to-rose-600", onClick: () => setShowSupportPlatform(true), hint: "Donate to HelpLift itself" },
+  ]
+
+  // Desktop "search anything" (components/dashboard-search.tsx): sections, actions and settings.
+  const openGiverSettings = () => setIsSettingsOpen(true)
+  const searchItems: DashboardSearchItem[] = [
+    ...[...mobilePrimarySections, ...mobileMoreSections].map(section => ({
+      id: `section-${section.id}`,
+      label: section.label,
+      group: "Sections" as const,
+      icon: section.icon,
+      hint: section.hint,
+      onSelect: () => changeTab(section.id),
+    })),
+    ...mobileActions.map(action => ({
+      id: `action-${action.id}`,
+      label: action.label,
+      group: "Actions" as const,
+      icon: action.icon,
+      hint: action.hint,
+      onSelect: action.onClick,
+    })),
+    { id: "action-settings", label: "Open Settings", group: "Actions", icon: Settings, keywords: "settings preferences options", onSelect: openGiverSettings },
+    { id: "action-refresh", label: "Refresh the dashboard", group: "Actions", icon: ClipboardList, keywords: "reload refresh update", onSelect: () => { refreshAll() } },
+    { id: "action-needs-board", label: "Open the full Needs board", group: "Actions", icon: HeartHandshake, keywords: "needs board browse all public", onSelect: () => router.push("/needs") },
+    themeSearchItem,
+    { id: "action-home", label: "Go to the homepage", group: "Actions", icon: Home, keywords: "home homepage website", onSelect: () => router.push("/") },
+    { id: "inner-near-me", label: "Find needs near me", group: "Actions", icon: MapPin, hint: "Browse Needs", keywords: "near me nearby location close local", onSelect: () => changeTab("needs") },
+    ...settingsSearchItems(openGiverSettings, { editProfile: true, loginEmail: false, platform: false, emailNotifications: true, giverSpotlight: true, deleteAccount: true }),
+  ]
+
   const renderUrgencyBadge = (urgency?: string) => {
     const level = (urgency || "medium").toLowerCase()
     if (level === "high") {
@@ -842,11 +894,12 @@ export default function GiverDashboardPage() {
   if (isLoading) return <main className="flex min-h-screen items-center justify-center bg-[#FAFAFA] dark:bg-[#0B1220]"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></main>
 
   return (
-    <main className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100">
+    <main className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100 max-md:pb-24">
       <div className="mx-auto max-w-[2400px] px-4 md:px-10 py-6 md:py-14 space-y-6">
 
         {/* Greeting for the time of day, with the clock and date beside it. */}
         <div className="flex flex-wrap items-center justify-end max-md:flex-nowrap max-md:justify-between gap-x-8 max-md:gap-x-3 gap-y-3">
+          <DashboardSearch items={searchItems} placeholder="Search sections, actions and settings..." />
           <TimeGreeting name={giver?.name} firstNameOnly />
           <AnalogClock />
         </div>
@@ -867,7 +920,7 @@ export default function GiverDashboardPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap max-md:flex-nowrap max-md:overflow-x-auto no-scrollbar max-md:w-full max-md:pb-1 max-md:[&>*]:shrink-0">
+          <div className="flex items-center gap-2 flex-wrap mobile-toolbar">
             <RefreshButton onRefresh={refreshAll} />
             <Link
               href="/"
@@ -882,14 +935,14 @@ export default function GiverDashboardPage() {
             <button
               onClick={() => setShowSupportPlatform(true)}
               data-tip="Donate directly to HelpLift - not to any organization"
-              className="inline-flex items-center gap-1.5 rounded border border-pink-200 dark:border-pink-900 bg-pink-50 dark:bg-pink-950/40 px-4 py-2 text-sm font-semibold text-pink-700 dark:text-pink-300 hover:bg-pink-100 dark:hover:bg-pink-950/70"
+              className="max-md:hidden inline-flex items-center gap-1.5 rounded border border-pink-200 dark:border-pink-900 bg-pink-50 dark:bg-pink-950/40 px-4 py-2 text-sm font-semibold text-pink-700 dark:text-pink-300 hover:bg-pink-100 dark:hover:bg-pink-950/70"
             >
               <Heart className="h-3.5 w-3.5" /> Support The Platform
             </button>
 
             <Link
               href="/organizations"
-              className="inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+              className="max-md:hidden inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
             >
               Organizations
             </Link>
@@ -912,7 +965,7 @@ export default function GiverDashboardPage() {
 
             <button
               onClick={() => setShowGiftModal(true)}
-              className="inline-flex items-center gap-2 rounded bg-purple-600 px-4 py-2 text-sm font-bold text-white hover:bg-purple-700 shadow-sm shadow-purple-600/20"
+              className="max-md:hidden inline-flex items-center gap-2 rounded bg-purple-600 px-4 py-2 text-sm font-bold text-white hover:bg-purple-700 shadow-sm shadow-purple-600/20"
             >
               <Gift className="h-4 w-4" /> Pledge a Gift
             </button>
@@ -921,37 +974,48 @@ export default function GiverDashboardPage() {
               data-tour="badges"
               onClick={() => setShowBadges(true)}
               data-tip="Your badges and progress toward the next one"
-              className="inline-flex items-center gap-1.5 rounded border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 px-4 py-2 text-sm font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950/70"
+              className="max-md:hidden inline-flex items-center gap-1.5 rounded border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 px-4 py-2 text-sm font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950/70"
             >
               <Star className="h-3.5 w-3.5" fill="currentColor" /> Badges
             </button>
 
             <button
               data-tour="settings"
+              aria-label="Settings"
               onClick={() => setIsSettingsOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+              className="max-md:h-9 max-md:w-9 max-md:justify-center max-md:px-0 inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
             >
-              <Settings className="h-3.5 w-3.5" /> Settings
+              <Settings className="h-3.5 w-3.5" /> <span className="max-md:hidden">Settings</span>
             </button>
 
             <button
               onClick={() => setIsMessagingAdmin(true)}
-              className="inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+              className="max-md:hidden inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-[#1A2740]"
             >
               <MessageSquare className="h-3.5 w-3.5" /> Message Admin
             </button>
 
             <button
               onClick={logout}
-              className="inline-flex items-center gap-2 rounded bg-slate-900 dark:bg-slate-100 px-4 py-2 text-sm font-semibold text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white"
+              aria-label="Sign out"
+              className="max-md:h-9 max-md:w-9 max-md:justify-center max-md:px-0 inline-flex items-center gap-2 rounded bg-slate-900 dark:bg-slate-100 px-4 py-2 text-sm font-semibold text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white"
             >
-              <LogOut className="h-4 w-4" /> Sign out
+              <LogOut className="h-4 w-4" /> <span className="max-md:hidden">Sign out</span>
             </button>
           </div>
         </header>
 
         {/* --- STATS ROW --- */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4 max-md:flex max-md:overflow-x-auto no-scrollbar max-md:gap-x-4 max-md:[&>*]:w-[40%] max-md:[&>*]:shrink-0">
+        <MobileAttentionGrid
+          onSelect={changeTab}
+          items={[
+            { id: "needs", label: "Needs for you", value: stats.openNeeds, icon: ClipboardList, tone: "text-blue-600" },
+            { id: "interests", label: "Pending interests", value: stats.myInterests, icon: Users, tone: "text-emerald-600" },
+            { id: "gifts", label: "Active pledges", value: stats.myGifts, icon: Gift, tone: "text-purple-600" },
+            { id: "fulfillments", label: "Active fulfillments", value: stats.activeFulfillments, icon: PackageCheck, tone: "text-amber-600" },
+          ]}
+        />
+        <div className="max-md:hidden grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
           <StatCard icon={ClipboardList} label="Needs For You" value={stats.openNeeds} accent="blue" />
           <StatCard icon={Users} label="Pending Interests" value={stats.myInterests} accent="emerald" />
           <StatCard icon={Gift} label="Active Gift Pledges" value={stats.myGifts} accent="purple" />
@@ -959,8 +1023,10 @@ export default function GiverDashboardPage() {
         </div>
 
         {/* --- TABS --- */}
-        <Tabs value={activeTab} onValueChange={changeTab} className="gap-6">
-          <TabsList className="w-full flex-nowrap justify-start overflow-x-auto">
+        <Tabs value={activeTab} onValueChange={changeTab} className="gap-6 max-md:gap-4">
+          <MobileSectionHeading section={[...mobilePrimarySections, ...mobileMoreSections].find(section => section.id === activeTab)} />
+          <MobileSectionNav primary={mobilePrimarySections} more={mobileMoreSections} actions={mobileActions} active={activeTab} onSelect={changeTab} />
+          <TabsList className="w-full flex-nowrap max-xl:flex-wrap max-xl:gap-y-1 justify-start overflow-x-auto max-md:hidden">
             <TabsTrigger value="needs" data-tour="tab-needs" className="shrink-0 gap-1.5"><ClipboardList className="w-4 h-4" />Browse Needs</TabsTrigger>
             <TabsTrigger value="interests" data-tour="tab-interests" className="shrink-0 gap-1.5"><Users className="w-4 h-4" />My Interests</TabsTrigger>
             <TabsTrigger value="gifts" data-tour="tab-gifts" className="shrink-0 gap-1.5"><Gift className="w-4 h-4" />Gift Library</TabsTrigger>
@@ -1840,7 +1906,7 @@ export default function GiverDashboardPage() {
                 <div className="space-y-1.5">
                   <p className="text-sm font-semibold">Profile picture</p>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <label className={`inline-flex cursor-pointer items-center rounded border border-slate-200 dark:border-[#233350] px-3.5 py-1.5 text-xs font-bold hover:bg-slate-50 dark:hover:bg-[#1A2740] ${isUpdatingAvatar ? "pointer-events-none opacity-60" : ""}`}>
+                    <label className={`inline-flex cursor-pointer items-center btn-pill btn-pill--neutral ${isUpdatingAvatar ? "pointer-events-none opacity-60" : ""}`}>
                       {isUpdatingAvatar ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
                       {giver.avatar_url ? "Change photo" : "Upload photo"}
                       <input

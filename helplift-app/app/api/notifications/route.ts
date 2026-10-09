@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { fileUrl } from "@/lib/file-links"
 import { createClient } from "@/lib/supabase/server"
 
 export async function GET() {
@@ -32,9 +33,7 @@ export async function GET() {
     (data || []).map(async (item) => {
       let attachmentUrl: string | null = null
       if (item.attachment_storage_path) {
-        const { data: signed } = await supabase.storage
-          .from("message-attachments")
-          .createSignedUrl(item.attachment_storage_path, 60 * 60)
+        const signed = { signedUrl: fileUrl("message-attachments", item.attachment_storage_path) }
         attachmentUrl = signed?.signedUrl || null
       }
 
@@ -45,7 +44,7 @@ export async function GET() {
         .order("created_at", { ascending: true })
       const attachments = await Promise.all(
         (attachmentRows || []).map(async (row) => {
-          const { data: signed } = await supabase.storage.from("message-attachments").createSignedUrl(row.storage_path, 60 * 60)
+          const signed = { signedUrl: fileUrl("message-attachments", row.storage_path) }
           return { id: row.id, file_name: row.file_name, url: signed?.signedUrl || null }
         })
       )

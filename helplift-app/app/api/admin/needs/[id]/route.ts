@@ -20,12 +20,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       .single()
     if (!existing) return NextResponse.json({ message: "Need not found." }, { status: 404 })
 
-    // "closed" is normally the organization's own call (see
-    // api/organization/needs/[id]/route.ts) - it's only valid here as the
-    // admin's decision to decline a pending reopen request, which keeps the
-    // need exactly where it already was.
+    // "closed" means one of two things here: declining a pending reopen
+    // request (the need stays where it was), or an administrator closing a
+    // live (open or in-progress) need - e.g. after a tip-off or a policy
+    // problem - with an optional reason shared with the organization.
     const isReopenRequest = existing.status === "reopen_pending"
-    const allowedStatuses = isReopenRequest ? ["open", "closed"] : ["open", "fulfilled", "rejected"]
+    const isLive = existing.status === "open" || existing.status === "in_progress"
+    const allowedStatuses = isReopenRequest ? ["open", "closed"] : ["open", "fulfilled", "rejected", ...(isLive ? ["closed"] : [])]
     if (!allowedStatuses.includes(status)) return NextResponse.json({ message: "Invalid need status." }, { status: 400 })
 
     if (status === "open" && isPastDate((existing as any).due_date)) {
@@ -58,7 +59,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       if (orgProfileId) {
         const verdict = status === "open"
           ? (isReopenRequest ? "reopened" : "approved and published")
-          : status === "closed" ? "kept closed - the reopen request was declined"
+          : status === "closed" ? (isReopenRequest ? "kept closed - the reopen request was declined" : "closed")
           : status === "rejected" ? "rejected"
           : "marked fulfilled"
         const reasonSuffix = rejection_reason ? ` Reason: ${rejection_reason}` : ""
@@ -74,10 +75,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     } catch (notifyErr) {
       console.warn("Need status notification warning:", notifyErr)
     }
-    if (status === "fulfilled") {
+    if (status === "fulfilled" || (status === "closed" && !isReopenRequest)) {
       const orgField = (need as any).organizations
       const orgName = (Array.isArray(orgField) ? orgField[0]?.name : orgField?.name) || "The organization"
-      await notifyNeedSupporters({ id: need.id, title: need.title }, orgName, "fulfilled")
+      await notifyNeedSupporters({ id: need.id, title: need.title }, orgName, status === "fulfilled" ? "fulfilled" : "closed_by_admin")
     }
 
     let notifiedGivers = 0

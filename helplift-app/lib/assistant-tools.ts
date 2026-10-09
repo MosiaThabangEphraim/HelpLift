@@ -254,9 +254,10 @@ async function getOrganization(supabase: SupabaseClient, args: ToolArgs) {
   }
 
   const org: any = orgs[0]
-  const [needs, stories] = await Promise.all([
+  const [needs, stories, timeline] = await Promise.all([
     supabase.from("needs").select("id, title, category, location, urgency, due_date").eq("organization_id", org.id).in("status", ["open", "in_progress"]).or(notPastFilter("due_date")).order("created_at", { ascending: false }).limit(MAX_LIMIT),
     supabase.from("impact_stories").select("id, title, created_at").eq("organization_id", org.id).eq("status", "approved").order("created_at", { ascending: false }).limit(5),
+    supabase.from("org_timeline_posts").select("id, post_type, title, body, event_starts_at, event_location, created_at").eq("organization_id", org.id).order("created_at", { ascending: false }).limit(5),
   ])
 
   return {
@@ -267,6 +268,15 @@ async function getOrganization(supabase: SupabaseClient, args: ToolArgs) {
       on_helplift_since: org.created_at?.slice(0, 10),
       open_needs: (needs.data || []).map((need: any) => ({ title: need.title, category: need.category, location: need.location, urgency: need.urgency, due_date: need.due_date, link: `/needs?need=${need.id}` })),
       recent_impact_stories: (stories.data || []).map((story: any) => ({ title: story.title, link: `/organizations/${org.id}?story=${story.id}` })),
+      // The organization's own timeline: updates, events, milestones and news.
+      latest_timeline_posts: (timeline.data || []).map((post: any) => ({
+        type: post.post_type,
+        title: post.title,
+        text: excerpt(post.body, 300),
+        posted: post.created_at?.slice(0, 10),
+        ...(post.event_starts_at ? { event_date: post.event_starts_at, event_location: post.event_location } : {}),
+        link: `/organizations/${org.id}#post-${post.id}`,
+      })),
     },
   }
 }

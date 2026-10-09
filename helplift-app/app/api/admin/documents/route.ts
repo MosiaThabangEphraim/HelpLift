@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { fileUrl } from "@/lib/file-links"
 import { createClient } from "@/lib/supabase/server"
 
 export async function GET() {
@@ -12,7 +13,7 @@ export async function GET() {
     const { data: documents, error } = await supabase.from("organization_documents").select("id, organization_id, file_name, document_type, storage_path, created_at").order("created_at", { ascending: false })
     if (error) return NextResponse.json({ message: error.message }, { status: 400 })
     const withLinks = await Promise.all((documents || []).map(async document => {
-      const { data } = await supabase.storage.from("organization-documents").createSignedUrl(document.storage_path, 300)
+      const data = { signedUrl: fileUrl("organization-documents", document.storage_path) }
       return { ...document, signed_url: data?.signedUrl || null }
     }))
     return NextResponse.json({ documents: withLinks })

@@ -66,7 +66,7 @@ export async function PATCH(
       return NextResponse.json({ message: "No updatable organization fields provided." }, { status: 400 })
     }
 
-    const { data: organizationOwner } = await supabase.from("organizations").select("profile_id, name").eq("id", id).single()
+    const { data: organizationOwner } = await supabase.from("organizations").select("profile_id, name, verification_status").eq("id", id).single()
     const { data: organization, error } = await supabase
       .from("organizations")
       .update(update)
@@ -79,15 +79,20 @@ export async function PATCH(
     if (organizationOwner && update.verification_status !== undefined) {
       try {
         const status = update.verification_status
+        // Revoking an approved organization, or reconsidering a rejected one, reads differently.
+        const revoked = organizationOwner.verification_status === "approved" && status === "rejected"
+        const reconsidered = organizationOwner.verification_status === "rejected" && status === "approved"
         const verdictText = status === "more_info_requested"
           ? "asked to provide additional information"
+          : revoked ? "had its HelpLift verification revoked. Its needs are no longer shown publicly"
+          : reconsidered ? "reconsidered and approved"
           : `marked ${status}`
         await supabase.from("notifications").insert({
           recipient_id: organizationOwner.profile_id,
           sender_id: user.id,
           sender_name: "HelpLift Notifications",
           type: "organization_verification",
-          title: status === "more_info_requested" ? "Additional information requested" : `Organization ${status}`,
+          title: status === "more_info_requested" ? "Additional information requested" : revoked ? "Verification revoked" : `Organization ${status}`,
           message: `${organizationOwner.name} was ${verdictText} by an administrator.${update.verification_notes ? ` Note: ${update.verification_notes}` : ""}`,
         })
       } catch (e) {

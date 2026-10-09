@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { fileUrl } from "@/lib/file-links"
 import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/staged-uploads"
 import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { createClient } from "@/lib/supabase/server"
@@ -25,9 +26,7 @@ export async function GET(
 
     let proofSignedUrl: string | null = null
     if (fulfillment.proof_storage_path) {
-      const { data: signed } = await supabase.storage
-        .from("fulfillment-proofs")
-        .createSignedUrl(fulfillment.proof_storage_path, 60 * 60)
+      const signed = { signedUrl: fileUrl("fulfillment-proofs", fulfillment.proof_storage_path) }
       if (signed) proofSignedUrl = signed.signedUrl
     }
 
@@ -39,7 +38,7 @@ export async function GET(
 
     const proofs = await Promise.all(
       (proofRows || []).map(async (row) => {
-        const { data: signed } = await supabase.storage.from("fulfillment-proofs").createSignedUrl(row.storage_path, 60 * 60)
+        const signed = { signedUrl: fileUrl("fulfillment-proofs", row.storage_path) }
         return { id: row.id, fileName: row.file_name, createdAt: row.created_at, signedUrl: signed?.signedUrl || null }
       })
     )

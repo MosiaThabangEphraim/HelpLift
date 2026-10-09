@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { fileUrl } from "@/lib/file-links"
 import { createClient } from "@/lib/supabase/server"
 
 // The whole conversation a message belongs to, oldest first. Only messages the
@@ -61,7 +62,7 @@ export async function GET(request: Request) {
       : { data: [] as { id: string; notification_id: string; storage_path: string; file_name: string | null }[] }
 
     const signed = async (path: string) => {
-      const { data } = await supabase.storage.from("message-attachments").createSignedUrl(path, 60 * 60)
+      const data = { signedUrl: fileUrl("message-attachments", path) }
       return data?.signedUrl || null
     }
 

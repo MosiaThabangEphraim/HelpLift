@@ -65,6 +65,7 @@ function stepsFor(role: TourRole, name?: string | null): TourStep[] {
     { target: '[data-tour="tab-fulfillments"]', title: "Manage deliveries", body: "Accepted offers and claimed gifts become fulfillments. Track them here and upload proof once items arrive." },
     { target: '[data-tour="tab-wallet"]', title: "Donations and your wallet", body: "Donations shows every gift of money you receive. Wallet holds your balance, banking details and withdrawal requests." },
     { target: '[data-tour="tab-messages"]', title: "Messages", body: "Chat with givers and HelpLift's team. New replies also appear in your notifications." },
+    { target: '[data-tour="tab-timeline"]', title: "Your public timeline", body: "Post updates, events, milestones and news with photos or documents. They go live straight away on your public profile and in the Organizations directory." },
     { target: '[data-tour="tab-stories"]', title: "Share your impact", body: "Post impact stories with photos or videos. Once approved they appear on your public profile and the HelpLift homepage." },
     { target: '[data-tour="tab-gifts"]', title: "Claim from the Gift Library", body: "Givers pledge goods, services and funds before a need exists. Browse them here and claim what helps you." },
     { target: '[data-tour="tab-team"]', title: "Bring in your team", body: "Invite teammates by email as Owners, Managers or Coordinators (who handle deliveries, messages and stories), so the whole team can work on HelpLift." },

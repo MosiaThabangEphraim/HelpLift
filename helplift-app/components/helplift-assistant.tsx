@@ -10,6 +10,7 @@ import { isAssistantEnabled, onAssistantPreferenceChange, setAssistantEnabled } 
 import { isSpeechToTextSupported, useSpeechToText } from "@/lib/speech-to-text"
 import { isTextToSpeechSupported, primeSpeechSynthesis, speakInSentences } from "@/lib/text-to-speech"
 import { ReadAloudButton } from "@/components/read-aloud-button"
+import { isWakeWordEnabled, onWakeWordPreferenceChange, useWakeWord } from "@/lib/wake-word"
 import { logClientAction } from "@/components/activity-tracker"
 
 // Lifty, the floating HelpLift AI assistant, rendered once for every page of the site from
@@ -247,6 +248,33 @@ export function HelpLiftAssistant() {
     return onAssistantPreferenceChange(sync)
   }, [])
 
+  // --- "Hey Lifty" (lib/wake-word.ts): an opt-in setting for signed-in users.
+  // Listens only while Lifty is visible and closed, and not in a voice chat.
+  const [wakeEnabled, setWakeEnabled] = useState(false)
+  useEffect(() => {
+    const sync = () => setWakeEnabled(isWakeWordEnabled())
+    sync()
+    return onWakeWordPreferenceChange(sync)
+  }, [])
+  const wakeActive = wakeEnabled && signedIn === true && enabled === true && canListen && !isChatOpen && !conversation
+  const wake = useWakeWord(wakeActive, () => {
+    // Open the chat, greet out loud, then listen for the question.
+    const greeting = "Hi! I'm here. How can I help?"
+    setIsChatOpen(true)
+    setVoiceNote(null)
+    setMessages(current => [...current, { role: "assistant", text: greeting }])
+    silentTurnsRef.current = 0
+    conversationRef.current = true
+    setConversation(true)
+    logClientAction("Woke Lifty with \"Hey Lifty\"")
+    // A moment for the wake listener to release the microphone.
+    window.setTimeout(() => {
+      if (!conversationRef.current) return
+      if (canSpeak) speakReply(greeting)
+      else speech.start()
+    }, 350)
+  })
+
   useEffect(() => {
     chatMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages, isTyping])
@@ -333,7 +361,7 @@ export function HelpLiftAssistant() {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[150]">
+    <div data-above-mobile-nav className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[150]">
       {!isChatOpen ? (
         <div className="flex items-center gap-3">
         {/* On the homepage, a speech bubble beside the button always invites a question. */}
@@ -351,12 +379,19 @@ export function HelpLiftAssistant() {
           data-tour="lifty"
           onClick={() => setIsChatOpen(true)}
           className="relative group flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-full shadow-[0_10px_30px_rgb(37,99,235,0.4)] hover:scale-105 active:scale-95 transition-all duration-300"
-          aria-label="Chat with Lifty, the HelpLift assistant"
+          aria-label={wake.listening ? "Chat with Lifty, the HelpLift assistant. Listening for \"Hey Lifty\"" : "Chat with Lifty, the HelpLift assistant"}
+          data-tip={wake.error || (wake.listening ? "Say \"Hey Lifty\" to talk hands-free, or click to chat" : undefined)}
         >
           <span className="absolute -top-1 -right-1 flex h-3 w-3">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
           </span>
+          {/* "Hey Lifty" is listening (green), or the microphone is blocked (red). */}
+          {(wake.listening || wake.error) && (
+            <span className={`absolute -bottom-0.5 -left-0.5 flex h-5 w-5 items-center justify-center rounded-full ring-2 ring-white dark:ring-slate-950 ${wake.error ? "bg-red-500" : "bg-emerald-500"}`}>
+              <Mic className="h-3 w-3" />
+            </span>
+          )}
           <Bot className="w-6 h-6" />
         </button>
         </div>

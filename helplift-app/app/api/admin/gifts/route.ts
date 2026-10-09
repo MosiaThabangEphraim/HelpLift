@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { fileUrl } from "@/lib/file-links"
 import { createClient } from "@/lib/supabase/server"
 
 export async function GET() {
@@ -31,7 +32,7 @@ export async function GET() {
             const claimOrg = Array.isArray(claim.organizations) ? claim.organizations[0] : claim.organizations
             const documents = await Promise.all(
               (claim.gift_claim_documents || []).map(async (doc: any) => {
-                const { data: signed } = await supabase.storage.from("gift-claim-documents").createSignedUrl(doc.storage_path, 3600)
+                const signed = { signedUrl: fileUrl("gift-claim-documents", doc.storage_path) }
                 return { id: doc.id, file_name: doc.file_name, url: signed?.signedUrl || null }
               })
             )
@@ -51,7 +52,7 @@ export async function GET() {
         claims.sort((a, b) => (a.status === "pending" ? -1 : 1) - (b.status === "pending" ? -1 : 1))
         const photos = await Promise.all(
           (gift.gift_offering_photos || []).map(async (p: any) => {
-            const { data: signed } = await supabase.storage.from("gift-offering-photos").createSignedUrl(p.storage_path, 3600)
+            const signed = { signedUrl: fileUrl("gift-offering-photos", p.storage_path) }
             return { id: p.id, file_name: p.file_name, url: signed?.signedUrl || null }
           })
         )

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { fileUrl } from "@/lib/file-links"
 import { createClient } from "@/lib/supabase/server"
 import { getOrgContext, roleAtLeast, insufficientRoleMessage } from "@/lib/organization-access"
 
@@ -20,7 +21,7 @@ export async function GET() {
 
   const withPhotoUrls = await Promise.all((data || []).map(async (item: any) => {
     const photos = await Promise.all((item.support_interest_photos || []).map(async (p: any) => {
-      const { data: signed } = await supabase.storage.from("support-interest-photos").createSignedUrl(p.storage_path, 3600)
+      const signed = { signedUrl: fileUrl("support-interest-photos", p.storage_path) }
       return { id: p.id, file_name: p.file_name, url: signed?.signedUrl || null }
     }))
     const { support_interest_photos, ...rest } = item

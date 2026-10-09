@@ -213,7 +213,7 @@ export function OrganizationTeam({ refreshKey = 0 }: { refreshKey?: number }) {
                           <button
                             onClick={() => removeMember(member)}
                             disabled={busyMemberId === member.id}
-                            className="p-2 rounded text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-60"
+                            className="btn-delete"
                             aria-label="Remove member and delete their account"
                           >
                             <Trash2 className="w-4 h-4" />

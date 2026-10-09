@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { fileUrl } from "@/lib/file-links"
 import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/staged-uploads"
 import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { logUserAction } from "@/lib/activity-log"
@@ -27,7 +28,7 @@ export async function GET() {
 
     const withPhotoUrls = await Promise.all((gifts || []).map(async (gift: any) => {
       const photos = await Promise.all((gift.gift_offering_photos || []).map(async (p: any) => {
-        const { data: signed } = await supabase.storage.from("gift-offering-photos").createSignedUrl(p.storage_path, 3600)
+        const signed = { signedUrl: fileUrl("gift-offering-photos", p.storage_path) }
         return { id: p.id, file_name: p.file_name, url: signed?.signedUrl || null }
       }))
       const { gift_offering_photos, ...rest } = gift

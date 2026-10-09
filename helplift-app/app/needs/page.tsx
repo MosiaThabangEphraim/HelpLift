@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
+import { MobileFilterSelect } from "@/components/mobile-filter-select"
 import { stageFormFiles } from "@/lib/stage-uploads"
 import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import Link from "next/link"
@@ -465,8 +466,15 @@ export default function PublicNeedsPage() {
             </div>
           </div>
 
-          {/* Category Pills */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 no-scrollbar text-xs">
+          {/* Category: a dropdown on phones, pills on larger screens */}
+          <MobileFilterSelect
+            label="Category"
+            icon={Filter}
+            value={selectedCategory}
+            options={categoryOptions.map(cat => ({ value: cat, label: cat }))}
+            onChange={setSelectedCategory}
+          />
+          <div className="max-md:hidden flex items-center gap-2 overflow-x-auto pb-1 pt-1 no-scrollbar text-xs">
             <span className="text-slate-400 font-bold uppercase tracking-wider text-[11px] mr-1 shrink-0 flex items-center gap-1">
               <Filter className="w-3 h-3" /> Category:
             </span>

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react"
 import { ArrowLeft, Eye, Loader2, MousePointerClick, Trash2, X } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { RefreshButton } from "@/components/refresh-button"
-import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -188,18 +187,16 @@ export function AdminLiveActivity({ refreshKey = 0 }: { refreshKey?: number }) {
           </div>
           <div className="flex items-center gap-2">
             {!person && (
-              <Button
+              <button
                 type="button"
-                variant="outline"
-                size="sm"
                 onClick={() => { setNotice(""); setConfirmClear(true) }}
                 disabled={isClearing || !events?.length}
                 data-tip="Delete all live activity"
-                className="text-red-600 hover:text-red-700 dark:text-red-400"
+                className="btn-delete btn-delete--label h-9"
               >
-                {isClearing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                {isClearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                 Clear log
-              </Button>
+              </button>
             )}
             <RefreshButton onRefresh={load} />
           </div>

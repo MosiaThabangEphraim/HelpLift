@@ -87,11 +87,11 @@ export function AdminDeleteButton({
         data-tip="Delete permanently"
         className={
           iconOnly
-            ? `inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 ${className}`
-            : `inline-flex items-center gap-1.5 rounded border border-red-200 dark:border-red-900 px-2.5 py-1 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 ${className}`
+            ? `btn-delete ${className}`
+            : `btn-delete btn-delete--label ${className}`
         }
       >
-        <Trash2 className="h-3.5 w-3.5" />
+        <Trash2 className="h-4 w-4" />
         {!iconOnly && label}
       </button>
 

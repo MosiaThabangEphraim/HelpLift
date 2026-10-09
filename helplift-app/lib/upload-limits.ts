@@ -28,6 +28,8 @@ export const UPLOAD_LIMITS = {
   organizationDocument: { maxFiles: 1, maxMB: 10, extensions: DOCS, kinds: "PDF, PNG or JPG" },
   /** Files attached to a need. */
   needAttachments: { maxFiles: 10, maxMB: 10, extensions: OFFICE, kinds: "images, PDF or Office documents" },
+  /** Images and documents attached to an organization timeline post. */
+  timelineAttachments: { maxFiles: 10, maxMB: 10, extensions: OFFICE, kinds: "images, PDF or Office documents" },
   /** Photos in an impact story. */
   storyImages: { maxFiles: 10, maxMB: 10, extensions: IMAGES, kinds: "PNG, JPG, WebP or GIF" },
   /** Photos of a Gift Library pledge. */

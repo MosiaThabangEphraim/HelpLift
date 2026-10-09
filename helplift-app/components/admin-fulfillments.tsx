@@ -44,7 +44,7 @@ function sourceBadge(f: AdminFulfillment) {
 
 // Admin overview of deliveries, with a viewer for the proof (photos, receipts,
 // documents) the organization attached.
-export function AdminFulfillmentsView({ fulfillments, onDelete }: { fulfillments: AdminFulfillment[]; onDelete?: (id: string) => Promise<void> | void }) {
+export function AdminFulfillmentsView({ fulfillments, onDelete, onChanged }: { fulfillments: AdminFulfillment[]; onDelete?: (id: string) => Promise<void> | void; onChanged?: () => Promise<void> | void }) {
   const [filter, setFilter] = useState<"all" | "completed" | "in_progress" | "pending" | "cancelled">("all")
   const [selected, setSelected] = useState<AdminFulfillment | null>(null)
   const visible = filter === "all" ? fulfillments : fulfillments.filter(f => f.status === filter)
@@ -104,6 +104,7 @@ export function AdminFulfillmentsView({ fulfillments, onDelete }: { fulfillments
         fulfillment={selected}
         onClose={() => setSelected(null)}
         onDelete={onDelete ? async id => { await onDelete(id); setSelected(null) } : undefined}
+        onChanged={async () => { setSelected(null); await onChanged?.() }}
       />
     </>
   )
@@ -113,11 +114,39 @@ function FulfillmentDetail({
   fulfillment,
   onClose,
   onDelete,
+  onChanged,
 }: {
   fulfillment: AdminFulfillment | null
   onClose: () => void
   onDelete?: (id: string) => Promise<void> | void
+  onChanged?: () => Promise<void> | void
 }) {
+  // Stepping in on an active delivery: cancel it, or mark it completed.
+  const [action, setAction] = useState<"cancelled" | "completed" | null>(null)
+  const [reason, setReason] = useState("")
+  const [isSaving, setIsSaving] = useState(false)
+  const isActive = fulfillment?.status === "pending" || fulfillment?.status === "in_progress"
+  const saveStatus = async () => {
+    if (!fulfillment || !action) return
+    setIsSaving(true)
+    setError("")
+    try {
+      const res = await fetch(`/api/admin/fulfillments/${fulfillment.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: action, reason }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.message || "Could not update this delivery.")
+      setAction(null)
+      setReason("")
+      await onChanged?.()
+    } catch (e: any) {
+      setError(e?.message || "Could not update this delivery.")
+    } finally {
+      setIsSaving(false)
+    }
+  }
   const [proofs, setProofs] = useState<Proof[]>([])
   const [legacyUrl, setLegacyUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -224,6 +253,34 @@ function FulfillmentDetail({
                 <p className="text-xs text-slate-400">No proof has been attached yet.</p>
               )}
             </div>
+
+            {isActive && (
+              <div className="space-y-2 border-t border-slate-200 dark:border-[#233350] pt-3">
+                {action ? (
+                  <>
+                    <textarea
+                      value={reason}
+                      onChange={e => setReason(e.target.value)}
+                      placeholder={action === "cancelled" ? "Why is this delivery being cancelled? (optional, shared with the giver and organization)" : "Note for the giver and organization (optional)"}
+                      className="field min-h-16 text-xs"
+                      autoFocus
+                    />
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <button type="button" onClick={() => { setAction(null); setReason("") }} className="btn-pill btn-pill--neutral">Back</button>
+                      <button type="button" onClick={saveStatus} disabled={isSaving} className={`btn-pill ${action === "cancelled" ? "btn-pill--red-solid" : "btn-pill--green"}`}>
+                        {isSaving && <Loader2 className="animate-spin" />}
+                        {action === "cancelled" ? "Confirm cancel" : "Confirm completed"}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <button type="button" onClick={() => setAction("cancelled")} data-tip="Cancel a stuck or abandoned delivery. The giver and organization are told." className="btn-pill btn-pill--red">Cancel delivery</button>
+                    <button type="button" onClick={() => setAction("completed")} data-tip="Mark this delivery as done, e.g. if it was confirmed outside HelpLift" className="btn-pill btn-pill--green">Mark completed</button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {onDelete && fulfillment && (
               <div className="flex justify-end border-t border-slate-200 dark:border-[#233350] pt-3">

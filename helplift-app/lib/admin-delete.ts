@@ -11,10 +11,13 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 //   for accounting and audit, as the Privacy Policy states.
 // - The Security log (login_attempts), Live activity history
 //   (activity_events / user_presence), site-visit statistics and platform
-//   settings - the audit trail. Every deletion here is itself recorded in the
-//   activity log.
+//   settings - the audit trail. (The Security and Live activity logs can only
+//   be cleared as a whole, from their own tabs, and that is recorded.) Every
+//   deletion here is itself recorded in the activity log.
 // Accounts keep their own flow (app/api/admin/users/[id]), which refuses
-// accounts that hold financial records.
+// accounts that hold financial records. A whole organization is deletable
+// here ("organization"): with the same refusal, and every team member's
+// account is removed along with it.
 
 export type DeletableKind =
   | "need"
@@ -27,6 +30,8 @@ export type DeletableKind =
   | "dev-report"
   | "tip-off"
   | "organization-document"
+  | "timeline-post"
+  | "organization"
 
 type Files = { bucket: string; paths: string[] }
 type Linked = { label: string; count: number }
@@ -46,6 +51,10 @@ type KindConfig = {
   warning?: (row: any) => string | null
   /** A reason the record can't be deleted at all, if any. */
   blocked?: (db: SupabaseClient, row: any) => Promise<string | null>
+  /** Gathers what's needed after the delete, before the rows disappear. */
+  prepare?: (db: SupabaseClient, row: any) => Promise<any>
+  /** Runs after the record is deleted (e.g. removing related accounts). */
+  after?: (db: SupabaseClient, row: any, prepared: any) => Promise<void>
 }
 
 const rand = (value: unknown) => `R${Number(value || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -106,8 +115,17 @@ export const DELETABLE: Record<DeletableKind, KindConfig> = {
   gift: {
     table: "gift_offerings",
     label: "Gift Library offering",
-    select: "id, title, status",
+    select: "id, title, status, offering_type",
     describe: row => `"${row.title}" (${row.status})`,
+    // A financial pledge is money: it's created together with its donation,
+    // and deleting it would erase what that money was given for.
+    blocked: async (db, row) => {
+      if (row.offering_type !== "financial") return null
+      const donations = await count(db, "donations", "gift_offering_id", row.id)
+      return donations > 0
+        ? "This is a financial pledge with a donation behind it. Financial records can't be deleted, so the pledge has to stay. A pledge that was never paid can be cancelled instead."
+        : null
+    },
     linked: async (db, row) => [
       { label: "claims", count: await count(db, "gift_claims", "gift_offering_id", row.id) },
       { label: "fulfillments", count: await count(db, "fulfillments", "gift_offering_id", row.id) },
@@ -187,6 +205,63 @@ export const DELETABLE: Record<DeletableKind, KindConfig> = {
     describe: row => `"${row.file_name || "document"}"`,
     files: async (_db, row) => [{ bucket: "organization-documents", paths: row.storage_path ? [row.storage_path] : [] }],
   },
+  "timeline-post": {
+    table: "org_timeline_posts",
+    label: "timeline post",
+    select: "id, title, body, attachments",
+    describe: row => `"${row.title || String(row.body || "").slice(0, 60)}"`,
+    linked: async (_db, row) => [{ label: "attachments", count: Array.isArray(row.attachments) ? row.attachments.length : 0 }],
+    files: async (_db, row) => [{ bucket: "org-timeline", paths: (Array.isArray(row.attachments) ? row.attachments : []).map((file: any) => file.path).filter(Boolean) }],
+  },
+  organization: {
+    table: "organizations",
+    label: "organization",
+    select: "id, name, profile_id",
+    describe: row => `"${row.name}"`,
+    // Financial records are never deleted, so an organization that has any can't be.
+    blocked: async (db, row) => {
+      const records = (await count(db, "donations", "organization_id", row.id)) + (await count(db, "organization_withdrawals", "organization_id", row.id))
+      return records > 0
+        ? `This organization has ${records} financial record${records === 1 ? "" : "s"} (donations or withdrawals), which must be kept - so it can't be deleted. Revoke its verification or suspend its accounts instead.`
+        : null
+    },
+    linked: async (db, row) => {
+      const needIds = await ids(db, "needs", "organization_id", row.id)
+      return [
+        { label: "team member accounts (signed out and deleted)", count: (await memberIds(db, row)).length },
+        { label: "needs", count: needIds.length },
+        { label: "offers to help on those needs", count: await count(db, "support_interests", "need_id", needIds) },
+        { label: "deliveries", count: await count(db, "fulfillments", "organization_id", row.id) },
+        { label: "impact stories", count: await count(db, "impact_stories", "organization_id", row.id) },
+        { label: "timeline posts", count: await count(db, "org_timeline_posts", "organization_id", row.id) },
+        { label: "verification documents", count: await count(db, "organization_documents", "organization_id", row.id) },
+      ]
+    },
+    warning: () => "The organization disappears from HelpLift, and every team member's account is deleted. This can't be undone.",
+    files: async (db, row) => {
+      const needIds = await ids(db, "needs", "organization_id", row.id)
+      const { data: posts } = await db.from("org_timeline_posts").select("attachments").eq("organization_id", row.id)
+      return [
+        { bucket: "organization-documents", paths: await paths(db, "organization_documents", "organization_id", row.id) },
+        { bucket: "need-attachments", paths: await paths(db, "need_attachments", "need_id", needIds) },
+        { bucket: "org-timeline", paths: (posts || []).flatMap((post: any) => (Array.isArray(post.attachments) ? post.attachments : []).map((file: any) => file.path)).filter(Boolean) },
+      ]
+    },
+    prepare: async (db, row) => memberIds(db, row),
+    // The organization's rows are gone (cascades); now remove its people's accounts.
+    after: async (db, _row, profileIds: string[]) => {
+      for (const profileId of profileIds || []) {
+        const { error } = await db.auth.admin.deleteUser(profileId)
+        if (error) console.warn("Organization delete: couldn't remove a member account:", error.message)
+      }
+    },
+  },
+}
+
+/** Every account belonging to the organization: its members and its original owner. */
+async function memberIds(db: SupabaseClient, row: any) {
+  const { data } = await db.from("organization_members").select("profile_id").eq("organization_id", row.id)
+  return Array.from(new Set([row.profile_id, ...(data || []).map((member: any) => member.profile_id)].filter(Boolean))) as string[]
 }
 
 export function isDeletableKind(kind: string): kind is DeletableKind {
@@ -214,8 +289,10 @@ export async function previewDelete(db: SupabaseClient, kind: DeletableKind, row
 export async function performDelete(db: SupabaseClient, kind: DeletableKind, row: any) {
   const config = DELETABLE[kind]
   const files = config.files ? await config.files(db, row) : []
+  const prepared = config.prepare ? await config.prepare(db, row) : null
   const { error } = await db.from(config.table).delete().eq("id", row.id)
   if (error) throw new Error(error.message)
+  if (config.after) await config.after(db, row, prepared)
   for (const { bucket, paths: list } of files) {
     const unique = Array.from(new Set(list))
     if (unique.length === 0) continue

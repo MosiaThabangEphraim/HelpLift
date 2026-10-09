@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requireAdmin, retentionCutoff } from "@/lib/require-admin"
+import { logUserAction } from "@/lib/activity-log"
 
 // Login activity for the admin Security tab (see 20261006000100_login_attempts.sql).
 // ?result=all|failed|success  ?q=email, name or IP  ?days=1|7|30|90
+// ?from= / ?to= (ISO times) pick an exact range instead of ?days.
+// DELETE clears the whole log (the clearing itself is recorded in Live activity).
 // Also returns a 24-hour summary and the patterns worth a closer look:
 // IP addresses and accounts with repeated failures.
 
@@ -23,7 +26,14 @@ export async function GET(request: Request) {
     const result = searchParams.get("result") || "all"
     const days = Math.min(90, Math.max(1, Number(searchParams.get("days")) || 7))
     const q = (searchParams.get("q") || "").trim().replace(/[,()%*\\]/g, " ").slice(0, 80)
-    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+    const validTime = (value: string | null) => {
+      if (!value) return null
+      const time = new Date(value)
+      return Number.isNaN(time.getTime()) ? null : time.toISOString()
+    }
+    const from = validTime(searchParams.get("from"))
+    const to = validTime(searchParams.get("to"))
+    const since = from || (to ? new Date(0).toISOString() : new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString())
 
     let query = supabase
       .from("login_attempts")
@@ -31,6 +41,7 @@ export async function GET(request: Request) {
       .gte("created_at", since)
       .order("created_at", { ascending: false })
       .limit(500)
+    if (to) query = query.lte("created_at", to)
     if (result === "failed") query = query.in("outcome", FAILED)
     if (result === "success") query = query.in("outcome", SUCCESS)
     if (q) query = query.or(`email.ilike.%${q}%,ip_address.ilike.%${q}%`)
@@ -63,5 +74,24 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error("Admin login attempts error:", error)
     return NextResponse.json({ message: "Login activity is unavailable.", attempts: [] }, { status: 503 })
+  }
+}
+
+export async function DELETE() {
+  try {
+    const auth = await requireAdmin()
+    if ("error" in auth) return auth.error
+
+    const { error, count } = await createAdminClient()
+      .from("login_attempts")
+      .delete({ count: "exact" })
+      .not("id", "is", null)
+    if (error) return NextResponse.json({ message: error.message }, { status: 400 })
+
+    await logUserAction(auth.supabase, "Cleared the login history", `${count ?? 0} entries removed`)
+    return NextResponse.json({ success: true, removed: count ?? 0 })
+  } catch (error) {
+    console.error("Clear login history error:", error)
+    return NextResponse.json({ message: "Could not clear the login history." }, { status: 500 })
   }
 }

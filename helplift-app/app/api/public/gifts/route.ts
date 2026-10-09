@@ -1,4 +1,5 @@
 import { NextResponse, after } from "next/server"
+import { fileUrl } from "@/lib/file-links"
 import { createClient } from "@/lib/supabase/server"
 import { notPastFilter } from "@/lib/expiry"
 import { expireOverdueItems } from "@/lib/expiry-job"
@@ -53,7 +54,7 @@ export async function GET(request: Request) {
 
     filtered = await Promise.all(filtered.map(async (g: any) => {
       const photos = await Promise.all((g.gift_offering_photos || []).map(async (p: any) => {
-        const { data: signed } = await supabase.storage.from("gift-offering-photos").createSignedUrl(p.storage_path, 3600)
+        const signed = { signedUrl: fileUrl("gift-offering-photos", p.storage_path) }
         return { id: p.id, file_name: p.file_name, url: signed?.signedUrl || null }
       }))
       const { gift_offering_photos, ...rest } = g

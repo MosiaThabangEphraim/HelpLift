@@ -28,6 +28,7 @@ import { MessageComposeDialog } from "@/components/message-compose-dialog"
 import { useCanMessage } from "@/hooks/use-can-message"
 import { BackButton } from "@/components/back-button"
 import { ReadAloudButton } from "@/components/read-aloud-button"
+import { OrgTimeline } from "@/components/org-timeline"
 
 type OrganizationProfile = {
   id: string
@@ -298,6 +299,9 @@ export default function OrganizationPublicProfilePage() {
           recipientLabel={org.name}
           recipientId={org.message_recipient_id}
         />
+
+        {/* --- TIMELINE: the organization's own updates, events and news --- */}
+        <OrgTimeline organizationId={org.id} organizationName={org.name} />
 
         {/* --- ACTIVE OPEN NEEDS SECTION --- */}
         <section className="space-y-6">

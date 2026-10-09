@@ -47,6 +47,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
       }}
       aria-label={LABEL[current]}
       data-tip={LABEL[current]}
+      data-theme-toggle
       className={`inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${className}`}
     >
       <Icon className="w-4 h-4" />

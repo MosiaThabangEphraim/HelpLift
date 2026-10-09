@@ -12,7 +12,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 // Runs with the service role, since the sender can't normally write
 // notifications for other people.
 
-export type NeedEnding = "closed" | "fulfilled" | "deleted"
+export type NeedEnding = "closed" | "closed_by_admin" | "fulfilled" | "deleted"
 
 type Db = ReturnType<typeof createAdminClient>
 
@@ -49,6 +49,10 @@ export async function notifyNeedSupporters(
       closed: {
         title: "A need you supported was closed",
         message: `${organizationName} closed "${need.title}", so it no longer accepts offers or donations. Any donation you already made stays with the organization.`,
+      },
+      closed_by_admin: {
+        title: "A need you supported was closed",
+        message: `"${need.title}" from ${organizationName} was closed by the HelpLift team, so it no longer accepts offers or donations. Any donation you already made stays with the organization.`,
       },
       deleted: {
         title: "A need you supported was removed",

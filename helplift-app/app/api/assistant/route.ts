@@ -114,11 +114,13 @@ Notifications:
   feedback and admin announcements. Unread ones are highlighted.
 - Click a notification to mark it read, or use "mark all as read".
 - Need status changes: the organization is notified when an administrator
-  approves, rejects, reopens, marks fulfilled or removes one of its needs, or when
+  approves, rejects, reopens, closes, marks fulfilled or removes one of its needs, or when
   a need is closed automatically after its due date. Administrators are notified
   when an organization closes a need, marks it fulfilled or asks to reopen it.
   Givers with an open offer on a need, or who donated to it, are notified when it
-  is fulfilled, closed (by the organization or after its due date) or removed.
+  is fulfilled, closed (by the organization, an administrator or after its due date)
+  or removed. Administrators can close a live need (open or in progress), with an
+  optional reason shared with the organization.
 - They update live while the page is open and can play a sound (Settings).
 - Each notification is also emailed unless email notifications are turned off.
 - Admins may also post announcements as a banner on the login page or as a public
@@ -256,6 +258,12 @@ Tabs:
 - Donations: donations received.
 - Wallet: balance, banking details, withdrawals.
 - Messages: inbox, sent, replies.
+- Timeline: post updates, events (with date, time and location), milestones and
+  news, with photos and documents attached. Posts go live straight away (no admin
+  approval) on the organization's public profile and its card in the
+  Organizations directory, and can be shared. Coordinators and up can post and
+  edit or delete their own posts; managers and owners can edit, delete or pin any
+  post. Administrators can remove posts.
 - Impact Stories: share stories with photos or videos (YouTube/Vimeo links or
   uploads). Stories are published after admin approval and appear on your public
   profile and the homepage; they can be shared.
@@ -283,6 +291,17 @@ Team roles:
 
 All dashboards:
 - A short step-by-step tour is shown on your first visit (you can skip it).
+- On a computer, the search box at the top left finds anything on the dashboard -
+  sections (e.g. Wallet, Timeline), actions (e.g. Pledge a Gift, Message Admin,
+  switch theme) and settings (e.g. change password, font size, Hey Lifty) - even
+  things inside other screens, like each Platform settings field (withdrawal
+  limits, badge thresholds, bank accounts) or banking details. Type,
+  or tap its microphone to speak. Ctrl+K or "/" jumps to it.
+- On phones, the tabs become a bar at the bottom of the screen with the most-used
+  sections and a "More" button, which opens every other section plus quick actions
+  (e.g. Badges, Message Admin, Pledge a Gift, Documents, QR Code). The top buttons
+  form one icon toolbar, small chips show what is waiting (tap one to open it), and
+  filters such as categories or statuses become one dropdown.
 - The refresh button reloads the latest data without losing your filters.
 - A Home button returns to the homepage. When signed in, the homepage shows
   "My Dashboard" instead of "Sign In".
@@ -293,9 +312,11 @@ All dashboards:
 ==================================================================
 - /organizations: find verified organizations; filter by province or "near me";
   sort by most open needs or recently joined.
-- Each organization's public profile shows its details, open needs ("Support this
-  Need"), impact stories, and lets signed-in users message it. Public profiles do
-  not show donations or donors.
+- Each organization's public profile shows its details, its timeline (updates,
+  events, milestones and news it posts itself), open needs ("Support this Need"),
+  impact stories, and lets signed-in users message it. Directory cards show each
+  organization's latest timeline post. Public profiles do not show donations or
+  donors.
 
 ==================================================================
 12. RECOGNITION: BADGES, LEADERBOARD & SPOTLIGHT
@@ -355,15 +376,26 @@ All dashboards:
   answers out loud, then listens again.
 - Hide Lifty with the eye button in the chat header, or turn it off/on in
   Settings -> Lifty.
+- "Hey Lifty" (Settings -> "Hey Lifty", off by default, for signed-in users): say
+  "Hey Lifty" and Lifty opens, greets you out loud and listens for your question -
+  no clicking. A small green microphone on Lifty's button shows it's listening.
+  The microphone listens only while a HelpLift tab is open and visible and the chat
+  is closed; in Chrome and Edge the browser's speech service processes the audio.
+  Works in Chrome and Edge (computer or Android), not in Firefox or iPhone Safari.
 
 ==================================================================
 15. ADMINISTRATORS (for context - users cannot do these)
 ==================================================================
 Administrators (/admin-dashboard) approve or reject organizations, needs, reopen
 requests, gift offerings and claims, impact stories and withdrawals; confirm EFT
-donations and send receipts; review fulfillments and feedback; manage users
+donations and send receipts; review fulfillments and feedback; close live needs;
+revoke an approved organization's verification or reconsider a rejected one; remove
+a listed Gift Library offering (not paid financial pledges); cancel a stuck delivery
+or mark one completed (the people involved are told, with the reason); permanently
+delete an organization with no financial records (its team accounts go with it);
+remove timeline posts; manage users
 (editing account details, suspension); send announcements (in-app, email, login
-banner or homepage notice); view reports, sign-in attempts and live platform
+banner or homepage notice); view reports, sign-in attempts (filter by date, clear the log) and live platform
 activity; answer developer reports; and manage platform settings (maintenance mode,
 HelpLift's bank accounts, need categories, donation and withdrawal limits, badge
 thresholds). Administrators can never delete financial records such as donations or

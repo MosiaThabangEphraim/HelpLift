@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { fileUrl } from "@/lib/file-links"
 import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/staged-uploads"
 import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { createClient } from "@/lib/supabase/server"
@@ -14,7 +15,7 @@ export async function GET() {
   const { data, error } = await supabase.from("organization_documents").select("id, file_name, document_type, storage_path, created_at").eq("organization_id", organization.id).order("created_at", { ascending: false })
   if (error) return NextResponse.json({ message: error.message }, { status: 400 })
   const withLinks = await Promise.all((data || []).map(async document => {
-    const { data: signed } = await supabase.storage.from("organization-documents").createSignedUrl(document.storage_path, 300)
+    const signed = { signedUrl: fileUrl("organization-documents", document.storage_path) }
     return { id: document.id, file_name: document.file_name, document_type: document.document_type, created_at: document.created_at, signed_url: signed?.signedUrl || null }
   }))
   return NextResponse.json({ documents: withLinks })

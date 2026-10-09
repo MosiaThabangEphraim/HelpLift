@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { fileUrl } from "@/lib/file-links"
 import { createClient } from "@/lib/supabase/server"
 import { sendDonationReceipt } from "@/lib/donation-receipt"
 
@@ -23,9 +24,7 @@ export async function GET(
 
     let proofSignedUrl: string | null = null
     if (donation.proof_storage_path) {
-      const { data: signed } = await supabase.storage
-        .from("donation-proofs")
-        .createSignedUrl(donation.proof_storage_path, 60 * 60)
+      const signed = { signedUrl: fileUrl("donation-proofs", donation.proof_storage_path) }
       if (signed) proofSignedUrl = signed.signedUrl
     }
 
@@ -36,7 +35,7 @@ export async function GET(
       .order("created_at", { ascending: true })
     const proofs = await Promise.all(
       (proofRows || []).map(async (row) => {
-        const { data: signed } = await supabase.storage.from("donation-proofs").createSignedUrl(row.storage_path, 60 * 60)
+        const signed = { signedUrl: fileUrl("donation-proofs", row.storage_path) }
         return { id: row.id, file_name: row.file_name, url: signed?.signedUrl || null }
       })
     )

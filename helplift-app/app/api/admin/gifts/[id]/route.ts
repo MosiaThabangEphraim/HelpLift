@@ -32,7 +32,14 @@ export async function PATCH(
       .eq("id", id)
       .single()
     if (currentError || !current) return NextResponse.json({ message: "Gift offering not found." }, { status: 404 })
-    if (current.status !== "pending") {
+    // A listed (approved) goods or services offering can also be taken down,
+    // e.g. after a complaint. Paid financial pledges stay: their money has
+    // already been received.
+    const isTakedown = current.status === "approved" && status === "rejected"
+    if (isTakedown && current.offering_type === "financial") {
+      return NextResponse.json({ message: "A paid financial pledge can't be removed from the Gift Library - its money has already been received." }, { status: 400 })
+    }
+    if (current.status !== "pending" && !isTakedown) {
       return NextResponse.json({ message: "This listing has already been reviewed." }, { status: 400 })
     }
     if (current.offering_type === "financial" && status === "approved") {
@@ -66,8 +73,8 @@ export async function PATCH(
       if (giver?.profile_id) {
         await supabase.from("notifications").insert({
           recipient_id: giver.profile_id, sender_id: user.id, sender_name: "HelpLift Notifications", type: "gift_offering_reviewed",
-          title: `Gift offering ${status}`,
-          message: `Your offering "${current.title}" was ${status} by an administrator.${status === "approved" ? " It is now listed in the Gift Library." : cleanRejectionReason ? ` Reason: ${cleanRejectionReason}` : ""}`,
+          title: isTakedown ? "Gift offering removed" : `Gift offering ${status}`,
+          message: `Your offering "${current.title}" was ${isTakedown ? "removed from the Gift Library" : status} by an administrator.${status === "approved" ? " It is now listed in the Gift Library." : cleanRejectionReason ? ` Reason: ${cleanRejectionReason}` : ""}`,
         })
       }
     } catch (notifyErr) {

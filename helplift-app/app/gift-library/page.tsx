@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
+import { MobileFilterSelect } from "@/components/mobile-filter-select"
 import { stageFormFiles } from "@/lib/stage-uploads"
 import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import Link from "next/link"
@@ -299,7 +300,19 @@ export default function PublicGiftLibraryPage() {
           </div>
 
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+            <MobileFilterSelect
+              label="Type"
+              icon={Filter}
+              value={selectedType}
+              options={[
+                { value: "all", label: "All Offerings" },
+                { value: "goods", label: "Goods & Equipment" },
+                { value: "services", label: "Professional Services" },
+                { value: "financial", label: "Financial Grants" },
+              ]}
+              onChange={value => setSelectedType(value as any)}
+            />
+            <div className="max-md:hidden flex items-center gap-2 overflow-x-auto pb-1 text-xs">
               <span className="text-slate-400 font-bold uppercase tracking-wider text-[11px] mr-1 shrink-0 flex items-center gap-1">
                 <Filter className="w-3 h-3" /> Offering Type:
               </span>

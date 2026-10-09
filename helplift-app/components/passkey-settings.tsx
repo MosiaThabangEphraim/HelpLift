@@ -120,7 +120,7 @@ export function PasskeySettings({ open }: { open: boolean }) {
                 disabled={busy}
                 aria-label={`Remove passkey ${passkey.friendly_name || ""}`.trim()}
                 data-tip="Remove this passkey. It can no longer be used to sign in."
-                className="shrink-0 rounded p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-50"
+                className="btn-delete"
               >
                 <Trash2 className="h-4 w-4" />
               </button>

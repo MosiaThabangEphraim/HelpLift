@@ -1,6 +1,7 @@
 "use client"
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react"
+import { fileUrl } from "@/lib/file-links"
 import { useTabTransition } from "@/lib/use-tab-transition"
 import { isPastDate, todayInSA } from "@/lib/expiry"
 import { CountUp } from "@/components/count-up"
@@ -51,6 +52,7 @@ import {
   Download,
   RefreshCw,
   Home,
+  Newspaper,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { firstOf } from "@/lib/utils"
@@ -95,6 +97,10 @@ import { OrganizationWallet } from "@/components/organization-wallet"
 import { UserAvatar } from "@/components/user-avatar"
 import { MessageViewToggle, SentMessages } from "@/components/sent-messages"
 import { getOrgContext, ROLE_LABELS, roleAtLeast, type OrgRole } from "@/lib/organization-access"
+import { MobileFilterSelect } from "@/components/mobile-filter-select"
+import { OrgTimeline } from "@/components/org-timeline"
+import { DashboardSearch, settingsSearchItems, themeSearchItem, type DashboardSearchItem } from "@/components/dashboard-search"
+import { MobileAttentionGrid, MobileSectionHeading, MobileSectionNav, type MobileAction, type MobileSection } from "@/components/mobile-section-nav"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -274,7 +280,7 @@ export default function OrganizationDashboardPage() {
   const [activeTab, setActiveTab] = useState("needs")
   // Smooth tab transitions (lib/use-tab-transition.ts), in tab-bar order.
   const { changeTab, tabMotion } = useTabTransition(
-    ["needs", "fulfillments", "interests", "donations", "wallet", "messages", "stories", "gifts", "analytics", "team", "documents"],
+    ["needs", "fulfillments", "interests", "donations", "wallet", "messages", "timeline", "stories", "gifts", "analytics", "team", "documents"],
     activeTab,
     setActiveTab
   )
@@ -633,13 +639,13 @@ export default function OrganizationDashboardPage() {
 
       if (rows && rows.length > 0) {
         const withUrls = await Promise.all(rows.map(async (row) => {
-          const { data } = await supabase.storage.from("fulfillment-proofs").createSignedUrl(row.storage_path, 3600)
+          const data = { signedUrl: fileUrl("fulfillment-proofs", row.storage_path) }
           return { id: row.id, fileName: row.file_name, signedUrl: data?.signedUrl || null }
         }))
         setProofGallery(withUrls)
         setProofSignedUrl(null)
       } else if (selectedFulfillment.proof_storage_path) {
-        const { data } = await supabase.storage.from("fulfillment-proofs").createSignedUrl(selectedFulfillment.proof_storage_path, 3600)
+        const data = { signedUrl: fileUrl("fulfillment-proofs", selectedFulfillment.proof_storage_path) }
         setProofSignedUrl(data?.signedUrl || null)
         setProofGallery([])
       } else {
@@ -1250,6 +1256,70 @@ export default function OrganizationDashboardPage() {
   const unreadMessages = messages.filter(m => !m.read_at).length
   const pendingDonations = donations.filter(d => d.status === "pending").length
 
+  // Phones: a bottom bar + "More" sheet instead of the long tab row (components/mobile-section-nav.tsx).
+  const canSeeMoney = roleAtLeast(memberRole, "manager")
+  const mobilePrimarySections: MobileSection[] = [
+    { id: "needs", label: "Needs", icon: ClipboardList, gradient: "from-emerald-500 to-teal-600", hint: "Post and manage your needs" },
+    { id: "interests", label: "Interests", icon: Users, count: stats.pendingInterests, gradient: "from-blue-500 to-indigo-600", hint: "Offers to help from givers" },
+    { id: "fulfillments", label: "Deliveries", icon: PackageCheck, count: stats.activeFulfillments, gradient: "from-teal-500 to-cyan-600", hint: "Fulfillments and proof of delivery" },
+    { id: "messages", label: "Messages", icon: Mail, count: unreadMessages, gradient: "from-sky-500 to-blue-600", hint: "Conversations with givers and HelpLift" },
+  ]
+  const mobileMoreSections: MobileSection[] = [
+    ...(canSeeMoney ? [
+      { id: "donations", label: "Donations", icon: Banknote, count: pendingDonations, gradient: "from-amber-500 to-orange-500", hint: "Money received" },
+      { id: "wallet", label: "Wallet", icon: Wallet, gradient: "from-pink-500 to-rose-600", hint: "Balance and withdrawals" },
+    ] : []),
+    { id: "timeline", label: "Timeline", icon: Newspaper, gradient: "from-blue-500 to-indigo-600", hint: "Your public updates, events and news" },
+    { id: "stories", label: "Impact Stories", icon: Sparkles, gradient: "from-violet-500 to-purple-600", hint: "Share what your organization achieved" },
+    { id: "gifts", label: "Gift Library", icon: Gift, gradient: "from-purple-500 to-fuchsia-600", hint: "Offerings from givers you can claim" },
+    { id: "analytics", label: "Analytics", icon: BarChart3, gradient: "from-indigo-500 to-blue-600", hint: "Needs, donations and engagement" },
+    { id: "documents", label: "Documents", icon: FileText, gradient: "from-slate-500 to-slate-700", hint: "Verification documents" },
+    ...(memberRole === "owner" ? [{ id: "team", label: "Team", icon: Users, gradient: "from-emerald-500 to-green-600", hint: "Invite and manage teammates" }] : []),
+  ]
+  const mobileActions: MobileAction[] = [
+    { id: "badges", label: "Badges", icon: Star, gradient: "from-amber-400 to-yellow-500", onClick: () => setShowBadges(true), hint: "Your badges and the leaderboard" },
+    ...(organization?.id ? [{ id: "profile", label: "Public Profile", icon: ExternalLink, gradient: "from-blue-500 to-cyan-600", onClick: () => window.open(`/organizations/${organization.id}`, "_blank"), hint: "Open your public profile" }] : []),
+    { id: "qr", label: "QR Code", icon: QrCode, gradient: "from-slate-600 to-slate-800", onClick: () => setShowQrCode(true), hint: "Share or print a QR code to your profile" },
+    { id: "organizations", label: "Organizations", icon: Building2, gradient: "from-sky-500 to-blue-600", onClick: () => router.push("/organizations"), hint: "Browse verified organizations" },
+    { id: "message-admin", label: "Message Admin", icon: MessageSquare, gradient: "from-indigo-500 to-violet-600", onClick: () => setIsMessagingAdmin(true), hint: "Message the HelpLift team" },
+    ...(canSeeMoney ? [{ id: "support", label: "Support HelpLift", icon: Heart, gradient: "from-pink-500 to-rose-600", onClick: () => setShowSupportPlatform(true), hint: "Donate to HelpLift itself" }] : []),
+  ]
+
+  // Desktop "search anything" (components/dashboard-search.tsx): sections, actions and settings.
+  const openOrgSettings = () => setIsSettingsOpen(true)
+  const searchItems: DashboardSearchItem[] = [
+    ...[...mobilePrimarySections, ...mobileMoreSections].map(section => ({
+      id: `section-${section.id}`,
+      label: section.label,
+      group: "Sections" as const,
+      icon: section.icon,
+      hint: section.hint,
+      onSelect: () => changeTab(section.id),
+    })),
+    ...mobileActions.map(action => ({
+      id: `action-${action.id}`,
+      label: action.label,
+      group: "Actions" as const,
+      icon: action.icon,
+      hint: action.hint,
+      onSelect: action.onClick,
+    })),
+    { id: "action-settings", label: "Open Settings", group: "Actions", icon: Settings, keywords: "settings preferences options", onSelect: openOrgSettings },
+    { id: "action-post-need", label: "Post a need", group: "Actions", icon: Plus, keywords: "create new need request post", onSelect: () => changeTab("needs") },
+    { id: "action-post-timeline", label: "Post on your timeline", group: "Actions", icon: Sparkles, keywords: "timeline update event news milestone post share", onSelect: () => changeTab("timeline") },
+    { id: "action-refresh", label: "Refresh the dashboard", group: "Actions", icon: RefreshCw, keywords: "reload refresh update", onSelect: () => { refreshAll() } },
+    themeSearchItem,
+    { id: "action-home", label: "Go to the homepage", group: "Actions", icon: Home, keywords: "home homepage website", onSelect: () => router.push("/") },
+    // Inside sections.
+    ...(memberRole === "owner" ? [
+      { id: "inner-invite", label: "Invite a teammate", group: "Actions" as const, icon: Users, hint: "Team", keywords: "invite team member coordinator manager owner add staff", onSelect: () => changeTab("team") },
+      { id: "inner-banking", label: "Banking details", group: "Actions" as const, icon: Wallet, hint: "Wallet", keywords: "bank account banking details payout", onSelect: () => changeTab("wallet") },
+      { id: "inner-withdraw", label: "Request a withdrawal", group: "Actions" as const, icon: Wallet, hint: "Wallet", keywords: "withdraw withdrawal payout money cash out", onSelect: () => changeTab("wallet") },
+    ] : []),
+    { id: "inner-documents", label: "Verification documents", group: "Actions", icon: FileText, hint: "Documents", keywords: "documents upload verification certificate registration", onSelect: () => changeTab("documents") },
+    ...settingsSearchItems(openOrgSettings, { editProfile: memberRole === "owner", loginEmail: false, platform: false, emailNotifications: true, giverSpotlight: false, deleteAccount: true }),
+  ]
+
   const renderUrgencyBadge = (urgency?: string) => {
     const level = (urgency || "medium").toLowerCase()
     if (level === "high") {
@@ -1276,11 +1346,12 @@ export default function OrganizationDashboardPage() {
   if (isLoading) return <LoadingState />
 
   return (
-    <main className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100">
+    <main className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100 max-md:pb-24">
       <div className="mx-auto max-w-[2400px] px-4 md:px-10 py-6 md:py-14 space-y-6">
 
         {/* Greeting for the time of day, with the clock and date beside it. */}
         <div className="flex flex-wrap items-center justify-end max-md:flex-nowrap max-md:justify-between gap-x-8 max-md:gap-x-3 gap-y-3">
+          <DashboardSearch items={searchItems} placeholder="Search sections, actions and settings..." />
           <TimeGreeting name={organization?.name} />
           <AnalogClock />
         </div>
@@ -1316,7 +1387,7 @@ export default function OrganizationDashboardPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap max-md:flex-nowrap max-md:overflow-x-auto no-scrollbar max-md:w-full max-md:pb-1 max-md:[&>*]:shrink-0">
+          <div className="flex items-center gap-2 flex-wrap mobile-toolbar">
             <RefreshButton onRefresh={refreshAll} />
             <Link
               href="/"
@@ -1332,7 +1403,7 @@ export default function OrganizationDashboardPage() {
               <button
                 onClick={() => setShowSupportPlatform(true)}
                 data-tip="Donate directly to HelpLift - not to any organization"
-                className="inline-flex items-center gap-1.5 rounded-sm border border-pink-200 dark:border-pink-900 bg-pink-50 dark:bg-pink-950/40 px-4 py-2 text-sm font-semibold text-pink-700 dark:text-pink-300 hover:bg-pink-100 dark:hover:bg-pink-950/70"
+                className="max-md:hidden inline-flex items-center gap-1.5 rounded-sm border border-pink-200 dark:border-pink-900 bg-pink-50 dark:bg-pink-950/40 px-4 py-2 text-sm font-semibold text-pink-700 dark:text-pink-300 hover:bg-pink-100 dark:hover:bg-pink-950/70"
               >
                 <Heart className="h-3.5 w-3.5" /> Support The Platform
               </button>
@@ -1356,7 +1427,7 @@ export default function OrganizationDashboardPage() {
 
             <Link
               href="/organizations"
-              className="inline-flex items-center gap-1.5 rounded-sm border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+              className="max-md:hidden inline-flex items-center gap-1.5 rounded-sm border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
             >
               Organizations
             </Link>
@@ -1365,7 +1436,7 @@ export default function OrganizationDashboardPage() {
               <Link
                 href={`/organizations/${organization.id}`}
                 target="_blank"
-                className="inline-flex items-center gap-1.5 rounded-sm border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                className="max-md:hidden inline-flex items-center gap-1.5 rounded-sm border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
               >
                 <span>Public Profile</span>
                 <ExternalLink className="h-3.5 w-3.5 text-slate-400" />
@@ -1375,7 +1446,7 @@ export default function OrganizationDashboardPage() {
             <button
               onClick={() => setActiveTab("documents")}
               data-tip="View and upload your organization's verification documents"
-              className="inline-flex items-center gap-1.5 rounded-sm border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+              className="max-md:hidden inline-flex items-center gap-1.5 rounded-sm border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
             >
               <FileText className="h-3.5 w-3.5" /> Documents
             </button>
@@ -1384,7 +1455,7 @@ export default function OrganizationDashboardPage() {
               onClick={() => setShowQrCode(true)}
               aria-label="Get your QR code"
               data-tip="Get a QR code linking to your public profile, to share or print"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-sm border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740] transition-colors"
+              className="max-md:hidden inline-flex h-9 w-9 items-center justify-center rounded-sm border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740] transition-colors"
             >
               <QrCode className="h-4 w-4" />
             </button>
@@ -1393,31 +1464,33 @@ export default function OrganizationDashboardPage() {
               data-tour="badges"
               onClick={() => setShowBadges(true)}
               data-tip="Your organization's badges and progress toward the next one"
-              className="inline-flex items-center gap-1.5 rounded-sm border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 px-4 py-2 text-sm font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950/70"
+              className="max-md:hidden inline-flex items-center gap-1.5 rounded-sm border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 px-4 py-2 text-sm font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950/70"
             >
               <Star className="h-3.5 w-3.5" fill="currentColor" /> Badges
             </button>
 
             <button
               data-tour="settings"
+              aria-label="Settings"
               onClick={() => setIsSettingsOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-sm border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+              className="max-md:h-9 max-md:w-9 max-md:justify-center max-md:px-0 inline-flex items-center gap-1.5 rounded-sm border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
             >
-              <Settings className="h-3.5 w-3.5" /> Settings
+              <Settings className="h-3.5 w-3.5" /> <span className="max-md:hidden">Settings</span>
             </button>
 
             <button
               onClick={() => setIsMessagingAdmin(true)}
-              className="inline-flex items-center gap-1.5 rounded-sm border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+              className="max-md:hidden inline-flex items-center gap-1.5 rounded-sm border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
             >
               <MessageSquare className="h-3.5 w-3.5" /> Message Admin
             </button>
 
             <button
               onClick={logout}
-              className="inline-flex items-center gap-2 rounded-sm bg-slate-900 dark:bg-slate-100 px-4 py-2 text-sm font-semibold text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white"
+              aria-label="Sign out"
+              className="max-md:h-9 max-md:w-9 max-md:justify-center max-md:px-0 inline-flex items-center gap-2 rounded-sm bg-slate-900 dark:bg-slate-100 px-4 py-2 text-sm font-semibold text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white"
             >
-              <LogOut className="h-4 w-4" /> Sign out
+              <LogOut className="h-4 w-4" /> <span className="max-md:hidden">Sign out</span>
             </button>
           </div>
         </header>
@@ -1461,7 +1534,17 @@ export default function OrganizationDashboardPage() {
 
         {/* --- STATS ROW: what needs your attention right now, nothing
              that's just a total (that's what the Analytics tab is for) --- */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-x-6 gap-y-4 max-md:flex max-md:overflow-x-auto no-scrollbar max-md:gap-x-4 max-md:[&>*]:w-[40%] max-md:[&>*]:shrink-0">
+        <MobileAttentionGrid
+          onSelect={changeTab}
+          items={[
+            { id: "needs", label: "Open needs", value: stats.openNeeds, icon: ClipboardList, tone: "text-emerald-600" },
+            { id: "interests", label: "Pending interests", value: stats.pendingInterests, icon: Users, tone: "text-amber-600" },
+            { id: "fulfillments", label: "Active deliveries", value: stats.activeFulfillments, icon: PackageCheck, tone: "text-purple-600" },
+            ...(canSeeMoney ? [{ id: "wallet", label: "Pending withdrawals", value: pendingWithdrawals, icon: Wallet, tone: "text-pink-600" }] : []),
+            { id: "messages", label: "Unread messages", value: unreadMessages, icon: Mail, tone: "text-blue-600" },
+          ]}
+        />
+        <div className={`max-md:hidden grid grid-cols-2 ${canSeeMoney ? "md:grid-cols-5" : "md:grid-cols-4"} gap-x-6 gap-y-4`}>
           <StatCard icon={ClipboardList} label="Open Needs" value={stats.openNeeds} accent="emerald" />
           <StatCard icon={Users} label="Pending Interests" value={stats.pendingInterests} accent="amber" />
           <StatCard icon={PackageCheck} label="Active Fulfillments" value={stats.activeFulfillments} accent="purple" />
@@ -1470,8 +1553,10 @@ export default function OrganizationDashboardPage() {
         </div>
 
         {/* --- TABS --- */}
-        <Tabs value={activeTab} onValueChange={changeTab} className="gap-6">
-          <TabsList className="w-full flex-nowrap justify-start overflow-x-auto">
+        <Tabs value={activeTab} onValueChange={changeTab} className="gap-6 max-md:gap-4">
+          <MobileSectionHeading section={[...mobilePrimarySections, ...mobileMoreSections].find(section => section.id === activeTab)} />
+          <MobileSectionNav primary={mobilePrimarySections} more={mobileMoreSections} actions={mobileActions} active={activeTab} onSelect={changeTab} />
+          <TabsList className="w-full flex-nowrap max-xl:flex-wrap max-xl:gap-y-1 justify-start overflow-x-auto max-md:hidden">
             <TabsTrigger value="needs" className="shrink-0 gap-1.5 px-2.5"><ClipboardList className="w-4 h-4" />Needs</TabsTrigger>
             <TabsTrigger value="fulfillments" data-tour="tab-fulfillments" className="shrink-0 gap-1.5 px-2.5"><PackageCheck className="w-4 h-4" />Fulfillments<CountBadge value={stats.activeFulfillments} /></TabsTrigger>
             <TabsTrigger value="interests" data-tour="tab-interests" className="shrink-0 gap-1.5 px-2.5"><Users className="w-4 h-4" />Interests<CountBadge value={stats.pendingInterests} /></TabsTrigger>
@@ -1479,6 +1564,7 @@ export default function OrganizationDashboardPage() {
             {roleAtLeast(memberRole, "manager") && <TabsTrigger value="donations" data-tour="tab-donations" className="shrink-0 gap-1.5 px-2.5"><Banknote className="w-4 h-4" />Donations<CountBadge value={pendingDonations} /></TabsTrigger>}
             {roleAtLeast(memberRole, "manager") && <TabsTrigger value="wallet" data-tour="tab-wallet" className="shrink-0 gap-1.5 px-2.5"><Wallet className="w-4 h-4" />Wallet</TabsTrigger>}
             <TabsTrigger value="messages" data-tour="tab-messages" className="shrink-0 gap-1.5 px-2.5"><Mail className="w-4 h-4" />Messages<CountBadge value={unreadMessages} /></TabsTrigger>
+            <TabsTrigger value="timeline" data-tour="tab-timeline" data-tip="Your public timeline: updates, events and news" className="shrink-0 gap-1.5 px-2.5"><Newspaper className="w-4 h-4" />Timeline</TabsTrigger>
             <TabsTrigger value="stories" data-tour="tab-stories" className="shrink-0 gap-1.5 px-2.5"><Sparkles className="w-4 h-4" />Impact Stories</TabsTrigger>
             <TabsTrigger value="gifts" data-tour="tab-gifts" className="shrink-0 gap-1.5 px-2.5"><Gift className="w-4 h-4" />Gift Library</TabsTrigger>
             <TabsTrigger value="analytics" data-tour="tab-analytics" className="shrink-0 gap-1.5 px-2.5"><BarChart3 className="w-4 h-4" />Analytics</TabsTrigger>
@@ -1668,7 +1754,16 @@ export default function OrganizationDashboardPage() {
                         <option value="title">Title (A-Z)</option>
                       </select>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto pb-1">
+                    <MobileFilterSelect
+                      label="Status"
+                      value={needsStatusFilter}
+                      options={([
+                        ["all", "All"], ["draft", "Draft"], ["open", "Open"], ["in_progress", "In Progress"],
+                        ["fulfilled", "Fulfilled"], ["closed", "Closed"], ["reopen_pending", "Reopen Requested"], ["rejected", "Rejected"],
+                      ] as const).map(([value, label]) => ({ value, label }))}
+                      onChange={setNeedsStatusFilter}
+                    />
+                    <div className="max-md:hidden flex items-center gap-1.5 flex-nowrap overflow-x-auto pb-1">
                       {([
                         ["all", "All"], ["draft", "Draft"], ["open", "Open"], ["in_progress", "In Progress"],
                         ["fulfilled", "Fulfilled"], ["closed", "Closed"], ["reopen_pending", "Reopen Requested"], ["rejected", "Rejected"],
@@ -1765,14 +1860,14 @@ export default function OrganizationDashboardPage() {
                                 type="button"
                                 onClick={() => setQrNeed({ id: need.id, title: need.title })}
                                 data-tip="Get a QR code linking straight to this need - for a flyer or poster"
-                                className="inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-xs font-bold hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                                className="inline-flex items-center gap-1.5 btn-pill btn-pill--neutral"
                               >
                                 <QrCode className="w-3 h-3" /> QR code
                               </button>
                               <button
                                 onClick={() => runAction(`${need.id}:close`, () => updateNeedStatus(need, "closed"))}
                                 disabled={busyAction?.startsWith(`${need.id}:`)}
-                                className="inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-xs font-bold hover:bg-slate-50 dark:hover:bg-[#1A2740] disabled:opacity-60"
+                                className="inline-flex items-center gap-1.5 btn-pill btn-pill--neutral disabled:opacity-60"
                               >
                                 {busyAction === `${need.id}:close` && <Loader2 className="w-3 h-3 animate-spin" />}
                                 Close need
@@ -1780,7 +1875,7 @@ export default function OrganizationDashboardPage() {
                               <button
                                 onClick={() => runAction(`${need.id}:fulfil`, () => updateNeedStatus(need, "fulfilled"))}
                                 disabled={busyAction?.startsWith(`${need.id}:`)}
-                                className="inline-flex items-center gap-1.5 rounded-sm border border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-400 px-3 py-1.5 text-xs font-bold hover:bg-emerald-50 dark:hover:bg-emerald-950/30 disabled:opacity-60"
+                                className="inline-flex items-center gap-1.5 btn-pill btn-pill--green-soft disabled:opacity-60"
                               >
                                 {busyAction === `${need.id}:fulfil` && <Loader2 className="w-3 h-3 animate-spin" />}
                                 Mark fulfilled
@@ -1797,7 +1892,7 @@ export default function OrganizationDashboardPage() {
                                 type="button"
                                 onClick={() => { setReopenReason(""); setReopenFiles([]); setReopenDueDate(""); setReopenNeed(need) }}
                                 data-tip="Ask an administrator to reopen this need - you'll need to explain why"
-                                className="inline-flex items-center gap-1.5 rounded-sm border border-blue-200 dark:border-blue-900 text-blue-700 dark:text-blue-400 px-3 py-1.5 text-xs font-bold hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                                className="inline-flex items-center gap-1.5 btn-pill btn-pill--blue-soft"
                               >
                                 <RefreshCw className="w-3 h-3" /> Reopen
                               </button>
@@ -1812,7 +1907,7 @@ export default function OrganizationDashboardPage() {
                           {canEditOrDelete && (
                             <button
                               onClick={() => openEditNeed(need)}
-                              className="inline-flex items-center gap-1 rounded-sm px-3 py-1.5 text-xs font-bold hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                              className="inline-flex items-center gap-1 btn-pill btn-pill--neutral"
                             >
                               <Pencil className="w-3 h-3" /> Edit
                             </button>
@@ -1886,7 +1981,7 @@ export default function OrganizationDashboardPage() {
                             onClick={(e) => { e.stopPropagation(); if (busyAction !== `${item.id}:start`) runAction(`${item.id}:start`, () => handleStartFulfillment(item.id)) }}
                             onKeyDown={activateOnKey}
                             aria-disabled={busyAction === `${item.id}:start`}
-                            className="inline-flex items-center gap-1.5 rounded-sm bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-blue-700 aria-disabled:opacity-60"
+                            className="inline-flex items-center gap-1.5 btn-pill btn-pill--blue aria-disabled:opacity-60"
                           >
                             {busyAction === `${item.id}:start` && <Loader2 className="w-3 h-3 animate-spin" />}
                             Start Delivery
@@ -1899,7 +1994,7 @@ export default function OrganizationDashboardPage() {
                             tabIndex={0}
                             onClick={(e) => { e.stopPropagation(); setVerifyingFulfillment(item) }}
                             onKeyDown={activateOnKey}
-                            className="rounded-sm bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 shadow-sm"
+                            className="btn-pill btn-pill--green"
                           >
                             Verify & Complete
                           </span>
@@ -1968,7 +2063,7 @@ export default function OrganizationDashboardPage() {
                             tabIndex={0}
                             onClick={() => setViewingGiver(giver)}
                             onKeyDown={activateOnKey}
-                            className="inline-flex cursor-pointer items-center gap-1 rounded-sm px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                            className="inline-flex cursor-pointer items-center gap-1 btn-pill btn-pill--neutral"
                           >
                             <Eye className="w-3 h-3" /> Details
                           </span>
@@ -1976,7 +2071,7 @@ export default function OrganizationDashboardPage() {
                         {giver?.profile_id && (
                           <button
                             onClick={() => setMessagingGiver({ id: giver.profile_id!, label: giver.name })}
-                            className="inline-flex items-center gap-1 rounded-sm px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                            className="inline-flex items-center gap-1 btn-pill btn-pill--neutral"
                           >
                             <MessageSquare className="w-3 h-3" /> Message
                           </button>
@@ -1986,7 +2081,7 @@ export default function OrganizationDashboardPage() {
                             <button
                               onClick={() => runAction(`${item.id}:accept`, () => updateInterest(item.id, "accepted"))}
                               disabled={busyAction?.startsWith(`${item.id}:`)}
-                              className="inline-flex items-center gap-1.5 rounded-sm bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+                              className="inline-flex items-center gap-1.5 btn-pill btn-pill--green disabled:opacity-60"
                             >
                               {busyAction === `${item.id}:accept` && <Loader2 className="w-3 h-3 animate-spin" />}
                               Accept
@@ -1994,7 +2089,7 @@ export default function OrganizationDashboardPage() {
                             <button
                               onClick={() => runAction(`${item.id}:decline`, () => updateInterest(item.id, "declined"))}
                               disabled={busyAction?.startsWith(`${item.id}:`)}
-                              className="inline-flex items-center gap-1.5 rounded-sm bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-60"
+                              className="inline-flex items-center gap-1.5 btn-pill btn-pill--red disabled:opacity-60"
                             >
                               {busyAction === `${item.id}:decline` && <Loader2 className="w-3 h-3 animate-spin" />}
                               Decline
@@ -2088,7 +2183,7 @@ export default function OrganizationDashboardPage() {
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setMessagingGiver({ id: donor.profile_id, label: donor.name }) }}
-                              className="inline-flex items-center gap-1 rounded-sm px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                              className="inline-flex items-center gap-1 btn-pill btn-pill--neutral"
                             >
                               <MessageSquare className="w-3 h-3" /> Message
                             </button>
@@ -2205,6 +2300,14 @@ export default function OrganizationDashboardPage() {
           </TabsContent>
 
           {/* --- IMPACT STORIES TAB --- */}
+          <TabsContent value="timeline" className={tabMotion}>
+            <div className="mx-auto max-w-3xl space-y-4">
+              <p className="text-sm text-slate-500 dark:text-slate-400 max-md:hidden">
+                Post updates, events, milestones and news. Posts appear straight away on your public profile and in the Organizations directory - no admin approval needed.
+              </p>
+              {organization?.id && <OrgTimeline organizationId={organization.id} organizationName={organization.name || "Your organization"} refreshKey={refreshKey} heading={false} />}
+            </div>
+          </TabsContent>
           <TabsContent value="stories" className={`grid gap-6 lg:grid-cols-[0.9fr_1.1fr] ${tabMotion}`}>
             <Card className="border-0 rounded shadow-none">
               <CardHeader>
@@ -2346,7 +2449,7 @@ export default function OrganizationDashboardPage() {
                         <div className="flex items-center gap-2 pt-1">
                           <button
                             onClick={() => openEditStory(story)}
-                            className="inline-flex items-center gap-1 rounded-sm px-3 py-1.5 text-xs font-bold hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                            className="inline-flex items-center gap-1 btn-pill btn-pill--neutral"
                           >
                             <Pencil className="w-3 h-3" /> Edit
                           </button>
@@ -2508,7 +2611,7 @@ export default function OrganizationDashboardPage() {
                               onClick={() => setDeletingDoc({ id: document.id, file_name: document.file_name })}
                               aria-label={`Delete ${document.file_name}`}
                               data-tip="Delete this document"
-                              className="text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                              className="btn-delete"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -2765,14 +2868,13 @@ export default function OrganizationDashboardPage() {
                       </Button>
                     )}
                     {!isFinished && need.status !== "reopen_pending" && (
-                      <Button
+                      <button
                         type="button"
-                        variant="outline"
-                        className="text-red-600 border-red-200 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/30"
+                        className="btn-delete btn-delete--label h-9"
                         onClick={() => { const n = need; setSelectedNeed(null); deleteNeed(n.id) }}
                       >
-                        <X className="w-4 h-4" /> Delete
-                      </Button>
+                        <Trash2 className="w-4 h-4" /> Delete
+                      </button>
                     )}
                   </div>
                 </div>
