@@ -6,6 +6,7 @@ import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { useRouter } from "next/navigation"
 import { Clock, AlertTriangle, XCircle, LogOut, Mail, UploadCloud, FileText, Loader2, CheckCircle2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { getSessionUser } from "@/lib/session-user"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { MessageComposeDialog } from "@/components/message-compose-dialog"
@@ -58,7 +59,7 @@ export default function PendingVerificationPage() {
   const [sentToAdmin, setSentToAdmin] = useState(false)
 
   const loadData = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await getSessionUser(supabase)
     if (!user) return
     const { data: membership } = await supabase
       .from("organization_members")

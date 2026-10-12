@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ShieldAlert, LogOut, Mail } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { getSessionUser } from "@/lib/session-user"
 import { Button } from "@/components/ui/button"
 import { MessageComposeDialog } from "@/components/message-compose-dialog"
 
@@ -19,7 +20,7 @@ export default function SuspendedPage() {
   const [sent, setSent] = useState(false)
 
   useEffect(() => {
-    supabase.auth.getUser().then(async ({ data }) => {
+    getSessionUser(supabase).then(async ({ data }) => {
       if (!data.user) return
       const { data: profile } = await supabase.from("profiles").select("suspended_reason").eq("id", data.user.id).single()
       setReason(profile?.suspended_reason || null)

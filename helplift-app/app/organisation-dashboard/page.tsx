@@ -55,6 +55,7 @@ import {
   Newspaper,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { getSessionUser } from "@/lib/session-user"
 import { firstOf } from "@/lib/utils"
 import { useNeedCategories } from "@/lib/use-need-categories"
 import { NeedWriter } from "@/components/need-writer"
@@ -435,7 +436,7 @@ export default function OrganizationDashboardPage() {
   }
 
   const loadData = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await getSessionUser(supabase)
     if (!user) {
       // Offline, the sign-in check can fail even though the person is signed in. Don't send them
       // to the login page for that; tell them, and let them retry once they're back online.

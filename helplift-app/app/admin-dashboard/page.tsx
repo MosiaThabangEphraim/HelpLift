@@ -79,6 +79,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart"
 import { createClient } from "@/lib/supabase/client"
+import { getSessionUser } from "@/lib/session-user"
 import { firstOf } from "@/lib/utils"
 import { DonationDetailDialog, statusBadgeClasses, type DonationSummary } from "@/components/donation-detail-dialog"
 import { GiftDetailDialog, type GiftDetailSummary, type GiftClaimSummary } from "@/components/gift-detail-dialog"
@@ -333,7 +334,7 @@ export default function AdminDashboardPage() {
     let firstError = ""
     const recordError = (msg: string) => { firstError = firstError || msg }
 
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await getSessionUser(supabase)
     if (!user) return router.replace("/admin-login")
     if (user.email) setOwnEmail(user.email)
     const { data: currentProfile } = await supabase.from("profiles").select("role").eq("id", user.id).single()

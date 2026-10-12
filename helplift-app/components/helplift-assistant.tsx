@@ -6,6 +6,7 @@ import Link from "next/link"
 import { ArrowRight, Bot, EyeOff, Headphones, Mic, PhoneOff, Sparkles, Square, Volume2, X, User, Send } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
+import { getSessionUser } from "@/lib/session-user"
 import { isAssistantEnabled, onAssistantPreferenceChange, setAssistantEnabled } from "@/lib/assistant-preference"
 import { isSpeechToTextSupported, useSpeechToText } from "@/lib/speech-to-text"
 import { isTextToSpeechSupported, primeSpeechSynthesis, speakInSentences } from "@/lib/text-to-speech"
@@ -228,7 +229,7 @@ export function HelpLiftAssistant() {
     let cancelled = false
     const detectRole = async () => {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getSessionUser(supabase)
       let role: Role = "guest"
       if (user) {
         const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle()

@@ -27,6 +27,7 @@ import {
   Image as ImageIcon
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { getSessionUser } from "@/lib/session-user"
 import { useNeedCategories } from "@/lib/use-need-categories"
 import { DonateDialog } from "@/components/donate-dialog"
 import { BackButton } from "@/components/back-button"
@@ -139,7 +140,7 @@ export default function PublicNeedsPage() {
 
   const checkUserSession = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getSessionUser(supabase)
       if (user) {
         setCurrentUser(user)
         const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()

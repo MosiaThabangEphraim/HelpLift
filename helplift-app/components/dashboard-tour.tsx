@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { ArrowLeft, ArrowRight, Sparkles, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { getSessionUser } from "@/lib/session-user"
 import { logClientAction } from "@/components/activity-tracker"
 
 // First-time dashboard tour: a few dismissible step-by-step cards that spotlight
@@ -107,7 +108,7 @@ export function DashboardTour({ role, name }: { role: TourRole; name?: string | 
     const check = async () => {
       const forced = new URLSearchParams(window.location.search).get("tour") === "1"
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getSessionUser(supabase)
       if (!user || cancelled) return
       const done = !!user.user_metadata?.[DONE_KEY[role]]
       const isNewAccount = new Date(user.created_at).getTime() >= new Date(TOUR_LAUNCH).getTime()

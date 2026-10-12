@@ -4,6 +4,7 @@ import { useEffect, useState, use } from "react"
 import { useRouter } from "next/navigation"
 import { AlertCircle, CheckCircle2, HeartHandshake, Loader2, Users } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { getSessionUser } from "@/lib/session-user"
 import { PasswordRequirements } from "@/components/password-requirements"
 import { isPasswordValid } from "@/lib/password"
 import { ROLE_LABELS, type OrgRole } from "@/lib/organization-access"
@@ -45,7 +46,7 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
   useEffect(() => {
     const load = async () => {
       try {
-        const [res, { data: { user } }] = await Promise.all([fetch(`/api/invitations/${token}`), supabase.auth.getUser()])
+        const [res, { data: { user } }] = await Promise.all([fetch(`/api/invitations/${token}`), getSessionUser(supabase)])
         const data = await res.json()
         if (!res.ok) setLoadError(data.message || "This invitation link isn't valid.")
         else setInvite(data)

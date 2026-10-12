@@ -27,6 +27,7 @@ import {
   ShieldCheck
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { getSessionUser } from "@/lib/session-user"
 import { BackButton } from "@/components/back-button"
 import { GiftDetailDialog, type GiftDetailSummary } from "@/components/gift-detail-dialog"
 import { ReadAloudButton } from "@/components/read-aloud-button"
@@ -79,7 +80,7 @@ export default function PublicGiftLibraryPage() {
 
   const checkUserSession = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getSessionUser(supabase)
       if (user) {
         setCurrentUser(user)
         const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()

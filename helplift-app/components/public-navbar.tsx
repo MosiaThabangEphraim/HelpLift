@@ -24,6 +24,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
+import { getSessionUser } from "@/lib/session-user"
 import { logClientAction } from "@/components/activity-tracker"
 import { BrandLogo } from "@/components/brand-logo"
 
@@ -63,7 +64,7 @@ export default function PublicNavbar() {
   useEffect(() => {
     setMounted(true)
     const supabase = createClient()
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
+    getSessionUser(supabase).then(async ({ data: { user } }) => {
       if (!user) return
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
       if (profile?.role) setDashboardPath(DASHBOARD_PATH[profile.role] || null)

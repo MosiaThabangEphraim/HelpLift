@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { CheckCircle2, Fingerprint, Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { getSessionUser } from "@/lib/session-user"
 import { Button } from "@/components/ui/button"
 import { deviceLabel, isPasskeySupported, passkeyErrorMessage } from "@/lib/passkeys"
 
@@ -28,7 +29,7 @@ export function PasskeyPrompt() {
     // Wait a moment so the prompt doesn't compete with the dashboard loading.
     const timer = window.setTimeout(async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
+        const { data: { user } } = await getSessionUser(supabase)
         if (!user || cancelled) return
         const storedKey = storageKey(user.id)
         if (window.localStorage.getItem(storedKey)) return

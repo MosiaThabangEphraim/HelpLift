@@ -50,6 +50,7 @@ import { getCurrentPosition, haversineKm, NEAR_ME_RADIUS_KM, reverseGeocodePlace
 import { ViewToggle, type ListView } from "@/components/view-toggle"
 import { OutcomeBanner } from "@/components/outcome-banner"
 import { createClient } from "@/lib/supabase/client"
+import { getSessionUser } from "@/lib/session-user"
 import { firstOf } from "@/lib/utils"
 import { DonateDialog } from "@/components/donate-dialog"
 import { BadgesPanel } from "@/components/badges-panel"
@@ -313,7 +314,7 @@ export default function GiverDashboardPage() {
   }
 
   const loadData = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await getSessionUser(supabase)
     if (!user) {
       // Offline, the sign-in check can fail even though the person is signed in. Don't send them
       // to the login page for that; tell them, and let them retry once they're back online.

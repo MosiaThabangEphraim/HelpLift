@@ -59,7 +59,13 @@ export async function proxy(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  // getClaims() checks the sign-in token locally when the project signs tokens
+  // with asymmetric keys (falling back to asking Supabase otherwise), instead
+  // of a round trip to the auth server on every page - which was slow (~1s)
+  // and, with everything else, hit Supabase's auth rate limit. Only the
+  // user's id is needed here.
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const user = claimsData?.claims?.sub ? { id: claimsData.claims.sub as string } : null
   const pathname = request.nextUrl.pathname
 
   if (!MAINTENANCE_BYPASS.includes(pathname)) {

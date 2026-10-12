@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { getSessionUser } from "@/lib/session-user"
 
 // Whether the current visitor can send messages, for pages that offer a
 // "Message" button (organization directory and profile pages).
@@ -16,7 +17,7 @@ export function useCanMessage() {
     const supabase = createClient()
     const check = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
+        const { data: { user } } = await getSessionUser(supabase)
         if (!user) return
         const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
         let isCoordinator = false

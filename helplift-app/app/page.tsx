@@ -43,6 +43,7 @@ import { GrammarCheckButton } from "@/components/grammar-check-button"
 import { appendSpeech } from "@/lib/speech-to-text"
 import { activateOnKey } from "@/lib/keyboard"
 import { createClient } from "@/lib/supabase/client"
+import { getSessionUser } from "@/lib/session-user"
 import { SupportPlatformDialog } from "@/components/support-platform-dialog"
 import { TipOffDialog } from "@/components/tip-off-dialog"
 import { GuestSupportPlatformDialog } from "@/components/guest-support-platform-dialog"
@@ -112,7 +113,7 @@ export default function LandingPage() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
+    getSessionUser(supabase).then(async ({ data: { user } }) => {
       if (!user) return
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle()
       const paths: Record<string, string> = { giver: "/givers-dashboard", organization: "/organisation-dashboard", admin: "/admin-dashboard" }
@@ -128,7 +129,7 @@ export default function LandingPage() {
 
   const handleSupportPlatformClick = async () => {
     const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await getSessionUser(supabase)
     if (!user) {
       setShowSupportAuthPrompt(true)
       return
