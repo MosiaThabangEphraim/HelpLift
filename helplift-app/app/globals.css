@@ -54,38 +54,38 @@
    selector, which meant every page was dark by default regardless of the
    selected theme. */
 .dark {
-  --background: #0B1220;
+  --background: var(--scheme-deep, #0B1220);
   --foreground: #ffffff;
-  --card: #121B2E;
+  --card: var(--scheme-surface, #121B2E);
   --card-foreground: #ffffff;
-  --popover: #121B2E;
+  --popover: var(--scheme-surface, #121B2E);
   --popover-foreground: #ffffff;
   --primary: #0a8fdc;
   --primary-foreground: #ffffff;
-  --secondary: #1A2740;
+  --secondary: var(--scheme-raised, #1A2740);
   --secondary-foreground: #ffffff;
-  --muted: #1A2740;
+  --muted: var(--scheme-raised, #1A2740);
   --muted-foreground: #aaaaaa;
-  --accent: #1A2740;
+  --accent: var(--scheme-raised, #1A2740);
   --accent-foreground: #ffffff;
   --destructive: #dc2626;
   --destructive-foreground: #fecaca;
-  --border: #233350;
-  --input: #233350;
-  --ring: #2C3E63;
+  --border: var(--scheme-line, #233350);
+  --input: var(--scheme-line, #233350);
+  --ring: var(--scheme-line-strong, #2C3E63);
   --chart-1: #0a8fdc;
   --chart-2: #31a24c;
   --chart-3: #e4163a;
   --chart-4: #f02849;
   --chart-5: #0a66c2;
-  --sidebar: #121B2E;
+  --sidebar: var(--scheme-surface, #121B2E);
   --sidebar-foreground: #ffffff;
   --sidebar-primary: #0a8fdc;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #1A2740;
+  --sidebar-accent: var(--scheme-raised, #1A2740);
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #233350;
-  --sidebar-ring: #2C3E63;
+  --sidebar-border: var(--scheme-line, #233350);
+  --sidebar-ring: var(--scheme-line-strong, #2C3E63);
 }
 
 /* High-contrast mode - a third theme choice alongside light/dark (see
@@ -99,7 +99,7 @@
    Button/Card/Dialog/Input/etc., which use bg-background/text-foreground/
    border-border rather than literal colors) gets full coverage for free.
    The dashboards additionally use a lot of literal Tailwind colors
-   (bg-white, text-slate-500, dark:bg-[#121B2E]...) that predate this mode;
+   (bg-white, text-slate-500, dark:bg-[var(--scheme-surface, #121B2E)]...) that predate this mode;
    the broad-strokes overrides after the variables catch the handful of
    color combinations repeated the most often across this app, as a
    pragmatic first pass - not an exhaustive guarantee on every literal
@@ -278,7 +278,7 @@ body {
 }
 
 .dark .row {
-  border-color: #233350;
+  border-color: var(--scheme-line, #233350);
 }
 
 .field {
@@ -298,7 +298,7 @@ body {
 }
 
 .dark .field {
-  border-color: #233350;
+  border-color: var(--scheme-line, #233350);
   color: #f1f5f9;
   background: #0f1729;
 }
@@ -322,12 +322,6 @@ body {
   text-decoration: underline;
 }
 
-/* Mic button: a small rounded square (no border) instead of a circle, both
-   idle and recording states. */
-[data-tip="Speak instead of typing"],
-[data-tip="Stop voice typing"] {
-  border-radius: 4px;
-}
 
 code, pre {
   font-family: 'JetBrains Mono', monospace;
@@ -355,7 +349,7 @@ option {
 }
 
 .dark option {
-  background-color: #121B2E;
+  background-color: var(--scheme-surface, #121B2E);
   color: #f1f5f9;
 }
 
@@ -708,18 +702,18 @@ html.reduce-motion *:not(.animate-spin)::after {
   }
   .dark .mobile-toolbar button,
   .dark .mobile-toolbar a {
-    background-color: #1a2740;
+    background-color: var(--scheme-raised, #1A2740);
     box-shadow: none;
   }
   .mobile-toolbar button:active,
   .mobile-toolbar a:active {
     transform: scale(0.86);
-    background-color: rgb(37 99 235 / 0.14);
+    background-color: color-mix(in srgb, var(--color-blue-600) 14%, transparent);
   }
   .mobile-toolbar button[aria-expanded="true"],
   .mobile-toolbar button[aria-pressed="true"] {
-    background-color: rgb(37 99 235 / 0.12);
-    color: #2563eb;
+    background-color: color-mix(in srgb, var(--color-blue-600) 12%, transparent);
+    color: var(--color-blue-600);
   }
   .mobile-toolbar [aria-label="Sign out"] {
     color: #dc2626;
@@ -807,8 +801,8 @@ html.reduce-motion *:not(.animate-spin)::after {
 
 .btn-pill--neutral { background: #f1f5f9; color: #334155; }
 .btn-pill--neutral:hover { background: #e2e8f0; }
-.dark .btn-pill--neutral { background: #1a2740; color: #cbd5e1; }
-.dark .btn-pill--neutral:hover { background: #233350; }
+.dark .btn-pill--neutral { background: var(--scheme-raised, #1A2740); color: #cbd5e1; }
+.dark .btn-pill--neutral:hover { background: var(--scheme-line, #233350); }
 
 .btn-pill--red { background: rgb(239 68 68 / 0.1); color: #dc2626; }
 .btn-pill--red:hover { background: rgb(239 68 68 / 0.18); }
@@ -825,7 +819,7 @@ html.reduce-motion *:not(.animate-spin)::after {
 .btn-pill--red-solid,
 .btn-pill--amber-solid { color: #ffffff; }
 .btn-pill--green { background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 12px -4px rgb(16 185 129 / 0.55); }
-.btn-pill--blue { background: linear-gradient(135deg, #2563eb, #4f46e5); box-shadow: 0 4px 12px -4px rgb(37 99 235 / 0.55); }
+.btn-pill--blue { background: linear-gradient(135deg, var(--color-blue-600), var(--color-indigo-600)); box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--color-blue-600) 55%, transparent); }
 .btn-pill--red-solid { background: linear-gradient(135deg, #ef4444, #dc2626); box-shadow: 0 4px 12px -4px rgb(239 68 68 / 0.55); }
 .btn-pill--amber-solid { background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 4px 12px -4px rgb(245 158 11 / 0.55); }
 .btn-pill--green:hover,
@@ -838,9 +832,9 @@ html.reduce-motion *:not(.animate-spin)::after {
 .btn-pill--green-soft { background: rgb(16 185 129 / 0.12); color: #047857; }
 .btn-pill--green-soft:hover { background: rgb(16 185 129 / 0.2); }
 .dark .btn-pill--green-soft { background: rgb(52 211 153 / 0.12); color: #34d399; }
-.btn-pill--blue-soft { background: rgb(37 99 235 / 0.1); color: #1d4ed8; }
-.btn-pill--blue-soft:hover { background: rgb(37 99 235 / 0.18); }
-.dark .btn-pill--blue-soft { background: rgb(96 165 250 / 0.12); color: #60a5fa; }
+.btn-pill--blue-soft { background: color-mix(in srgb, var(--color-blue-600) 10%, transparent); color: var(--color-blue-700); }
+.btn-pill--blue-soft:hover { background: color-mix(in srgb, var(--color-blue-600) 18%, transparent); }
+.dark .btn-pill--blue-soft { background: color-mix(in srgb, var(--color-blue-400) 12%, transparent); color: var(--color-blue-400); }
 
 /* Admin dashboard, light themes: more readable text. Only text colours change -
    the pale greys used for secondary text, labels and inactive tabs are one
@@ -851,3 +845,114 @@ html.reduce-motion *:not(.animate-spin)::after {
 :is(.light, .grayscale) .admin-readable .text-slate-600 { color: #334155; }
 :is(.light, .grayscale) .admin-readable [data-slot="tabs-trigger"]:not([data-state="active"]) { color: #475569; }
 :is(.light, .grayscale) .admin-readable :is(input, textarea)::placeholder { color: #64748b; }
+
+/* Dashboard stat icons (StatCard on all three dashboards, and the phone
+   "waiting" chips): pop in when the page loads, then float gently, each one a
+   beat apart so they don't move in unison; a playful wiggle on hover. Reduce
+   motion (Settings or the device) switches it off via the rules above. */
+.stat-icon {
+  animation:
+    stat-icon-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+    stat-icon-float 3.6s ease-in-out 0.6s infinite;
+  will-change: transform;
+}
+:nth-child(2) > .stat-icon { animation-delay: 0.08s, 1.1s; }
+:nth-child(3) > .stat-icon { animation-delay: 0.16s, 1.6s; }
+:nth-child(4) > .stat-icon { animation-delay: 0.24s, 2.1s; }
+:nth-child(5) > .stat-icon { animation-delay: 0.32s, 2.6s; }
+:nth-child(6) > .stat-icon { animation-delay: 0.4s, 3.1s; }
+:nth-child(7) > .stat-icon { animation-delay: 0.48s, 3.6s; }
+[data-stat-card]:hover .stat-icon svg,
+button:hover > .stat-icon svg {
+  animation: stat-icon-wiggle 0.6s ease-in-out;
+}
+@keyframes stat-icon-pop {
+  0% { transform: scale(0.3) rotate(-12deg); opacity: 0; }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+@keyframes stat-icon-float {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-3px) scale(1.06); }
+}
+@keyframes stat-icon-wiggle {
+  0%, 100% { transform: rotate(0); }
+  20% { transform: rotate(-14deg) scale(1.1); }
+  45% { transform: rotate(10deg) scale(1.1); }
+  70% { transform: rotate(-6deg); }
+}
+
+/* Dashboard colour schemes (Settings -> User interface -> Colour scheme,
+   lib/color-scheme.ts). Default has no attribute. Each named scheme restyles
+   the whole dashboard: accents (Tailwind blue/indigo), neutral greys (slate),
+   the page background and the dark-mode surfaces. Success green, warning
+   amber and danger red are untouched. */
+html[data-scheme="forest"] {
+  --color-blue-50: #f0fdfa; --color-blue-100: #ccfbf1; --color-blue-200: #99f6e4; --color-blue-300: #5eead4; --color-blue-400: #2dd4bf; --color-blue-500: #14b8a6; --color-blue-600: #0d9488; --color-blue-700: #0f766e; --color-blue-800: #115e59; --color-blue-900: #134e4a; --color-blue-950: #042f2e;
+  --color-indigo-50: #ecfdf5; --color-indigo-100: #d1fae5; --color-indigo-200: #a7f3d0; --color-indigo-300: #6ee7b7; --color-indigo-400: #34d399; --color-indigo-500: #10b981; --color-indigo-600: #059669; --color-indigo-700: #047857; --color-indigo-800: #065f46; --color-indigo-900: #064e3b; --color-indigo-950: #022c22;
+  --color-slate-50: #f4f8f5; --color-slate-100: #e6eee8; --color-slate-200: #d2ddd5; --color-slate-300: #b1c2b6; --color-slate-400: #86998c; --color-slate-500: #627568; --color-slate-600: #4b5d51; --color-slate-700: #3a4a3f; --color-slate-800: #26342b; --color-slate-900: #17221b; --color-slate-950: #0c150f;
+  --scheme-page: #F1F6F2;
+  --scheme-deep: #0A1712; --scheme-surface: #10221A; --scheme-raised: #172E23;
+  --scheme-line: #21402F; --scheme-line-strong: #2D553F; --scheme-nav: #0D1C16;
+}
+html[data-scheme="forest"].dark { --primary: #14b8a6; --sidebar-primary: #14b8a6; }
+html[data-scheme="sunset"] {
+  --color-blue-50: #fff7ed; --color-blue-100: #ffedd5; --color-blue-200: #fed7aa; --color-blue-300: #fdba74; --color-blue-400: #fb923c; --color-blue-500: #f97316; --color-blue-600: #ea580c; --color-blue-700: #c2410c; --color-blue-800: #9a3412; --color-blue-900: #7c2d12; --color-blue-950: #431407;
+  --color-indigo-50: #fff1f2; --color-indigo-100: #ffe4e6; --color-indigo-200: #fecdd3; --color-indigo-300: #fda4af; --color-indigo-400: #fb7185; --color-indigo-500: #f43f5e; --color-indigo-600: #e11d48; --color-indigo-700: #be123c; --color-indigo-800: #9f1239; --color-indigo-900: #881337; --color-indigo-950: #4c0519;
+  --color-slate-50: #faf7f4; --color-slate-100: #f3ede7; --color-slate-200: #e5dcd3; --color-slate-300: #d0c3b6; --color-slate-400: #a89686; --color-slate-500: #857368; --color-slate-600: #685950; --color-slate-700: #51453e; --color-slate-800: #362d28; --color-slate-900: #221b17; --color-slate-950: #14100c;
+  --scheme-page: #FBF6F1;
+  --scheme-deep: #17110D; --scheme-surface: #211812; --scheme-raised: #2D2119;
+  --scheme-line: #3D2D22; --scheme-line-strong: #523C2D; --scheme-nav: #1C1510;
+}
+html[data-scheme="sunset"].dark { --primary: #f97316; --sidebar-primary: #f97316; }
+html[data-scheme="midnight"] {
+  --color-blue-50: #f5f3ff; --color-blue-100: #ede9fe; --color-blue-200: #ddd6fe; --color-blue-300: #c4b5fd; --color-blue-400: #a78bfa; --color-blue-500: #8b5cf6; --color-blue-600: #7c3aed; --color-blue-700: #6d28d9; --color-blue-800: #5b21b6; --color-blue-900: #4c1d95; --color-blue-950: #2e1065;
+  --color-indigo-50: #fdf4ff; --color-indigo-100: #fae8ff; --color-indigo-200: #f5d0fe; --color-indigo-300: #f0abfc; --color-indigo-400: #e879f9; --color-indigo-500: #d946ef; --color-indigo-600: #c026d3; --color-indigo-700: #a21caf; --color-indigo-800: #86198f; --color-indigo-900: #701a75; --color-indigo-950: #4a044e;
+  --color-slate-50: #f8f7fc; --color-slate-100: #eeecf7; --color-slate-200: #dcd8ec; --color-slate-300: #c0b9d8; --color-slate-400: #9790b5; --color-slate-500: #726a91; --color-slate-600: #585175; --color-slate-700: #443e5d; --color-slate-800: #2c2740; --color-slate-900: #1b172a; --color-slate-950: #0f0c1a;
+  --scheme-page: #F6F4FB;
+  --scheme-deep: #110D1F; --scheme-surface: #19142C; --scheme-raised: #231C3B;
+  --scheme-line: #30274F; --scheme-line-strong: #403466; --scheme-nav: #150F26;
+}
+html[data-scheme="midnight"].dark { --primary: #8b5cf6; --sidebar-primary: #8b5cf6; }
+/* Fixed dashboard colours (arbitrary Tailwind values) -> the scheme's own. */
+html[data-scheme]:not(.dark) .bg-\[\#FAFAFA\] { background-color: var(--scheme-page); }
+html[data-scheme].dark .dark\:bg-\[\#0B1220\] { background-color: var(--scheme-deep); }
+html[data-scheme] .bg-\[\#0B1220\]\/60 { background-color: color-mix(in srgb, var(--scheme-deep) 60%, transparent); }
+html[data-scheme].dark .dark\:ring-\[\#0B1220\] { --tw-ring-color: var(--scheme-deep); }
+html[data-scheme].dark .dark\:bg-\[\#121B2E\],
+html[data-scheme].dark .dark\:bg-\[\#111a2e\] { background-color: var(--scheme-surface); }
+html[data-scheme].dark .dark\:bg-\[\#121B2E\]\/60 { background-color: color-mix(in srgb, var(--scheme-surface) 60%, transparent); }
+html[data-scheme].dark .dark\:bg-\[\#1A2740\],
+html[data-scheme].dark .dark\:hover\:bg-\[\#1A2740\]:hover { background-color: var(--scheme-raised); }
+html[data-scheme].dark .dark\:hover\:bg-\[\#1A2740\]\/40:hover { background-color: color-mix(in srgb, var(--scheme-raised) 40%, transparent); }
+html[data-scheme].dark .dark\:hover\:bg-\[\#233350\]:hover { background-color: var(--scheme-line); }
+html[data-scheme].dark .dark\:border-\[\#233350\] { border-color: var(--scheme-line); }
+html[data-scheme].dark .dark\:border-\[\#2C3E63\],
+html[data-scheme].dark .dark\:hover\:border-\[\#2C3E63\]:hover { border-color: var(--scheme-line-strong); }
+html[data-scheme].dark .dark\:bg-\[\#0E1729\] { background-color: var(--scheme-nav); }
+html[data-scheme].dark .dark\:bg-\[\#0E1729\]\/95 { background-color: color-mix(in srgb, var(--scheme-nav) 95%, transparent); }
+
+/* Every icon across the app (lucide icons) stays still and animates only when
+   hovered - the icon itself, or the button, link or label it sits in - with
+   the stat icons' wiggle. (The dashboard stat tiles keep their pop-in and
+   float; see .stat-icon.) Spinners are left alone. Reduce motion (Settings or
+   the device) switches it off. */
+svg.lucide:not(.animate-spin):hover,
+:is(button, a, [role="button"], label):hover > svg.lucide:not(.animate-spin),
+:is(button, a, [role="button"], label):hover > span > svg.lucide:not(.animate-spin) {
+  animation: stat-icon-wiggle 0.6s ease-in-out;
+}
+
+/* Dashboard header buttons (.mobile-toolbar): besides the hover wiggle, the
+   icon also plays it when pressed (components/icon-click-animation.tsx adds
+   "icon-clicked"). Reduce motion still switches it off. */
+.mobile-toolbar svg.lucide.icon-clicked {
+  animation-name: stat-icon-wiggle !important;
+  animation-duration: 0.6s;
+  animation-timing-function: ease-in-out;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
+}
+/* Icon-only header buttons are circles, like Refresh, Home and Feedback. */
+.mobile-toolbar .h-9.w-9 {
+  border-radius: 9999px;
+}

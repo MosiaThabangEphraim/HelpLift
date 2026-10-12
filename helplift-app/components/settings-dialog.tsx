@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { AtSign, Bell, BookOpen, Bot, Clock, Mic, Download, KeyRound, Mail, MousePointerClick, ShieldCheck, SlidersHorizontal, Sparkles, Star, Trash2, Type, UserRound } from "lucide-react"
+import { Accessibility, AtSign, Check, Palette, Bell, BookOpen, Bot, Clock, Mic, Download, KeyRound, Mail, MousePointerClick, ShieldCheck, SlidersHorizontal, Sparkles, Star, Trash2, Type, UserRound } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -25,6 +25,7 @@ import {
 } from "@/lib/notification-sound"
 import { getFontSizeLevel, setFontSizeLevel, type FontSizeLevel } from "@/lib/font-size"
 import { isAssistantEnabled, setAssistantEnabled } from "@/lib/assistant-preference"
+import { COLOR_SCHEMES, getColorScheme, setColorScheme, type ColorScheme } from "@/lib/color-scheme"
 import { isWakeWordEnabled, isWakeWordSupported, setWakeWordEnabled } from "@/lib/wake-word"
 import { getReduceMotion, setReduceMotion } from "@/lib/reduce-motion"
 import { isClickSoundEnabled, playClickSound, setClickSoundEnabled } from "@/lib/click-sounds"
@@ -68,6 +69,20 @@ function SettingRow({
 // dashboards. Each action opens the dashboard's existing screen for it (edit
 // profile, change password, delete account), so nothing is duplicated; the
 // notification-sound switch lives here.
+const OPEN_ACCESSIBILITY_EVENT = "helplift:open-accessibility"
+
+const OPEN_INTERFACE_EVENT = "helplift:open-interface"
+
+/** Opens the User interface window from anywhere on a dashboard (e.g. the search). */
+export function openInterfaceSettings() {
+  window.dispatchEvent(new Event(OPEN_INTERFACE_EVENT))
+}
+
+/** Opens the Accessibility window from anywhere on a dashboard (e.g. the search). */
+export function openAccessibilitySettings() {
+  window.dispatchEvent(new Event(OPEN_ACCESSIBILITY_EVENT))
+}
+
 export function SettingsDialog({
   open,
   onOpenChange,
@@ -131,6 +146,28 @@ export function SettingsDialog({
 
   // Windows opened from here (Edit profile, Change password...) get
   // "Back to Settings" - see lib/window-return.ts.
+  // The Accessibility window (font size, reduce motion, click sounds).
+  const [showAccessibility, setShowAccessibility] = useState(false)
+  // The User interface window (colour scheme, Lifty, clock).
+  const [showInterface, setShowInterface] = useState(false)
+  const [scheme, setSchemeState] = useState<ColorScheme>("default")
+  useEffect(() => { if (showInterface) setSchemeState(getColorScheme()) }, [showInterface])
+  const changeScheme = (next: ColorScheme) => {
+    setSchemeState(next)
+    setColorScheme(next)
+    logClientAction("Changed settings", `Colour scheme: ${COLOR_SCHEMES.find(option => option.value === next)?.label || next}`)
+  }
+  useEffect(() => {
+    const openIt = () => { onOpenChange(false); setShowInterface(true) }
+    window.addEventListener(OPEN_INTERFACE_EVENT, openIt)
+    return () => window.removeEventListener(OPEN_INTERFACE_EVENT, openIt)
+  }, [onOpenChange])
+  useEffect(() => {
+    const openIt = () => { onOpenChange(false); setShowAccessibility(true) }
+    window.addEventListener(OPEN_ACCESSIBILITY_EVENT, openIt)
+    return () => window.removeEventListener(OPEN_ACCESSIBILITY_EVENT, openIt)
+  }, [onOpenChange])
+
   const withReturn = (action?: () => void) => () => {
     setReturnTo("Settings", () => onOpenChange(true))
     action?.()
@@ -194,6 +231,7 @@ export function SettingsDialog({
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/* Two columns on larger screens; one column on phones. Size and the
           maximize button come from DialogContent itself. */}
@@ -299,19 +337,6 @@ export function SettingsDialog({
           )}
 
           <SettingRow
-            icon={<Bot className="h-5 w-5" />}
-            title="Lifty (AI assistant)"
-            description={assistantOn ? "Lifty's chat button shows on every page, on this device." : "Hidden on this device. Turn on to bring Lifty back."}
-          >
-            <Switch
-              checked={assistantOn}
-              onCheckedChange={changeAssistant}
-              aria-label="Lifty (AI assistant)"
-              data-tip={assistantOn ? "Hide Lifty on every page" : "Show Lifty again"}
-            />
-          </SettingRow>
-
-          <SettingRow
             icon={<Mic className="h-5 w-5" />}
             title={'"Hey Lifty"'}
             description={
@@ -331,66 +356,14 @@ export function SettingsDialog({
             />
           </SettingRow>
 
-          <SettingRow
-            icon={<Clock className="h-5 w-5" />}
-            title="Clock & date"
-            description={clockOn ? "Shown at the top of your dashboard, on this device." : "Hidden on this device. Turn on to show the clock and date again."}
-          >
-            <Switch
-              checked={clockOn}
-              onCheckedChange={changeClock}
-              aria-label="Show clock and date"
-              data-tip={clockOn ? "Hide the clock and date" : "Show the clock and date"}
-            />
+          {/* User interface opens its own window: colour scheme, Lifty and the clock. */}
+          <SettingRow icon={<Palette className="h-5 w-5" />} title="User interface" description="Colour scheme, Lifty and the clock, on this device.">
+            <Button type="button" variant="outline" size="sm" onClick={withReturn(() => { onOpenChange(false); setShowInterface(true) })} data-tip="Open colour scheme, Lifty and clock settings">Open</Button>
           </SettingRow>
 
-          <SettingRow
-            icon={<MousePointerClick className="h-5 w-5" />}
-            title="Click sounds"
-            description={clickSounds ? "On - a soft click plays when you press buttons, links and tabs, on this device." : "Off - turn on to hear a soft click when you press buttons, links and tabs."}
-          >
-            <Switch
-              checked={clickSounds}
-              onCheckedChange={changeClickSounds}
-              aria-label="Click sounds"
-              data-tip={clickSounds ? "Turn click sounds off" : "Play a soft click on every press"}
-            />
-          </SettingRow>
-
-          <SettingRow
-            icon={<Sparkles className="h-5 w-5" />}
-            title="Reduce motion"
-            description={reduceMotion ? "On - animations and transitions are switched off, on this device." : "Off - tabs and panels animate smoothly. Turn on if motion is distracting or uncomfortable."}
-          >
-            <Switch
-              checked={reduceMotion}
-              onCheckedChange={changeReduceMotion}
-              aria-label="Reduce motion"
-              data-tip={reduceMotion ? "Turn animations back on" : "Switch off animations and transitions"}
-            />
-          </SettingRow>
-
-          <SettingRow icon={<Type className="h-5 w-5" />} title="Font size" description="Makes text larger across the whole site, on this device.">
-            <div className="flex items-center gap-1 rounded border border-slate-200 dark:border-[#233350] p-1">
-              {FONT_SIZE_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => changeFontSize(option.value)}
-                  aria-label={option.label}
-                  aria-pressed={fontSize === option.value}
-                  data-tip={option.label}
-                  style={{ fontSize: option.size }}
-                  className={`flex h-8 w-8 items-center justify-center rounded-full font-bold transition-colors ${
-                    fontSize === option.value
-                      ? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900"
-                      : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
-                  }`}
-                >
-                  A
-                </button>
-              ))}
-            </div>
+          {/* Accessibility opens its own window, like Platform settings does for admins. */}
+          <SettingRow icon={<Accessibility className="h-5 w-5" />} title="Accessibility" description="Font size, reduce motion and click sounds, on this device.">
+            <Button type="button" variant="outline" size="sm" onClick={withReturn(() => { onOpenChange(false); setShowAccessibility(true) })} data-tip="Open font size, reduce motion and click sounds">Open</Button>
           </SettingRow>
 
           <SettingRow icon={<BookOpen className="h-5 w-5" />} title="User manual" description="A step-by-step guide to everything on HelpLift, as a PDF.">
@@ -432,5 +405,164 @@ export function SettingsDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+    <Dialog open={showAccessibility} onOpenChange={setShowAccessibility}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><Accessibility className="h-5 w-5 text-blue-600" /> Accessibility</DialogTitle>
+          <DialogDescription>
+            Make HelpLift easier to read and use on this device. For dark, high-contrast or grayscale colours, use the theme button at the top of the page.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid grid-cols-1 gap-3 pt-1 md:grid-cols-2">
+            <SettingRow
+              icon={<MousePointerClick className="h-5 w-5" />}
+              title="Click sounds"
+              description={clickSounds ? "On - a soft click plays when you press buttons, links and tabs, on this device." : "Off - turn on to hear a soft click when you press buttons, links and tabs."}
+            >
+              <Switch
+                checked={clickSounds}
+                onCheckedChange={changeClickSounds}
+                aria-label="Click sounds"
+                data-tip={clickSounds ? "Turn click sounds off" : "Play a soft click on every press"}
+              />
+            </SettingRow>
+
+            <SettingRow
+              icon={<Sparkles className="h-5 w-5" />}
+              title="Reduce motion"
+              description={reduceMotion ? "On - animations and transitions are switched off, on this device." : "Off - tabs and panels animate smoothly. Turn on if motion is distracting or uncomfortable."}
+            >
+              <Switch
+                checked={reduceMotion}
+                onCheckedChange={changeReduceMotion}
+                aria-label="Reduce motion"
+                data-tip={reduceMotion ? "Turn animations back on" : "Switch off animations and transitions"}
+              />
+            </SettingRow>
+
+            <SettingRow icon={<Type className="h-5 w-5" />} title="Font size" description="Makes text larger across the whole site, on this device.">
+              <div className="flex items-center gap-1 rounded border border-slate-200 dark:border-[#233350] p-1">
+                {FONT_SIZE_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => changeFontSize(option.value)}
+                    aria-label={option.label}
+                    aria-pressed={fontSize === option.value}
+                    data-tip={option.label}
+                    style={{ fontSize: option.size }}
+                    className={`flex h-8 w-8 items-center justify-center rounded-full font-bold transition-colors ${
+                      fontSize === option.value
+                        ? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900"
+                        : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
+                    }`}
+                  >
+                    A
+                  </button>
+                ))}
+              </div>
+            </SettingRow>
+        </div>
+      </DialogContent>
+    </Dialog>
+    <Dialog open={showInterface} onOpenChange={setShowInterface}>
+      {/* Don't put the cursor on the first scheme tile when the window opens
+          (it drew a focus outline there); Tab still reaches every tile. */}
+      <DialogContent onOpenAutoFocus={event => event.preventDefault()}>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><Palette className="h-5 w-5 text-blue-600" /> User interface</DialogTitle>
+          <DialogDescription>
+            How your dashboard looks and what it shows, on this device. Light and dark mode are on the theme button at the top of the page.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid grid-cols-1 gap-3 pt-1 md:grid-cols-2">
+          {/* The row keeps its natural height (not h-full), so the tiles sit below it. */}
+          <div className="md:col-span-2 [&>[data-setting]]:h-auto" data-setting="Colour scheme">
+            <SettingRow icon={<Palette className="h-5 w-5" />} title="Colour scheme" description="Restyles the whole dashboard - colours, surfaces and backgrounds - in light and dark mode.">
+              <span className="sr-only">Choose below</span>
+            </SettingRow>
+            <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4" role="radiogroup" aria-label="Colour scheme">
+              {COLOR_SCHEMES.map(option => {
+                const selected = scheme === option.value
+                const { accent, light, dark } = option.preview
+                const gradient = `linear-gradient(135deg, ${accent[0]}, ${accent[1]})`
+                // A tiny dashboard: a panel with a title bar, two text lines and an accent button.
+                const mini = ([page, panel, line]: readonly string[], text: string) => (
+                  <span className="flex flex-1 flex-col gap-1.5 p-2" style={{ background: page }}>
+                    <span className="h-1.5 w-8 rounded-full" style={{ background: gradient }} />
+                    <span className="flex flex-col gap-1 rounded-md p-1.5 shadow-sm" style={{ background: panel }}>
+                      <span className="h-1 w-full rounded-full" style={{ background: text, opacity: 0.55 }} />
+                      <span className="h-1 w-2/3 rounded-full" style={{ background: line }} />
+                      <span className="mt-0.5 h-2.5 w-10 rounded-full" style={{ background: gradient }} />
+                    </span>
+                  </span>
+                )
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => changeScheme(option.value)}
+                    data-tip={option.description}
+                    className={`group relative flex flex-col gap-2.5 rounded-2xl p-2.5 text-left transition-all duration-200 hover:-translate-y-0.5 ${
+                      selected ? "bg-white dark:bg-slate-900 shadow-xl" : "bg-slate-100 dark:bg-[#1A2740] hover:shadow-md"
+                    }`}
+                    style={selected ? { boxShadow: `0 10px 28px -10px ${accent[0]}99` } : undefined}
+                  >
+                    {/* Light and dark mode side by side. */}
+                    <span className="flex h-20 w-full overflow-hidden rounded-xl">
+                      {mini(light, "#0f172a")}
+                      {mini(dark, "#ffffff")}
+                    </span>
+                    <span className="flex w-full items-center justify-between gap-2 px-1">
+                      <span className="min-w-0">
+                        <span className="flex items-center gap-1.5 text-sm font-extrabold text-slate-900 dark:text-slate-100">
+                          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: gradient }} />
+                          {option.label}
+                        </span>
+                        <span className="mt-0.5 block text-[11px] leading-snug text-slate-500 dark:text-slate-400">{option.description}</span>
+                      </span>
+                      {selected && (
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-white" style={{ background: gradient }}>
+                          <Check className="h-3 w-3" strokeWidth={3} />
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+            <SettingRow
+              icon={<Bot className="h-5 w-5" />}
+              title="Lifty (AI assistant)"
+              description={assistantOn ? "Lifty's chat button shows on every page, on this device." : "Hidden on this device. Turn on to bring Lifty back."}
+            >
+              <Switch
+                checked={assistantOn}
+                onCheckedChange={changeAssistant}
+                aria-label="Lifty (AI assistant)"
+                data-tip={assistantOn ? "Hide Lifty on every page" : "Show Lifty again"}
+              />
+            </SettingRow>
+
+            <SettingRow
+              icon={<Clock className="h-5 w-5" />}
+              title="Clock & date"
+              description={clockOn ? "Shown at the top of your dashboard, on this device." : "Hidden on this device. Turn on to show the clock and date again."}
+            >
+              <Switch
+                checked={clockOn}
+                onCheckedChange={changeClock}
+                aria-label="Show clock and date"
+                data-tip={clockOn ? "Hide the clock and date" : "Show the clock and date"}
+              />
+            </SettingRow>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }

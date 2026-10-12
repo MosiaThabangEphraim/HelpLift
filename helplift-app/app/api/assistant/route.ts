@@ -91,7 +91,14 @@ Special pages:
 - Email notifications: on/off. When off, notifications still appear in-app but are
   not emailed. Account emails (verification, password reset, sign-in codes) are
   always sent.
-- Font size: larger text across the site (saved on this device).
+- Accessibility (Settings -> Accessibility -> Open): Font size (larger text across the
+  site), Reduce motion and Click sounds, all saved on this device. Dark, high
+  contrast and grayscale themes are on the theme button at the top of the page.
+- User interface (Settings -> User interface -> Open): colour scheme for the
+  dashboards - Default, Forest (teal and emerald on sage, pine at night), Sunset
+  (orange and rose on warm cream, espresso at night) or Midnight (violet and
+  fuchsia on lilac, deep indigo at night). Each restyles the whole dashboard in
+  light and dark mode; saved on this device. Also Lifty on/off and Clock & date.
 - Lifty: turn this assistant on or off. Lifty can also be hidden with the eye
   button in its chat window; turn it back on here.
 - Clock & date: show or hide the analog and digital clock on the dashboards.
@@ -290,7 +297,17 @@ Team roles:
   or banking details.
 
 All dashboards:
-- A short step-by-step tour is shown on your first visit (you can skip it).
+- A short step-by-step tour is shown on your first visit (you can skip it). It
+  points out the search box on a computer and the bottom section bar on a phone,
+  and only shows what's on your screen.
+- The buttons at the top are in the same order on every dashboard: main actions
+  and places first (e.g. Pledge a Gift, Public Profile, Documents, Badges,
+  Organizations), then Support The Platform and Message Admin, then the round
+  icon buttons (Feedback, Notifications bell, Refresh, Theme, Home), then
+  Settings, and Sign out at the far right.
+- Icons move gently when you hover over them; the top buttons' icons also
+  wiggle when pressed, and the stat tiles' icons pop in and float. Settings ->
+  Accessibility -> Reduce motion keeps everything still.
 - On a computer, the search box at the top left finds anything on the dashboard -
   sections (e.g. Wallet, Timeline), actions (e.g. Pledge a Gift, Message Admin,
   switch theme) and settings (e.g. change password, font size, Hey Lifty) - even

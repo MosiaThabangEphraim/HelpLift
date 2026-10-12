@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { todayInSA } from "@/lib/expiry"
 
-function isoDate(date: Date) {
+// Calendar dates in South African time (the database groups visits the same
+// way - see 20261012000100_site_visits_sa_time.sql). Date arithmetic is done
+// on a UTC-noon anchor of the SA date, so it never slips a day.
+function saDate(offsetDays = 0, monthStart = false, monthOffset = 0) {
+  const [y, m, d] = todayInSA().split("-").map(Number)
+  const date = new Date(Date.UTC(y, m - 1 + monthOffset, monthStart ? 1 : d + offsetDays, 12))
   return date.toISOString().slice(0, 10)
 }
 
@@ -24,18 +30,17 @@ export async function GET(request: Request) {
     if (profile?.role !== "admin") return NextResponse.json({ message: "Administrator access required." }, { status: 403 })
 
     const url = new URL(request.url)
-    const now = new Date()
-    const today = isoDate(now)
-    const defaultFrom = isoDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29))
+    const today = saDate()
+    const defaultFrom = saDate(-29)
     const from = url.searchParams.get("from") || defaultFrom
     const to = url.searchParams.get("to") || today
 
-    const monthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1)
-    const firstOfThisMonth = isoDate(new Date(now.getFullYear(), now.getMonth(), 1))
+    const monthsAgo = saDate(0, true, -11)
+    const firstOfThisMonth = saDate(0, true)
 
     const [dailyRes, monthlyRes, todayRes, thisMonthRes] = await Promise.all([
       supabase.rpc("admin_site_visit_daily", { p_from: from, p_to: to }),
-      supabase.rpc("admin_site_visit_monthly", { p_from: isoDate(monthsAgo), p_to: today }),
+      supabase.rpc("admin_site_visit_monthly", { p_from: monthsAgo, p_to: today }),
       supabase.rpc("admin_site_visit_daily", { p_from: today, p_to: today }),
       supabase.rpc("admin_site_visit_monthly", { p_from: firstOfThisMonth, p_to: today }),
     ])

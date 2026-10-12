@@ -13,6 +13,7 @@ import { OfflineProvider } from "@/components/offline-provider"
 import { FontSizeProvider } from "@/components/font-size-provider"
 import { ReduceMotionProvider } from "@/components/reduce-motion-provider"
 import { ClickSoundProvider } from "@/components/click-sound-provider"
+import { IconClickAnimation } from "@/components/icon-click-animation"
 import { SiteVisitTracker } from "@/components/site-visit-tracker"
 import { HelpLiftAssistant } from "@/components/helplift-assistant"
 import { ActivityTracker } from "@/components/activity-tracker"
@@ -92,6 +93,7 @@ export default function RootLayout({
           <FontSizeProvider />
           <ReduceMotionProvider />
           <ClickSoundProvider />
+          <IconClickAnimation />
           <SiteVisitTracker />
           <HelpLiftAssistant />
           <ActivityTracker />

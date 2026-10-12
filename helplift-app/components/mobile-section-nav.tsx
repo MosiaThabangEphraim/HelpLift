@@ -107,6 +107,7 @@ export function MobileSectionNav({
       {/* Bottom bar. data-mobile-bottom-nav lifts Lifty's button above it (globals.css). */}
       <nav
         data-mobile-bottom-nav
+        data-tour="mobile-nav"
         aria-label="Sections"
         className="md:hidden fixed inset-x-0 bottom-0 z-[140] bg-white/95 dark:bg-[#0E1729]/95 backdrop-blur-xl shadow-[0_-8px_30px_-12px_rgba(15,23,42,0.25)] pb-[env(safe-area-inset-bottom)]"
       >
@@ -234,7 +235,7 @@ export function MobileAttentionGrid({ items, onSelect }: {
           data-tip={`Open ${label}`}
           className="inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-[#121B2E] px-2.5 py-1 text-xs font-semibold shadow-sm transition-transform active:scale-95"
         >
-          <Icon className={`h-3.5 w-3.5 ${tone}`} />
+          <span className="stat-icon inline-flex"><Icon className={`h-3.5 w-3.5 ${tone}`} /></span>
           <span className="font-extrabold">{value}</span>
           <span className="text-slate-500 dark:text-slate-400">{label}</span>
         </button>

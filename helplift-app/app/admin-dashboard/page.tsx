@@ -115,6 +115,7 @@ import { AdminLoginActivity } from "@/components/admin-login-activity"
 import { AdminLiveActivity } from "@/components/admin-live-activity"
 import { AdminDeveloperReports } from "@/components/admin-developer-reports"
 import { AdminInquiries, type InquiriesView } from "@/components/admin-inquiries"
+import { useDashboardColorScheme } from "@/lib/color-scheme"
 import { DashboardSearch, platformSettingsSearchItems, settingsSearchItems, themeSearchItem, type DashboardSearchItem } from "@/components/dashboard-search"
 import { MobileAttentionGrid, MobileSectionHeading, MobileSectionNav, type MobileSection } from "@/components/mobile-section-nav"
 import { AdminFulfillmentsView, type AdminFulfillment } from "@/components/admin-fulfillments"
@@ -257,6 +258,8 @@ type AdminWithdrawal = {
 
 export default function AdminDashboardPage() {
   const router = useRouter()
+  // The colour scheme chosen in Settings -> User interface (lib/color-scheme.ts).
+  useDashboardColorScheme()
   const supabase = createClient()
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [profiles, setProfiles] = useState<Profile[]>([])
@@ -1157,16 +1160,6 @@ export default function AdminDashboardPage() {
                 <Icon className="h-4 w-4" /> {name}
               </button>
             ))}
-            <button
-              data-tour="settings"
-              aria-label="Settings"
-              data-tip="Settings - your login email and password, and platform settings"
-              onClick={() => { setSettingsMode("menu"); setSettingsMessage(""); setIsSettingsOpen(true) }}
-              className="inline-flex h-9 w-9 items-center justify-center rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
-            >
-              <Settings className="h-4 w-4" />
-            </button>
-
             <NotificationsWindow
               unreadCount={unreadNotifications}
               buttonTip={unreadNotifications > 0 ? `Notifications: ${unreadNotifications} need attention. Click to see them.` : "Notifications. You're all caught up."}
@@ -1184,6 +1177,7 @@ export default function AdminDashboardPage() {
             />
 
             <RefreshButton onRefresh={refreshAll} />
+            <ThemeToggle className="h-9 w-9" />
             <Link
               href="/"
               aria-label="Home"
@@ -1192,7 +1186,16 @@ export default function AdminDashboardPage() {
             >
               <Home className="w-4 h-4" />
             </Link>
-            <ThemeToggle className="h-9 w-9" />
+            <button
+              data-tour="settings"
+              aria-label="Settings"
+              data-tip="Settings - your login email and password, and platform settings"
+              onClick={() => { setSettingsMode("menu"); setSettingsMessage(""); setIsSettingsOpen(true) }}
+              className="inline-flex h-9 w-9 items-center justify-center rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+            >
+              <Settings className="h-4 w-4" />
+            </button>
+
             <button onClick={logout} aria-label="Sign out" className="inline-flex items-center gap-2 rounded bg-slate-900 dark:bg-slate-100 px-4 py-2 max-md:h-9 max-md:w-9 max-md:justify-center max-md:px-0 text-sm font-semibold text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white">
               <LogOut className="h-4 w-4" /> <span className="max-md:hidden">Sign out</span>
             </button>
@@ -1236,7 +1239,7 @@ export default function AdminDashboardPage() {
             <TabsTrigger value="fulfillments" className="shrink-0 gap-1.5 px-2.5"><PackageCheck className="w-4 h-4" />Fulfillments</TabsTrigger>
             <TabsTrigger value="users" data-tour="tab-users" className="shrink-0 gap-1.5 px-2.5"><Users className="w-4 h-4" />Users<CountBadge value={pendingApprovals} /></TabsTrigger>
             <TabsTrigger value="messages" className="shrink-0 gap-1.5 px-2.5"><Mail className="w-4 h-4" />Messages<CountBadge value={unreadMessages} /></TabsTrigger>
-            <TabsTrigger value="inquiries" data-tip="Anonymous tip-offs and contact-form inquiries from the website" className="shrink-0 gap-1.5 px-2.5"><Inbox className="w-4 h-4" />Inquiries<CountBadge value={unreadInquiries} /></TabsTrigger>
+            <TabsTrigger value="inquiries" data-tour="tab-inquiries" data-tip="Anonymous tip-offs and contact-form inquiries from the website" className="shrink-0 gap-1.5 px-2.5"><Inbox className="w-4 h-4" />Inquiries<CountBadge value={unreadInquiries} /></TabsTrigger>
             <TabsTrigger value="reports" data-tour="tab-reports" className="shrink-0 gap-1.5 px-2.5"><BarChart3 className="w-4 h-4" />Reports</TabsTrigger>
           </TabsList>
 
@@ -4019,8 +4022,9 @@ function StatCard({ icon: Icon, label, value, accent, prefix = "", decimals = 0 
 
   // Flat, like the rest of the dashboard: no box or fill, just a rule above and below.
   return (
-    <div className="flex items-center gap-3 max-md:gap-2 border-y border-slate-200 dark:border-[#233350] py-3 max-md:py-2">
-      <Icon className={`h-5 w-5 max-md:h-4 max-md:w-4 shrink-0 ${accentClasses}`} />
+    <div data-stat-card className="flex items-center gap-3 max-md:gap-2 border-y border-slate-200 dark:border-[#233350] py-3 max-md:py-2">
+      {/* Animated icon (pop in, then a gentle float; wiggles on hover) - see .stat-icon in globals.css. */}
+      <span className="stat-icon inline-flex shrink-0"><Icon className={`h-5 w-5 max-md:h-4 max-md:w-4 shrink-0 ${accentClasses}`} /></span>
       <div>
         <p className="text-2xl max-md:text-xl font-extrabold leading-none">
           {typeof value === "number" ? <CountUp value={value} prefix={prefix} decimals={decimals} /> : value}

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Award, AtSign, Banknote, Bell, BookOpen, Bot, Clock, CornerDownLeft, Landmark, Tags, Trophy, Wallet, Wrench, Fingerprint, KeyRound, Mail, Mic, MousePointerClick, Palette, Search, ShieldCheck, SlidersHorizontal, Sparkles, Star, Trash2, Type, UserRound, X } from "lucide-react"
 import { MicButton } from "@/components/mic-button"
+import { openAccessibilitySettings, openInterfaceSettings } from "@/components/settings-dialog"
 
 // "Search anything" box at the top left of each dashboard (desktop only).
 // Finds the dashboard's sections and its actions and settings, e.g. "wallet",
@@ -143,7 +144,7 @@ export function DashboardSearch({ items, placeholder = "Search this dashboard...
   let lastGroup = ""
 
   return (
-    <div ref={boxRef} className="relative w-full max-w-md max-md:hidden mr-auto">
+    <div ref={boxRef} data-tour="search" className="relative w-full max-w-md max-md:hidden mr-auto">
       <div className="relative">
         <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
@@ -209,7 +210,8 @@ export function DashboardSearch({ items, placeholder = "Search this dashboard...
 
 /** Settings rows (components/settings-dialog.tsx) as search results; each opens Settings at that row. */
 export function settingsSearchItems(openSettings: () => void, options: { editProfile?: boolean; loginEmail?: boolean; platform?: boolean; emailNotifications?: boolean; giverSpotlight?: boolean; deleteAccount?: boolean } = {}): DashboardSearchItem[] {
-  const rows: { title: string; icon: DashboardSearchItem["icon"]; keywords: string; show?: boolean }[] = [
+  // window: rows that live in the Accessibility or User interface window, not the Settings list.
+  const rows: { title: string; icon: DashboardSearchItem["icon"]; keywords: string; show?: boolean; window?: "accessibility" | "interface" }[] = [
     { title: "Edit profile", icon: UserRound, keywords: "name phone details account information organization logo picture", show: options.editProfile },
     { title: "Login email", icon: AtSign, keywords: "email address change sign in", show: options.loginEmail },
     { title: "Change password", icon: KeyRound, keywords: "password pwd reset security" },
@@ -218,12 +220,15 @@ export function settingsSearchItems(openSettings: () => void, options: { editPro
     { title: "Two-factor sign-in", icon: ShieldCheck, keywords: "2fa two factor code otp security verification" },
     { title: "Notification sounds", icon: Bell, keywords: "sound audio alert ding mute" },
     { title: "Email notifications", icon: Mail, keywords: "emails inbox notify", show: options.emailNotifications },
-    { title: "Lifty (AI assistant)", icon: Bot, keywords: "lifty assistant chatbot ai hide show" },
+    { title: "User interface", icon: Palette, keywords: "user interface ui appearance look layout colour color scheme lifty clock", window: "interface" },
+    { title: "Colour scheme", icon: Palette, keywords: "colour color scheme theme look forest sunset midnight green orange purple palette appearance", window: "interface" },
+    { title: "Lifty (AI assistant)", icon: Bot, keywords: "lifty assistant chatbot ai hide show", window: "interface" },
     { title: "Hey Lifty", icon: Mic, keywords: "wake word voice microphone hands free speak" },
-    { title: "Clock & date", icon: Clock, keywords: "time clock date" },
-    { title: "Click sounds", icon: MousePointerClick, keywords: "click tap sound feedback" },
-    { title: "Reduce motion", icon: Sparkles, keywords: "animations motion accessibility" },
-    { title: "Font size", icon: Type, keywords: "text size bigger larger smaller zoom accessibility" },
+    { title: "Clock & date", icon: Clock, keywords: "time clock date hide show", window: "interface" },
+    { title: "Accessibility", icon: Type, keywords: "accessibility a11y readable vision hearing motion font text size sounds", window: "accessibility" },
+    { title: "Click sounds", icon: MousePointerClick, keywords: "click tap sound feedback" , window: "accessibility" },
+    { title: "Reduce motion", icon: Sparkles, keywords: "animations motion accessibility" , window: "accessibility" },
+    { title: "Font size", icon: Type, keywords: "text size bigger larger smaller zoom accessibility" , window: "accessibility" },
     { title: "User manual", icon: BookOpen, keywords: "help guide manual pdf download instructions" },
     { title: "Giver of the Month", icon: Star, keywords: "spotlight privacy featured homepage", show: options.giverSpotlight },
     { title: "Delete account", icon: Trash2, keywords: "delete remove close account", show: options.deleteAccount },
@@ -236,7 +241,11 @@ export function settingsSearchItems(openSettings: () => void, options: { editPro
       group: "Settings" as const,
       icon: row.icon,
       keywords: `${row.keywords} settings`,
-      onSelect: () => jumpToSetting(openSettings, row.title),
+      onSelect: () => {
+        if (row.window === "accessibility") return row.title === "Accessibility" ? openAccessibilitySettings() : jumpTo(openAccessibilitySettings, row.title)
+        if (row.window === "interface") return row.title === "User interface" ? openInterfaceSettings() : jumpTo(openInterfaceSettings, row.title)
+        jumpToSetting(openSettings, row.title)
+      },
     }))
 }
 

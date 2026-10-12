@@ -7,6 +7,7 @@ import { CountUp } from "@/components/count-up"
 import { stageFormFiles } from "@/lib/stage-uploads"
 import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { useRouter } from "next/navigation"
+import { useDashboardColorScheme } from "@/lib/color-scheme"
 import { DashboardSearch, settingsSearchItems, themeSearchItem, type DashboardSearchItem } from "@/components/dashboard-search"
 import { MobileAttentionGrid, MobileSectionHeading, MobileSectionNav, type MobileAction, type MobileSection } from "@/components/mobile-section-nav"
 import Link from "next/link"
@@ -189,6 +190,8 @@ type MyGift = {
 
 export default function GiverDashboardPage() {
   const router = useRouter()
+  // The colour scheme chosen in Settings -> User interface (lib/color-scheme.ts).
+  useDashboardColorScheme()
   const supabase = createClient()
   const needCategories = useNeedCategories()
 
@@ -921,48 +924,6 @@ export default function GiverDashboardPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap mobile-toolbar">
-            <RefreshButton onRefresh={refreshAll} />
-            <Link
-              href="/"
-              aria-label="Home"
-              data-tip="Go to the HelpLift homepage"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-            >
-              <Home className="w-4 h-4" />
-            </Link>
-            <ThemeToggle className="h-9 w-9" />
-            <FeedbackButton />
-            <button
-              onClick={() => setShowSupportPlatform(true)}
-              data-tip="Donate directly to HelpLift - not to any organization"
-              className="max-md:hidden inline-flex items-center gap-1.5 rounded border border-pink-200 dark:border-pink-900 bg-pink-50 dark:bg-pink-950/40 px-4 py-2 text-sm font-semibold text-pink-700 dark:text-pink-300 hover:bg-pink-100 dark:hover:bg-pink-950/70"
-            >
-              <Heart className="h-3.5 w-3.5" /> Support The Platform
-            </button>
-
-            <Link
-              href="/organizations"
-              className="max-md:hidden inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
-            >
-              Organizations
-            </Link>
-
-            <NotificationsWindow
-              dataTour="notifications"
-              buttonClassName="rounded"
-              unreadCount={unreadCount}
-              buttonTip={unreadCount > 0 ? `Notifications: ${unreadCount} unread. Click to see them.` : "Notifications. You're all caught up."}
-              onMarkAllRead={markAllNotificationsRead}
-              items={notifications.map(item => ({
-                id: item.id,
-                title: item.title,
-                subtitle: item.message,
-                read: !!item.read_at,
-                createdAt: item.created_at,
-                onOpen: () => openMessage(item),
-              }))}
-            />
-
             <button
               onClick={() => setShowGiftModal(true)}
               className="max-md:hidden inline-flex items-center gap-2 rounded bg-purple-600 px-4 py-2 text-sm font-bold text-white hover:bg-purple-700 shadow-sm shadow-purple-600/20"
@@ -979,13 +940,19 @@ export default function GiverDashboardPage() {
               <Star className="h-3.5 w-3.5" fill="currentColor" /> Badges
             </button>
 
-            <button
-              data-tour="settings"
-              aria-label="Settings"
-              onClick={() => setIsSettingsOpen(true)}
-              className="max-md:h-9 max-md:w-9 max-md:justify-center max-md:px-0 inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+            <Link
+              href="/organizations"
+              className="max-md:hidden inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
             >
-              <Settings className="h-3.5 w-3.5" /> <span className="max-md:hidden">Settings</span>
+              Organizations
+            </Link>
+
+            <button
+              onClick={() => setShowSupportPlatform(true)}
+              data-tip="Donate directly to HelpLift - not to any organization"
+              className="max-md:hidden inline-flex items-center gap-1.5 rounded border border-pink-200 dark:border-pink-900 bg-pink-50 dark:bg-pink-950/40 px-4 py-2 text-sm font-semibold text-pink-700 dark:text-pink-300 hover:bg-pink-100 dark:hover:bg-pink-950/70"
+            >
+              <Heart className="h-3.5 w-3.5" /> Support The Platform
             </button>
 
             <button
@@ -993,6 +960,42 @@ export default function GiverDashboardPage() {
               className="max-md:hidden inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-[#1A2740]"
             >
               <MessageSquare className="h-3.5 w-3.5" /> Message Admin
+            </button>
+
+            <FeedbackButton />
+            <NotificationsWindow
+              dataTour="notifications"
+              buttonClassName="rounded"
+              unreadCount={unreadCount}
+              buttonTip={unreadCount > 0 ? `Notifications: ${unreadCount} unread. Click to see them.` : "Notifications. You're all caught up."}
+              onMarkAllRead={markAllNotificationsRead}
+              items={notifications.map(item => ({
+                id: item.id,
+                title: item.title,
+                subtitle: item.message,
+                read: !!item.read_at,
+                createdAt: item.created_at,
+                onOpen: () => openMessage(item),
+              }))}
+            />
+
+            <RefreshButton onRefresh={refreshAll} />
+            <ThemeToggle className="h-9 w-9" />
+            <Link
+              href="/"
+              aria-label="Home"
+              data-tip="Go to the HelpLift homepage"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            >
+              <Home className="w-4 h-4" />
+            </Link>
+            <button
+              data-tour="settings"
+              aria-label="Settings"
+              onClick={() => setIsSettingsOpen(true)}
+              className="max-md:h-9 max-md:w-9 max-md:justify-center max-md:px-0 inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+            >
+              <Settings className="h-3.5 w-3.5" /> <span className="max-md:hidden">Settings</span>
             </button>
 
             <button
@@ -2279,8 +2282,9 @@ function StatCard({ icon: Icon, label, value, accent }: { icon: React.ComponentT
 
   // Same flat design as the admin dashboard's tiles: no box or fill, just a rule above and below.
   return (
-    <div className="flex items-center gap-3 max-md:gap-2 border-y border-slate-200 dark:border-[#233350] py-3 max-md:py-2">
-      <Icon className={`h-5 w-5 max-md:h-4 max-md:w-4 shrink-0 ${accentClasses}`} />
+    <div data-stat-card className="flex items-center gap-3 max-md:gap-2 border-y border-slate-200 dark:border-[#233350] py-3 max-md:py-2">
+      {/* Animated icon (pop in, then a gentle float; wiggles on hover) - see .stat-icon in globals.css. */}
+      <span className="stat-icon inline-flex shrink-0"><Icon className={`h-5 w-5 max-md:h-4 max-md:w-4 shrink-0 ${accentClasses}`} /></span>
       <div>
         <p className="text-2xl max-md:text-xl font-extrabold leading-none">
           <CountUp value={value} />
