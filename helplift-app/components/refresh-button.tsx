@@ -7,9 +7,10 @@ import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
 // Reloads a page's data in place (no full page reload, so the current tab,
-// filters and any half-filled form stay as they are). "icon" matches the round
-// header buttons on the dashboards; "pill" is a small labelled button for the
-// public pages. Spins while loading and confirms with a short toast.
+// filters and any half-filled form stay as they are). "icon" is a quiet icon
+// button (dashboard headers and admin panels); "pill" is a small labelled one
+// for the public pages. Both are borderless and only shaded on hover. Spins
+// while loading and confirms with a short toast.
 export function RefreshButton({
   onRefresh,
   variant = "icon",
@@ -37,7 +38,7 @@ export function RefreshButton({
     }
   }
 
-  const icon = <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+  const icon = <RefreshCw className={cn(variant === "pill" ? "h-3.5 w-3.5" : "h-4 w-4", isRefreshing && "animate-spin")} />
 
   if (variant === "pill") {
     return (
@@ -48,12 +49,12 @@ export function RefreshButton({
         aria-label="Refresh"
         data-tip="Load the latest updates"
         className={cn(
-          "inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-70 transition-colors",
+          "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-white/5 dark:hover:text-white disabled:opacity-70 transition-colors",
           className
         )}
       >
         {icon}
-        {isRefreshing ? "Refreshing..." : "Refresh"}
+        Refresh
       </button>
     )
   }
@@ -66,7 +67,7 @@ export function RefreshButton({
       aria-label="Refresh"
       data-tip="Load the latest updates"
       className={cn(
-        "inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-70 transition-colors",
+        "inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-white/5 dark:hover:text-white disabled:opacity-70 transition-colors",
         className
       )}
     >

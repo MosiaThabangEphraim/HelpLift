@@ -87,7 +87,7 @@ export function OrganizationQrCodeDialog({
             )}
           </div>
 
-          <p className="text-xs text-slate-400 break-all">{profileUrl}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 break-all">{profileUrl}</p>
 
           <div className="flex gap-2">
             <Button type="button" variant="outline" onClick={copyLink} className="flex-1">

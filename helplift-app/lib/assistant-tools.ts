@@ -125,7 +125,7 @@ function publicOrganization(org: any) {
 async function searchNeeds(supabase: SupabaseClient, args: ToolArgs) {
   let query = supabase
     .from("needs")
-    .select(`id, title, description, category, location, quantity, target_amount, due_date, urgency, status, created_at, organizations(${PUBLIC_ORG_COLUMNS}, verification_status)`)
+    .select(`id, title, description, category, location, quantity, target_amount, amount_raised, quantity_still_needed, support_type, due_date, urgency, status, created_at, organizations(${PUBLIC_ORG_COLUMNS}, verification_status)`)
     .in("status", ["open", "in_progress"])
     .or(notPastFilter("due_date"))
     .order("created_at", { ascending: false })
@@ -162,6 +162,10 @@ async function searchNeeds(supabase: SupabaseClient, args: ToolArgs) {
       location: need.location,
       quantity: need.quantity,
       funding_goal: need.target_amount,
+      amount_raised: need.amount_raised,
+      money_still_needed: need.target_amount == null ? null : Math.max(0, Number(need.target_amount) - Number(need.amount_raised || 0)),
+      goods_still_needed: need.quantity_still_needed,
+      asks_for: need.support_type === "both" ? "goods and money" : need.support_type || null,
       due_date: need.due_date,
       urgency: need.urgency,
       status: need.status,

@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Accessibility, AtSign, Check, Palette, Bell, BookOpen, Bot, Clock, Mic, Download, KeyRound, Mail, MousePointerClick, ShieldCheck, SlidersHorizontal, Sparkles, Star, Trash2, Type, UserRound } from "lucide-react"
+import { useTheme } from "next-themes"
+import { Accessibility, AtSign, Check, Compass, Contrast, Moon, Palette, Sun, Bell, BookOpen, Bot, Mic, Download, KeyRound, Mail, MousePointerClick, ShieldCheck, SlidersHorizontal, Star, Trash2, Type, UserRound, Pause } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -29,14 +30,21 @@ import { COLOR_SCHEMES, getColorScheme, setColorScheme, type ColorScheme } from 
 import { isWakeWordEnabled, isWakeWordSupported, setWakeWordEnabled } from "@/lib/wake-word"
 import { getReduceMotion, setReduceMotion } from "@/lib/reduce-motion"
 import { isClickSoundEnabled, playClickSound, setClickSoundEnabled } from "@/lib/click-sounds"
-import { isClockShown, setClockShown } from "@/lib/clock-preference"
 import { logClientAction } from "@/components/activity-tracker"
+import { startDashboardTour } from "@/components/dashboard-tour"
 
 const FONT_SIZE_OPTIONS: { value: FontSizeLevel; label: string; size: string }[] = [
   { value: "normal", label: "Normal text", size: "13px" },
   { value: "large", label: "Large text", size: "16px" },
   { value: "larger", label: "Larger text", size: "19px" },
 ]
+
+const THEME_OPTIONS = [
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+  { value: "high-contrast", label: "High contrast", icon: Contrast },
+  { value: "grayscale", label: "Grayscale", icon: Palette },
+] as const
 
 function SettingRow({
   icon,
@@ -128,7 +136,6 @@ export function SettingsDialog({
   const [wakeSupported, setWakeSupported] = useState(true)
   const [reduceMotion, setReduceMotionState] = useState(false)
   const [clickSounds, setClickSounds] = useState(false)
-  const [clockOn, setClockOn] = useState(true)
 
   useEffect(() => {
     if (open) {
@@ -140,7 +147,6 @@ export function SettingsDialog({
     setWakeSupported(isWakeWordSupported())
       setReduceMotionState(getReduceMotion())
       setClickSounds(isClickSoundEnabled())
-      setClockOn(isClockShown())
     }
   }, [open])
 
@@ -148,10 +154,17 @@ export function SettingsDialog({
   // "Back to Settings" - see lib/window-return.ts.
   // The Accessibility window (font size, reduce motion, click sounds).
   const [showAccessibility, setShowAccessibility] = useState(false)
-  // The User interface window (colour scheme, Lifty, clock).
+  // The User interface window (colour scheme, Lifty).
   const [showInterface, setShowInterface] = useState(false)
   const [scheme, setSchemeState] = useState<ColorScheme>("default")
   useEffect(() => { if (showInterface) setSchemeState(getColorScheme()) }, [showInterface])
+  // Theme (light / dark / high contrast / grayscale) - one value for the whole
+  // site, kept by next-themes (app/layout.tsx).
+  const { theme, setTheme } = useTheme()
+  const changeTheme = (next: string) => {
+    setTheme(next)
+    logClientAction("Changed the theme", `Theme: ${THEME_OPTIONS.find(option => option.value === next)?.label || next}`)
+  }
   const changeScheme = (next: ColorScheme) => {
     setSchemeState(next)
     setColorScheme(next)
@@ -177,12 +190,6 @@ export function SettingsDialog({
     setFontSize(level)
     setFontSizeLevel(level)
     logClientAction("Changed settings", `Font size: ${level}`)
-  }
-
-  const changeClock = (next: boolean) => {
-    setClockOn(next)
-    setClockShown(next)
-    logClientAction("Changed settings", `Clock & date turned ${next ? "on" : "off"}`)
   }
 
   const changeClickSounds = (next: boolean) => {
@@ -304,10 +311,10 @@ export function SettingsDialog({
                     onClick={() => changeSoundChoice(option.id)}
                     aria-pressed={soundChoice === option.id}
                     data-tip={`Preview and use the "${option.label}" notification sound`}
-                    className={`rounded px-3 py-1.5 text-xs font-bold transition-colors ${
+                    className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors bg-slate-100 dark:bg-[#1A2740]${
                       soundChoice === option.id
                         ? "bg-blue-600 text-white"
-                        : "border border-slate-200 dark:border-[#233350] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                        : " text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350]"
                     }`}
                   >
                     {option.label}
@@ -356,9 +363,9 @@ export function SettingsDialog({
             />
           </SettingRow>
 
-          {/* User interface opens its own window: colour scheme, Lifty and the clock. */}
-          <SettingRow icon={<Palette className="h-5 w-5" />} title="User interface" description="Colour scheme, Lifty and the clock, on this device.">
-            <Button type="button" variant="outline" size="sm" onClick={withReturn(() => { onOpenChange(false); setShowInterface(true) })} data-tip="Open colour scheme, Lifty and clock settings">Open</Button>
+          {/* User interface opens its own window: colour scheme and Lifty. */}
+          <SettingRow icon={<Palette className="h-5 w-5" />} title="User interface" description="Colour scheme and Lifty, on this device.">
+            <Button type="button" variant="outline" size="sm" onClick={withReturn(() => { onOpenChange(false); setShowInterface(true) })} data-tip="Open colour scheme and Lifty settings">Open</Button>
           </SettingRow>
 
           {/* Accessibility opens its own window, like Platform settings does for admins. */}
@@ -371,6 +378,18 @@ export function SettingsDialog({
               <a href="/helplift-user-manual.pdf" download="HelpLift User Manual.pdf" data-tip="Download the HelpLift user manual (PDF)">
                 <Download className="h-4 w-4" /> Download
               </a>
+            </Button>
+          </SettingRow>
+
+          <SettingRow icon={<Compass className="h-5 w-5" />} title="Take the tour" description="The quick guided tour of this dashboard you saw when you first signed in. Take it again any time.">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => { onOpenChange(false); startDashboardTour(); logClientAction("Took the dashboard tour again") }}
+              data-tip="Start the guided tour of this dashboard"
+            >
+              Start
             </Button>
           </SettingRow>
 
@@ -411,7 +430,7 @@ export function SettingsDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><Accessibility className="h-5 w-5 text-blue-600" /> Accessibility</DialogTitle>
           <DialogDescription>
-            Make HelpLift easier to read and use on this device. For dark, high-contrast or grayscale colours, use the theme button at the top of the page.
+            Make HelpLift easier to read and use on this device. For dark, high-contrast or grayscale colours, see Theme in Settings, User interface.
           </DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-1 gap-3 pt-1 md:grid-cols-2">
@@ -429,7 +448,7 @@ export function SettingsDialog({
             </SettingRow>
 
             <SettingRow
-              icon={<Sparkles className="h-5 w-5" />}
+              icon={<Pause className="h-5 w-5" />}
               title="Reduce motion"
               description={reduceMotion ? "On - animations and transitions are switched off, on this device." : "Off - tabs and panels animate smoothly. Turn on if motion is distracting or uncomfortable."}
             >
@@ -473,10 +492,36 @@ export function SettingsDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><Palette className="h-5 w-5 text-blue-600" /> User interface</DialogTitle>
           <DialogDescription>
-            How your dashboard looks and what it shows, on this device. Light and dark mode are on the theme button at the top of the page.
+            How your dashboard looks and what it shows, on this device.
           </DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-1 gap-3 pt-1 md:grid-cols-2">
+          <div className="md:col-span-2" data-setting="Theme">
+            <SettingRow icon={<Sun className="h-5 w-5" />} title="Theme" description="Light, dark, or the high-contrast and grayscale accessibility modes, across the whole site.">
+              <div className="flex flex-wrap items-center gap-1 rounded-full bg-slate-100 dark:bg-[#1A2740] p-1" role="radiogroup" aria-label="Theme">
+                {THEME_OPTIONS.map(option => {
+                  const selected = (theme || "light") === option.value
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => changeTheme(option.value)}
+                      data-tip={option.label}
+                      className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-bold transition-colors ${
+ selected
+ ? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 "
+ : "text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-[#121B2E]"
+ }`}
+                    >
+                      <option.icon className="h-3.5 w-3.5" /> {option.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </SettingRow>
+          </div>
           {/* The row keeps its natural height (not h-full), so the tiles sit below it. */}
           <div className="md:col-span-2 [&>[data-setting]]:h-auto" data-setting="Colour scheme">
             <SettingRow icon={<Palette className="h-5 w-5" />} title="Colour scheme" description="Restyles the whole dashboard - colours, surfaces and backgrounds - in light and dark mode.">
@@ -507,8 +552,8 @@ export function SettingsDialog({
                     onClick={() => changeScheme(option.value)}
                     data-tip={option.description}
                     className={`group relative flex flex-col gap-2.5 rounded-2xl p-2.5 text-left transition-all duration-200 hover:-translate-y-0.5 ${
-                      selected ? "bg-white dark:bg-slate-900 shadow-xl" : "bg-slate-100 dark:bg-[#1A2740] hover:shadow-md"
-                    }`}
+ selected ? "bg-white dark:bg-slate-900 " : "bg-slate-100 dark:bg-[#1A2740] "
+ }`}
                     style={selected ? { boxShadow: `0 10px 28px -10px ${accent[0]}99` } : undefined}
                   >
                     {/* Light and dark mode side by side. */}
@@ -545,19 +590,6 @@ export function SettingsDialog({
                 onCheckedChange={changeAssistant}
                 aria-label="Lifty (AI assistant)"
                 data-tip={assistantOn ? "Hide Lifty on every page" : "Show Lifty again"}
-              />
-            </SettingRow>
-
-            <SettingRow
-              icon={<Clock className="h-5 w-5" />}
-              title="Clock & date"
-              description={clockOn ? "Shown at the top of your dashboard, on this device." : "Hidden on this device. Turn on to show the clock and date again."}
-            >
-              <Switch
-                checked={clockOn}
-                onCheckedChange={changeClock}
-                aria-label="Show clock and date"
-                data-tip={clockOn ? "Hide the clock and date" : "Show the clock and date"}
               />
             </SettingRow>
         </div>

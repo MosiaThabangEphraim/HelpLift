@@ -27,9 +27,13 @@ export function appendSpeech(previous: string, chunk: string): string {
 // `continuous: false` stops by itself after the person pauses - one spoken
 // message, as Lifty's voice chat uses - and `onEnd` reports when listening
 // stopped and whether any speech was recognized.
+// Languages this browser couldn't listen in (e.g. Sesotho in Chrome), so the
+// microphone goes straight to the device's language next time this visit.
+const unsupportedLocales = new Set<string>()
+
 export function useSpeechToText(
   onFinalText: (text: string) => void,
-  options: { continuous?: boolean; onEnd?: (heardSpeech: boolean) => void } = {}
+  options: { continuous?: boolean; onEnd?: (heardSpeech: boolean) => void; lang?: string } = {}
 ) {
   const [listening, setListening] = useState(false)
   const [error, setError] = useState("")
@@ -38,6 +42,12 @@ export function useSpeechToText(
   onFinalTextRef.current = onFinalText
   const onEndRef = useRef(options.onEnd)
   onEndRef.current = options.onEnd
+  // The language to listen for (e.g. "zu-ZA"); the device's language when not set.
+  const langRef = useRef(options.lang)
+  langRef.current = options.lang
+  // A friendly note (not an error) - e.g. "listening in English instead".
+  const [notice, setNotice] = useState("")
+  const retryRef = useRef<() => void>(() => {})
   const continuous = options.continuous ?? true
 
   const stop = useCallback(() => {
@@ -53,7 +63,11 @@ export function useSpeechToText(
     }
     const recognition = new Ctor()
     let heardSpeech = false
-    recognition.lang = typeof navigator !== "undefined" ? navigator.language || "en-US" : "en-US"
+    const deviceLang = typeof navigator !== "undefined" ? navigator.language || "en-US" : "en-US"
+    const wanted = langRef.current
+    const usingWanted = !!wanted && !unsupportedLocales.has(wanted)
+    recognition.lang = usingWanted ? wanted! : deviceLang
+    let fallBack = false
     recognition.continuous = continuous
     recognition.interimResults = false
     recognition.onresult = (event: any) => {
@@ -68,6 +82,14 @@ export function useSpeechToText(
     }
     recognition.onerror = (event: any) => {
       if (event.error === "no-speech" || event.error === "aborted") return
+      // The browser can't listen in the chosen language: switch to the
+      // device's language and start again, instead of failing.
+      if (usingWanted && event.error !== "not-allowed" && event.error !== "service-not-allowed") {
+        unsupportedLocales.add(wanted!)
+        fallBack = true
+        setNotice("Voice typing isn't available in that language in this browser, so I'm listening in your device's language instead. You can still type in any language.")
+        return
+      }
       setError(
         event.error === "not-allowed" || event.error === "service-not-allowed"
           ? "Microphone access was blocked. Allow it in your browser to use voice typing."
@@ -77,6 +99,7 @@ export function useSpeechToText(
     }
     recognition.onend = () => {
       setListening(false)
+      if (fallBack) { retryRef.current(); return }
       onEndRef.current?.(heardSpeech)
     }
     recognitionRef.current = recognition
@@ -88,8 +111,10 @@ export function useSpeechToText(
     }
   }, [continuous])
 
+  retryRef.current = start
+
   // Stop listening if the component unmounts (dialog closed, navigated away) mid-session.
   useEffect(() => () => { recognitionRef.current?.stop() }, [])
 
-  return { listening, error, start, stop }
+  return { listening, error, notice, start, stop }
 }

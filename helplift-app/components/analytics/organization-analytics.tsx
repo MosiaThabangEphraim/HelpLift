@@ -8,7 +8,7 @@ import {
   bucketByMonth, byStatusOrder, countBy, firstOf, inRange, percent, resolveRange, sumBy, topN,
   type AnalyticsRange, type MonthPoint,
 } from "@/lib/analytics"
-import { ChartCard, DateRangeFilter, MonthlyArea, MonthlyLine, RangeFilter, RankedBars, StatTile, StatusPie, VizRoot } from "@/components/analytics/chart-parts"
+import { ChartCard, DateRangeFilter, MonthlyArea, MonthlyLine, RangeFilter, RankedBars, StatusPie, VizRoot } from "@/components/analytics/chart-parts"
 
 type Withdrawal = { amount: number; status: string; created_at: string }
 
@@ -239,15 +239,7 @@ export function OrganizationAnalytics({ needs, donations, interests, fulfillment
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-3 xl:grid-cols-6">
-        <StatTile label="Funds received" value={view.funds} prefix="R" decimals={2} note={view.awaitingCount ? `${view.awaitingCount} awaiting verification` : "Confirmed donations"} />
-        <StatTile label="Donations" value={view.successfulCount} note="Confirmed by an administrator" />
-        <StatTile label="Offers of support" value={view.offersCount} note={view.acceptedShare === null ? "None yet" : `${view.acceptedShare}% accepted`} />
-        <StatTile label="Deliveries completed" value={view.completed} note={view.completionRate === null ? "None started yet" : `${view.completionRate}% of started`} />
-        <StatTile label="Open needs" value={view.openNeeds} note={`${view.createdNeeds} created in this period`} />
-        <StatTile label="Withdrawn" value={view.withdrawn} prefix="R" decimals={2} note={`${view.withdrawalCount} request${view.withdrawalCount === 1 ? "" : "s"} in this period`} />
-      </div>
-
+      {/* Graphs only - no number tiles. */}
       <div className="grid gap-x-10 gap-y-8 lg:grid-cols-2">
         <ChartCard
           title="Funds received"

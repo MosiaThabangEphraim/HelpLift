@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronDown, Loader2, Sparkles } from "lucide-react"
+import { ChevronDown, Loader2 } from "lucide-react"
 import { MicButton } from "@/components/mic-button"
 import { appendSpeech } from "@/lib/speech-to-text"
 
@@ -60,9 +60,9 @@ export function NeedWriter({ onDraft }: { onDraft: (draft: NeedDraft) => void })
           onClick={() => setOpen(true)}
           aria-expanded={false}
           data-tip="Describe the need in a sentence - typed or spoken - and Lifty fills in the form"
-          className="inline-flex items-center gap-1.5 rounded border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 px-3 py-1 text-xs font-bold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 px-3 py-1 text-xs font-bold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
         >
-          <Sparkles className="h-3.5 w-3.5" /> Let Lifty write it
+          Let Lifty write it
           <ChevronDown className="h-3.5 w-3.5" />
         </button>
       </div>
@@ -77,7 +77,6 @@ export function NeedWriter({ onDraft }: { onDraft: (draft: NeedDraft) => void })
         aria-expanded={true}
         className="flex w-full items-center gap-2 px-3 py-2 text-left"
       >
-        <Sparkles className="h-3.5 w-3.5 shrink-0 text-blue-600" />
         <span className="flex-1 text-xs font-bold text-slate-900 dark:text-slate-100">Let Lifty write it for you</span>
         <ChevronDown className="h-3.5 w-3.5 shrink-0 rotate-180 text-slate-400" />
       </button>
@@ -103,9 +102,9 @@ export function NeedWriter({ onDraft }: { onDraft: (draft: NeedDraft) => void })
               type="button"
               onClick={writeDraft}
               disabled={isDrafting || text.trim().length < 5}
-              className="inline-flex items-center gap-2 rounded bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {isDrafting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {isDrafting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               {isDrafting ? "Writing..." : "Write it for me"}
             </button>
             {note && (

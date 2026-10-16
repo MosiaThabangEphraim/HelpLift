@@ -27,7 +27,7 @@ export async function GET(
     try {
       const { data: orgNeeds } = await supabase
         .from("needs")
-        .select("id, title, description, category, location, quantity, target_amount, due_date, urgency, status, created_at")
+        .select("id, title, description, category, location, quantity, target_amount, amount_raised, quantity_still_needed, support_type, due_date, urgency, status, created_at")
         .eq("organization_id", id)
         .in("status", ["open", "in_progress"])
         .or(notPastFilter("due_date"))

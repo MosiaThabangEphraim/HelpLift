@@ -12,11 +12,6 @@ import {
   Search,
   MapPin,
   Calendar,
-  Sparkles,
-  Package,
-  Wrench,
-  DollarSign,
-  HeartHandshake,
   CheckCircle2,
   AlertCircle,
   Loader2,
@@ -24,7 +19,6 @@ import {
   X,
   Building2,
   ArrowRight,
-  ShieldCheck
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { getSessionUser } from "@/lib/session-user"
@@ -202,7 +196,7 @@ export default function PublicGiftLibraryPage() {
     if (t === "goods") {
       return (
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400">
-          <Package className="w-3.5 h-3.5" />
+          
           Goods & Supplies
         </span>
       )
@@ -210,49 +204,48 @@ export default function PublicGiftLibraryPage() {
     if (t === "services") {
       return (
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400">
-          <Wrench className="w-3.5 h-3.5" />
+          
           Pro-Bono Service
         </span>
       )
     }
     return (
       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
-        <DollarSign className="w-3.5 h-3.5" />
+        
         Financial Grant
       </span>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 text-slate-900 dark:text-slate-100 pt-28 pb-20 px-4 md:px-8">
-      <div className="max-w-[2400px] mx-auto space-y-10">
+    <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 text-slate-900 dark:text-slate-100 pt-28 pb-20 max-md:pt-20 max-md:pb-24 px-4 md:px-8">
+      <div className="max-w-[2400px] mx-auto space-y-10 max-md:space-y-4">
         <div>
           <BackButton fallbackHref="/" />
         </div>
 
         {/* --- HEADER --- */}
-        <header className="flex flex-col md:flex-row items-center justify-between gap-6 border-b border-slate-200 dark:border-slate-800 pb-10">
-          <div className="space-y-3 max-w-2xl text-center md:text-left">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-900 text-purple-600 dark:text-purple-400 text-xs font-bold uppercase tracking-wider">
+        <header className="flex flex-col md:flex-row items-center justify-between gap-6 max-md:gap-3 border-b border-slate-200 dark:border-slate-800 pb-10 max-md:pb-4">
+          <div className="space-y-3 max-md:space-y-2 max-w-2xl text-center md:text-left">
+            <div className="max-md:hidden inline-flex items-center gap-2 px-4 py-1.5 rounded bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-900 text-purple-600 dark:text-purple-400 text-xs font-bold uppercase tracking-wider">
               <Gift className="w-4 h-4" />
               <span>Proactive Community Offerings</span>
             </div>
-            <h1 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900 dark:text-white">
+            <h1 className="text-2xl sm:text-4xl md:text-5xl font-black tracking-tight text-slate-900 dark:text-white">
               Community Gift Library
             </h1>
-            <p className="text-slate-600 dark:text-slate-400 text-base">
+            <p className="text-slate-600 dark:text-slate-400 text-base max-md:text-sm max-md:line-clamp-2">
               A repository of proactive donations, free professional services, and surplus supplies
               pledged by generous individuals and businesses ready for verified organizations.
             </p>
           </div>
 
-          <div className="shrink-0 flex flex-col sm:flex-row items-center gap-3">
+          <div className="shrink-0 flex flex-row items-center gap-3">
             <RefreshButton variant="pill" onRefresh={() => fetchGifts(true)} />
             <Link
               href="/givers-dashboard"
-              className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-sm hover:opacity-90 transition-opacity shadow-md"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3.5 max-md:px-4 max-md:py-2.5 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-sm hover:opacity-90 transition-opacity"
             >
-              <Sparkles className="w-4 h-4 text-amber-400" />
               <span>Pledge an Offering</span>
             </Link>
           </div>
@@ -276,8 +269,8 @@ export default function PublicGiftLibraryPage() {
         )}
 
         {/* --- FILTER BAR --- */}
-        <div className="rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 p-6 shadow-sm space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+        <div className="rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 p-6 max-md:p-3 shadow-sm space-y-4 max-md:space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 max-md:gap-2">
             <div className="md:col-span-8 relative">
               <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
               <input
@@ -314,8 +307,8 @@ export default function PublicGiftLibraryPage() {
               onChange={value => setSelectedType(value as any)}
             />
             <div className="max-md:hidden flex items-center gap-2 overflow-x-auto pb-1 text-xs">
-              <span className="text-slate-400 font-bold uppercase tracking-wider text-[11px] mr-1 shrink-0 flex items-center gap-1">
-                <Filter className="w-3 h-3" /> Offering Type:
+              <span className="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-[11px] mr-1 shrink-0 flex items-center gap-1">
+                Offering Type:
               </span>
               {[
                 { id: "all", label: "All Offerings" },
@@ -326,11 +319,11 @@ export default function PublicGiftLibraryPage() {
                 <button
                   key={tab.id}
                   onClick={() => setSelectedType(tab.id as any)}
-                  className={`px-4 py-1.5 rounded font-bold transition-all shrink-0 ${
-                    selectedType === tab.id
-                      ? "bg-purple-600 text-white shadow-md shadow-purple-600/20"
-                      : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
-                  }`}
+                  className={`px-4 py-1.5 rounded-lg font-bold transition-all shrink-0 ${
+ selectedType === tab.id
+ ? "bg-purple-600 text-white "
+ : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+ }`}
                 >
                   {tab.label}
                 </button>
@@ -348,7 +341,7 @@ export default function PublicGiftLibraryPage() {
           </div>
         ) : filteredGifts.length === 0 ? (
           <div className="text-center py-20 rounded border border-dashed border-slate-300 dark:border-slate-700 p-8 space-y-4 bg-white dark:bg-slate-900/40">
-            <Gift className="w-12 h-12 text-slate-400 mx-auto" />
+            <Gift className="w-12 h-12 text-slate-500 dark:text-slate-400 mx-auto" />
             <h3 className="text-xl font-bold">No offerings available in this category</h3>
             <p className="text-slate-500 dark:text-slate-400 text-sm max-w-md mx-auto">
               Check back soon as new offerings are approved daily, or pledge an offering if you have resources to share.
@@ -373,7 +366,7 @@ export default function PublicGiftLibraryPage() {
                     {renderTypeBadge(gift.offering_type)}
                     {gift.location && (
                       <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                        <MapPin className="w-3 h-3 text-slate-400" />
+                        
                         {gift.location}
                       </span>
                     )}
@@ -420,7 +413,7 @@ export default function PublicGiftLibraryPage() {
                     <button
                       onClick={() => handleClaimClick(gift)}
                       data-tip="Ask an administrator to claim this offering for your organization"
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition-colors shadow-sm shadow-purple-600/20"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition-colors"
                     >
                       <Building2 className="w-3.5 h-3.5" />
                       <span>Claim Offering</span>
@@ -463,13 +456,13 @@ export default function PublicGiftLibraryPage() {
               <div className="space-y-3 pt-2">
                 <button
                   onClick={() => router.push("/login")}
-                  className="w-full inline-flex items-center justify-center gap-2 py-3.5 px-4 rounded bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm shadow-md shadow-purple-600/20 transition-all"
+                  className="w-full inline-flex items-center justify-center gap-2 py-3.5 px-4 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm transition-all"
                 >
                   <span>Sign In as Organization</span>
                 </button>
                 <button
                   onClick={() => router.push("/register")}
-                  className="w-full inline-flex items-center justify-center gap-2 py-3.5 px-4 rounded border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-800 dark:text-slate-200 font-bold text-sm transition-all"
+                  className="w-full inline-flex items-center justify-center gap-2 py-3.5 px-4 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800/60 text-slate-800 dark:text-slate-200 font-bold text-sm transition-all bg-slate-100 dark:bg-[#1A2740]"
                 >
                   <span>Register an Organization</span>
                   <ArrowRight className="w-4 h-4" />
@@ -478,7 +471,7 @@ export default function PublicGiftLibraryPage() {
 
               <button
                 onClick={() => setShowOrgPrompt(false)}
-                className="text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                className="text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
               >
                 Close and continue browsing
               </button>

@@ -22,7 +22,7 @@ export default async function MaintenancePage() {
         </div>
         <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">We'll be right back</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{message}</p>
-        <Link href="/admin-login" className="inline-block text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+        <Link href="/admin-login" className="inline-block text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
           Administrator sign in
         </Link>
       </div>

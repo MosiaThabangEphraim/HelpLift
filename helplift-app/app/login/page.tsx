@@ -7,7 +7,7 @@ import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { ReadAloudButton } from "@/components/read-aloud-button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { ArrowRight, HeartHandshake, Loader2, AlertCircle, CheckCircle2, Mail, Lock, Fingerprint, Megaphone, Paperclip, Quote as QuoteIcon, X, UserPlus, ShieldCheck } from "lucide-react"
+import { ArrowRight, Loader2, AlertCircle, CheckCircle2, Mail, Lock, Fingerprint, Megaphone, Paperclip, Quote as QuoteIcon, X, UserPlus, ShieldCheck } from "lucide-react"
 import { getRandomQuote, GIVING_QUOTES, type Quote } from "@/lib/quotes"
 import { GoogleSignInButton } from "@/components/google-sign-in-button"
 import { LinkedInSignInButton } from "@/components/linkedin-sign-in-button"
@@ -279,7 +279,7 @@ function LoginContent() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.45, ease: "easeOut" }}
-            className="text-sm italic font-semibold text-slate-400 dark:text-slate-500 mt-1.5"
+            className="text-sm italic font-semibold text-slate-500 dark:text-slate-500 mt-1.5"
           >
             - {quote.author}
           </motion.p>
@@ -362,7 +362,7 @@ function LoginContent() {
               type="button"
               onClick={dismissAdminBanner}
               aria-label="Dismiss"
-              className="shrink-0 rounded p-1 text-slate-400 transition-colors hover:text-slate-700 dark:hover:text-slate-200"
+              className="shrink-0 rounded-lg p-1 text-slate-500 dark:text-slate-400 transition-colors hover:text-slate-700 dark:hover:text-slate-200"
             >
               <X className="h-4 w-4" />
             </button>
@@ -429,7 +429,7 @@ function LoginContent() {
               <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-3">
                 <Link
                   href="/register"
-                  className="btn-shine group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:-translate-y-0.5 hover:shadow-blue-600/40"
+                  className="btn-shine group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2.5 text-sm font-bold text-white transition-all hover:-translate-y-0.5"
                 >
                   Create an account
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
@@ -447,7 +447,7 @@ function LoginContent() {
               type="button"
               onClick={() => setShowNoAccount(false)}
               aria-label="Dismiss"
-              className="absolute top-1 right-0 rounded p-1 text-slate-400 transition-colors hover:text-slate-700 dark:hover:text-slate-200"
+              className="absolute top-1 right-0 rounded-lg p-1 text-slate-500 dark:text-slate-400 transition-colors hover:text-slate-700 dark:hover:text-slate-200"
             >
               <X className="h-4 w-4" />
             </button>
@@ -492,7 +492,7 @@ function LoginContent() {
 </div>
         <Button
           type="submit"
-          className="w-full py-6 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded shadow-lg transition-all"
+          className="w-full py-6 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg transition-all"
           disabled={isLoading}
         >
           Sign In <ArrowRight className="ml-2 h-5 w-5" />
@@ -510,21 +510,21 @@ function LoginContent() {
             type="button"
             onClick={handlePasskeyLogin}
             disabled={isPasskeyLoading}
-            className="flex w-full items-center justify-center gap-3 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-6 py-3.5 text-sm font-bold text-slate-800 dark:text-slate-100 shadow-sm transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-3 rounded-lg bg-white dark:bg-[#1A2740] px-6 py-3.5 text-sm font-bold text-slate-800 dark:text-slate-100 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-60"
           >
             {isPasskeyLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Fingerprint className="h-5 w-5" />}
             <span>Sign in with a passkey</span>
           </button>
         )}
         {passkeySupported && (
-          <p className="-mt-2 text-center text-xs text-slate-400 dark:text-slate-500">
+          <p className="-mt-2 text-center text-xs text-slate-500 dark:text-slate-500">
             Passkeys are set up after your first sign-in, in Settings.
           </p>
         )}
         <GoogleSignInButton label="Sign in with Google" onError={setErrorMsg} />
         <LinkedInSignInButton label="Sign in with LinkedIn" onError={setErrorMsg} />
         <MicrosoftSignInButton label="Sign in with Microsoft" onError={setErrorMsg} />
-        <p className="text-center text-xs text-slate-400 dark:text-slate-500">
+        <p className="text-center text-xs text-slate-500 dark:text-slate-500">
           New to HelpLift? Google/LinkedIn/Microsoft only verify your email. You'll then choose whether you're a giver or an organization and finish registering.
         </p>
       </div>
@@ -532,14 +532,14 @@ function LoginContent() {
       <div className="mt-8 grid w-full max-w-xl grid-cols-1 sm:grid-cols-2 gap-3">
         <Link
           href="/register"
-          className="flex items-center justify-center gap-2 rounded border border-blue-200 dark:border-blue-900 bg-blue-50/60 dark:bg-blue-950/30 px-6 py-3 text-sm font-bold text-blue-700 dark:text-blue-300 transition-colors hover:bg-blue-100 dark:hover:bg-blue-950/50"
+          className="flex items-center justify-center gap-2 rounded bg-blue-50/60 dark:bg-blue-950/30 px-6 py-3 text-sm font-bold text-blue-700 dark:text-blue-300 transition-colors hover:bg-blue-100 dark:hover:bg-blue-950/50"
         >
           <UserPlus className="h-4 w-4" />
           Create an account
         </Link>
         <Link
           href="/admin-login"
-          className="flex items-center justify-center gap-2 rounded border border-indigo-200 dark:border-indigo-900 bg-indigo-50/60 dark:bg-indigo-950/30 px-6 py-3 text-sm font-bold text-indigo-700 dark:text-indigo-300 transition-colors hover:bg-indigo-100 dark:hover:bg-indigo-950/50"
+          className="flex items-center justify-center gap-2 rounded bg-indigo-50/60 dark:bg-indigo-950/30 px-6 py-3 text-sm font-bold text-indigo-700 dark:text-indigo-300 transition-colors hover:bg-indigo-100 dark:hover:bg-indigo-950/50"
         >
           <ShieldCheck className="h-4 w-4" />
           Sign in as admin

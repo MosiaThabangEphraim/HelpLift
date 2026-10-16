@@ -157,7 +157,7 @@ function ReportItem({ report, onSaved, onRemoved }: { report: Report; onSaved: (
     <li className="border-t border-slate-200 dark:border-[#233350] py-4">
       <button type="button" onClick={() => setOpen(value => !value)} aria-expanded={open} className="flex w-full items-start gap-3 text-left">
         <span className={`mt-0.5 inline-flex shrink-0 items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold ${type.className}`}>
-          <TypeIcon className="h-3 w-3" /> {type.label}
+          {type.label}
         </span>
         <span className="min-w-0 flex-1">
           <span className="block font-semibold text-slate-900 dark:text-slate-100">{report.title}</span>
@@ -175,11 +175,11 @@ function ReportItem({ report, onSaved, onRemoved }: { report: Report; onSaved: (
 
       {open && (
         <div className="mt-3 space-y-3 pl-1 text-sm">
-          <p className="whitespace-pre-line text-slate-700 dark:text-slate-300">{report.description}</p>
+          <p className="text-justify-smart whitespace-pre-line text-slate-700 dark:text-slate-300">{report.description}</p>
           {report.steps_to_reproduce && (
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Steps to reproduce</p>
-              <p className="whitespace-pre-line text-slate-700 dark:text-slate-300">{report.steps_to_reproduce}</p>
+              <p className="text-justify-smart whitespace-pre-line text-slate-700 dark:text-slate-300">{report.steps_to_reproduce}</p>
             </div>
           )}
           <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-xs">
@@ -221,7 +221,7 @@ function ReportItem({ report, onSaved, onRemoved }: { report: Report; onSaved: (
                   href={file.url || undefined}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                  className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350] bg-slate-100 dark:bg-[#1A2740]"
                 >
                   <Paperclip className="h-3 w-3" /> {file.name} <span className="text-slate-400">({Math.max(1, Math.round(file.size / 1024))} KB)</span>
                   <ExternalLink className="h-3 w-3" />

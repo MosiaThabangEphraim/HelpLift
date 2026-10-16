@@ -3,16 +3,25 @@
 import { useState, useEffect, useRef, type ReactNode } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
-import { ArrowRight, Bot, EyeOff, Headphones, Mic, PhoneOff, Sparkles, Square, Volume2, X, User, Send } from "lucide-react"
+import { ArrowRight, Bot, Check, EyeOff, Headphones, Languages, Mic, PhoneOff, Square, Volume2, X, User, Send } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { getSessionUser } from "@/lib/session-user"
 import { isAssistantEnabled, onAssistantPreferenceChange, setAssistantEnabled } from "@/lib/assistant-preference"
 import { isSpeechToTextSupported, useSpeechToText } from "@/lib/speech-to-text"
-import { isTextToSpeechSupported, primeSpeechSynthesis, speakInSentences } from "@/lib/text-to-speech"
+import { hasVoiceFor, isTextToSpeechSupported, noVoiceMessage, primeSpeechSynthesis, readingLanguage, speakInSentences } from "@/lib/text-to-speech"
 import { ReadAloudButton } from "@/components/read-aloud-button"
 import { isWakeWordEnabled, onWakeWordPreferenceChange, useWakeWord } from "@/lib/wake-word"
 import { logClientAction } from "@/components/activity-tracker"
+import { TRANSLATE_LANGUAGES, languageLabel, speechLocale } from "@/lib/languages"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 // Lifty, the floating HelpLift AI assistant, rendered once for every page of the site from
 // app/layout.tsx. Answers come from /api/assistant, which works out who the
@@ -63,7 +72,7 @@ function withSiteLinks(text: string): ReactNode[] {
       <Link
         key={`${match.index}-${path}`}
         href={path}
-        className="inline-flex items-center gap-1 rounded bg-blue-50 dark:bg-blue-950/60 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors align-middle"
+        className="inline-flex items-center gap-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors align-middle"
       >
         {linkLabel(path)}
         <ArrowRight className="h-3 w-3" />
@@ -106,9 +115,9 @@ function toSpeakable(text: string) {
 }
 
 function greetingFor(role: Role) {
-  if (role === "giver") return "Hi there! I'm Lifty, your HelpLift assistant 😊 Need help browsing needs, managing your pledges, or tracking donations?"
-  if (role === "organization") return "Hi there! I'm Lifty, your HelpLift assistant 😊 Need help posting needs, uploading verification documents, or claiming gifts?"
-  return "Hi there! I'm Lifty, your HelpLift assistant 😊 How can I help you navigate our giving platform today?"
+  if (role === "giver") return "Hi there! I'm Lifty, your HelpLift assistant Need help browsing needs, managing your pledges, or tracking donations?"
+  if (role === "organization") return "Hi there! I'm Lifty, your HelpLift assistant Need help posting needs, uploading verification documents, or claiming gifts?"
+  return "Hi there! I'm Lifty, your HelpLift assistant How can I help you navigate our giving platform today?"
 }
 
 export function HelpLiftAssistant() {
@@ -141,8 +150,25 @@ export function HelpLiftAssistant() {
   // all) before the voice chat ends.
   const silentTurnsRef = useRef(0)
   const MAX_SILENT_TURNS = 3
+  // The language Lifty replies in, chosen in its window: "auto" matches the
+  // user's own language. Remembered on this device.
+  const [replyLanguage, setReplyLanguage] = useState("auto")
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("helplift:lifty-language")
+      if (saved && (saved === "auto" || TRANSLATE_LANGUAGES.some(option => option.code === saved))) setReplyLanguage(saved)
+    } catch {}
+  }, [])
+  const changeReplyLanguage = (code: string) => {
+    setReplyLanguage(code)
+    try { window.localStorage.setItem("helplift:lifty-language", code) } catch {}
+    logClientAction("Changed Lifty's language", code === "auto" ? "Same as the user writes" : languageLabel(code))
+  }
+  const replySpeechLang = replyLanguage === "auto" ? undefined : speechLocale(replyLanguage)
+
   const speech = useSpeechToText(text => sendMessageRef.current(text), {
     continuous: false, // one spoken message, sent when the person pauses
+    lang: replySpeechLang, // the language chosen in Lifty's menu, if any
     onEnd: heardSpeech => {
       if (!conversationRef.current) return
       if (heardSpeech) {
@@ -168,8 +194,17 @@ export function HelpLiftAssistant() {
   }
 
   // Says a reply aloud; in a voice chat, starts listening again once it's done.
-  const speakReply = (text: string) => {
+  const speakReply = async (text: string) => {
     if (!isTextToSpeechSupported()) return
+    // Only speak with a voice for the reply's language - an English voice
+    // reading isiZulu sounds like gibberish. Without one, the reply is text
+    // only, and a voice chat simply listens for the next question.
+    const lang = readingLanguage(text, replySpeechLang)
+    if (lang && !(await hasVoiceFor(lang))) {
+      setVoiceNote(noVoiceMessage(lang))
+      if (conversationRef.current) speech.start()
+      return
+    }
     stopSpeaking()
     setIsSpeaking(true)
     stopSpeakingRef.current = speakInSentences(
@@ -185,7 +220,8 @@ export function HelpLiftAssistant() {
         stopSpeakingRef.current = null
         setIsSpeaking(false)
         if (conversationRef.current) endConversation("Voice chat ended because something else on the page started reading aloud. Tap the headphones to talk again.")
-      }
+      },
+      readingLanguage(text, replySpeechLang) || undefined
     )
   }
 
@@ -212,6 +248,12 @@ export function HelpLiftAssistant() {
     setCanSpeak(isTextToSpeechSupported())
     return () => { stopSpeakingRef.current?.() }
   }, [])
+
+  // The microphone couldn't use the chosen language and switched to the
+  // device's: say so, without ending the voice chat.
+  useEffect(() => {
+    if (speech.notice) setVoiceNote(speech.notice)
+  }, [speech.notice])
 
   // A microphone problem (blocked permission etc.) ends any voice chat.
   useEffect(() => {
@@ -320,7 +362,7 @@ export function HelpLiftAssistant() {
       const res = await fetch("/api/assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history }),
+        body: JSON.stringify({ messages: history, language: replyLanguage }),
         // Never leave the typing dots spinning forever.
         signal: AbortSignal.timeout(60_000),
       }).catch((fetchError: any) => {
@@ -370,16 +412,16 @@ export function HelpLiftAssistant() {
           <button
             type="button"
             onClick={() => setIsChatOpen(true)}
-            className="relative hidden sm:block rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 shadow-lg animate-in fade-in slide-in-from-right-2 duration-500 hover:text-blue-600"
+            className="relative hidden sm:block rounded-xl bg-slate-100 dark:bg-[#1A2740] px-4 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 animate-in fade-in slide-in-from-right-2 duration-500 hover:text-blue-600"
           >
-            Hi, I&apos;m Lifty 😊 How can I help you?
+            Hi, I&apos;m Lifty How can I help you?
             <span aria-hidden="true" className="absolute top-1/2 -right-1.5 h-3 w-3 -translate-y-1/2 rotate-45 border-t border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900" />
           </button>
         )}
         <button
           data-tour="lifty"
           onClick={() => setIsChatOpen(true)}
-          className="relative group flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-full shadow-[0_10px_30px_rgb(37,99,235,0.4)] hover:scale-105 active:scale-95 transition-all duration-300"
+          className="relative group flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-full hover:scale-105 active:scale-95 transition-all duration-300"
           aria-label={wake.listening ? "Chat with Lifty, the HelpLift assistant. Listening for \"Hey Lifty\"" : "Chat with Lifty, the HelpLift assistant"}
           data-tip={wake.error || (wake.listening ? "Say \"Hey Lifty\" to talk hands-free, or click to chat" : undefined)}
         >
@@ -402,18 +444,46 @@ export function HelpLiftAssistant() {
           <div className="flex items-center justify-between px-6 py-4 bg-slate-900 text-white">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center shadow-inner">
-                <Sparkles className="w-5 h-5 text-white animate-pulse" />
+                <Bot className="w-5 h-5 text-white" />
               </div>
               <div>
                 <h4 className="font-bold text-sm leading-tight">Lifty</h4>
-                <p className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Online & Ready</p>
+                <p className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
+                  {replyLanguage === "auto" ? "Online & Ready" : `Replying in ${languageLabel(replyLanguage)}`}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-1">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors"
+                    aria-label="Choose Lifty's language"
+                    data-tip="Choose the language Lifty replies in"
+                  >
+                    <Languages className="w-5 h-5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="z-[300] max-h-72 w-52 overflow-y-auto rounded border-0 p-1 shadow-xl">
+                  <DropdownMenuLabel className="text-[11px] uppercase tracking-wider text-slate-500">Lifty replies in</DropdownMenuLabel>
+                  <DropdownMenuItem onSelect={() => changeReplyLanguage("auto")} className="justify-between gap-2">
+                    <span>Same as you write</span>
+                    {replyLanguage === "auto" && <Check className="h-4 w-4 text-blue-600" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {TRANSLATE_LANGUAGES.map(option => (
+                    <DropdownMenuItem key={option.code} onSelect={() => changeReplyLanguage(option.code)} className="justify-between gap-2">
+                      <span>{option.label}</span>
+                      {replyLanguage === option.code && <Check className="h-4 w-4 text-blue-600" />}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
               {canListen && canSpeak && !conversation && (
                 <button
                   onClick={startConversation}
-                  className="text-slate-400 hover:text-white p-1 rounded transition-colors"
+                  className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors"
                   aria-label="Start a voice chat with Lifty"
                   data-tip="Talk to Lifty hands-free - it listens, answers out loud, then listens again"
                 >
@@ -423,7 +493,7 @@ export function HelpLiftAssistant() {
               {signedIn && (
                 <button
                   onClick={hideAssistant}
-                  className="text-slate-400 hover:text-white p-1 rounded transition-colors"
+                  className="text-slate-500 dark:text-slate-400 hover:text-white p-1 rounded-lg transition-colors"
                   aria-label="Hide Lifty"
                   data-tip="Hide Lifty on every page (turn it back on in Settings)"
                 >
@@ -432,7 +502,7 @@ export function HelpLiftAssistant() {
               )}
               <button
                 onClick={closeChat}
-                className="text-slate-400 hover:text-white p-1 rounded transition-colors"
+                className="text-slate-500 dark:text-slate-400 hover:text-white p-1 rounded-lg transition-colors"
                 aria-label="Close Chat"
               >
                 <X className="w-5 h-5" />
@@ -518,7 +588,7 @@ export function HelpLiftAssistant() {
               <button
                 type="button"
                 onClick={() => endConversation()}
-                className="inline-flex shrink-0 items-center gap-1 rounded bg-red-600 px-3 py-1 text-[11px] font-bold text-white hover:bg-red-700 transition-colors"
+                className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-red-600 px-3 py-1 text-[11px] font-bold text-white hover:bg-red-700 transition-colors"
               >
                 <PhoneOff className="h-3 w-3" /> End
               </button>
@@ -550,7 +620,7 @@ export function HelpLiftAssistant() {
                 disabled={isTyping}
                 aria-label={speech.listening ? "Stop listening" : "Speak your message"}
                 data-tip={speech.listening ? "Stop listening" : "Speak instead of typing - it sends when you pause"}
-                className={`w-11 h-11 rounded flex items-center justify-center shrink-0 transition-all disabled:opacity-50 ${
+                className={`w-11 h-11 rounded-lg flex items-center justify-center shrink-0 transition-all disabled:opacity-50 ${
                   speech.listening ? "bg-red-600 text-white animate-pulse" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
                 }`}
               >
@@ -561,7 +631,7 @@ export function HelpLiftAssistant() {
               type="submit"
               disabled={isTyping || !chatInput.trim()}
               aria-label="Send message"
-              className="w-11 h-11 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded flex items-center justify-center shadow-md transition-all shrink-0"
+              className="w-11 h-11 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg flex items-center justify-center transition-all shrink-0"
             >
               <Send className="w-4 h-4" />
             </button>

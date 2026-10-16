@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     // Try query with urgency column
     let query = supabase
       .from("needs")
-      .select("id, title, description, category, location, latitude, longitude, quantity, target_amount, due_date, status, urgency, created_at, organizations(id, name, type, verification_status, city, province, logo_url), need_attachments(id, storage_path, file_name)")
+      .select("id, title, description, category, location, latitude, longitude, quantity, target_amount, amount_raised, quantity_still_needed, support_type, due_date, status, urgency, created_at, organizations(id, name, type, verification_status, city, province, logo_url), need_attachments(id, storage_path, file_name)")
       .in("status", ["open", "in_progress"])
       // Needs past their due date come off straight away (lib/expiry.ts).
       .or(notPastFilter("due_date"))
@@ -40,7 +40,7 @@ export async function GET(request: Request) {
     if (error && error.message?.toLowerCase().includes("urgency")) {
       let fallbackQuery = supabase
         .from("needs")
-        .select("id, title, description, category, location, latitude, longitude, quantity, target_amount, due_date, status, created_at, organizations(id, name, type, verification_status, city, province, logo_url)")
+        .select("id, title, description, category, location, latitude, longitude, quantity, target_amount, amount_raised, quantity_still_needed, support_type, due_date, status, created_at, organizations(id, name, type, verification_status, city, province, logo_url)")
         .in("status", ["open", "in_progress"])
         .or(notPastFilter("due_date"))
         .order("created_at", { ascending: false })

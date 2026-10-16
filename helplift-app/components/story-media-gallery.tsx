@@ -126,7 +126,7 @@ export function StoryMediaGallery({
               type="button"
               onClick={() => scrollToIndex(index)}
               aria-label={`Show photo/video ${index + 1}`}
-              className={`h-1.5 rounded transition-all ${index === activeIndex ? "w-5 bg-blue-600" : "w-1.5 bg-slate-300 dark:bg-slate-700"}`}
+              className={`h-1.5 rounded-lg transition-all ${index === activeIndex ? "w-5 bg-blue-600" : "w-1.5 bg-slate-300 dark:bg-slate-700"}`}
             />
           ))}
         </div>
@@ -141,7 +141,7 @@ export function StoryMediaGallery({
           <button
             type="button"
             onClick={() => setLightboxIndex(null)}
-            className="absolute top-4 right-4 rounded bg-white/10 p-2 text-white hover:bg-white/20"
+            className="absolute top-4 right-4 rounded-lg bg-white/10 p-2 text-white hover:bg-white/20"
             aria-label="Close"
           >
             <X className="w-5 h-5" />
@@ -151,7 +151,7 @@ export function StoryMediaGallery({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => (i === null ? i : (i - 1 + images.length) % images.length)) }}
-                className="absolute left-2 md:left-4 rounded bg-white/10 p-2 text-white hover:bg-white/20"
+                className="absolute left-2 md:left-4 rounded-lg bg-white/10 p-2 text-white hover:bg-white/20"
                 aria-label="Previous photo"
               >
                 <ChevronLeft className="w-6 h-6" />
@@ -159,7 +159,7 @@ export function StoryMediaGallery({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => (i === null ? i : (i + 1) % images.length)) }}
-                className="absolute right-2 md:right-4 rounded bg-white/10 p-2 text-white hover:bg-white/20"
+                className="absolute right-2 md:right-4 rounded-lg bg-white/10 p-2 text-white hover:bg-white/20"
                 aria-label="Next photo"
               >
                 <ChevronRight className="w-6 h-6" />

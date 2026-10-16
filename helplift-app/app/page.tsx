@@ -12,7 +12,6 @@ import {
   Star, 
   Plus, 
   Minus, 
-  Sparkles, 
   LayoutDashboard, 
   Gift,
   Users,
@@ -21,7 +20,6 @@ import {
   Search,
   MessageSquare,
   Flame,
-  ExternalLink,
   Loader2,
   Heart,
   Code2,
@@ -35,7 +33,6 @@ import {
   Menu,
   X
 } from "lucide-react"
-import { ThemeToggle } from "@/components/theme-toggle"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { StoryMediaGallery } from "@/components/story-media-gallery"
 import { MicButton } from "@/components/mic-button"
@@ -307,7 +304,7 @@ export default function LandingPage() {
                 href={`#${link.id}`}
                 onClick={(e) => handleScrollToSection(e, link.id)}
                 data-tip={link.tip}
-                className="px-5 py-2 rounded text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 hover:bg-white dark:hover:bg-slate-800 hover:shadow-sm transition-all duration-300"
+                className="px-5 py-2 rounded-lg text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-slate-100 hover:bg-white dark:hover:bg-slate-800 transition-all duration-300"
               >
                 {link.name}
               </a>
@@ -325,11 +322,10 @@ export default function LandingPage() {
               <Code2 className="h-4 w-4" />
               <span className="max-md:hidden">Developers</span>
             </Link>
-            <ThemeToggle className="h-9 w-9" />
             <button
               onClick={() => router.push(dashboardPath || "/login")}
               data-tip={dashboardPath ? "You're signed in - go to your dashboard" : undefined}
-              className="hidden md:inline-flex items-center justify-center gap-2 whitespace-nowrap shrink-0 px-6 py-2.5 text-sm font-bold text-white transition-all duration-300 bg-slate-900 dark:bg-blue-600 border border-transparent rounded hover:bg-slate-800 dark:hover:bg-blue-700 hover:shadow-lg hover:shadow-slate-200 dark:hover:shadow-none hover:-translate-y-0.5"
+              className="hidden md:inline-flex items-center justify-center gap-2 whitespace-nowrap shrink-0 px-6 py-2.5 text-sm font-bold text-white transition-all duration-300 bg-slate-900 dark:bg-blue-600 border-transparent rounded-lg hover:bg-slate-800 dark:hover:bg-blue-700 hover:-translate-y-0.5"
             >
               {dashboardPath ? (
                 <>
@@ -345,7 +341,7 @@ export default function LandingPage() {
               onClick={() => setMobileMenuOpen(open => !open)}
               aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
               aria-expanded={mobileMenuOpen}
-              className="md:hidden inline-flex h-9 w-9 items-center justify-center rounded bg-slate-900 dark:bg-blue-600 text-white"
+              className="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 dark:bg-blue-600 text-white"
             >
               {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -360,7 +356,7 @@ export default function LandingPage() {
                   key={link.id}
                   href={`#${link.id}`}
                   onClick={(e) => { setMobileMenuOpen(false); handleScrollToSection(e, link.id) }}
-                  className="rounded px-3 py-3 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  className="rounded-lg px-3 py-3 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
                   {link.name}
                 </a>
@@ -368,12 +364,12 @@ export default function LandingPage() {
             </div>
             <button
               onClick={() => { setMobileMenuOpen(false); router.push(dashboardPath || "/login") }}
-              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/25"
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-bold text-white"
             >
               {dashboardPath ? (<><LayoutDashboard className="w-4 h-4" /> My Dashboard</>) : "Sign In"}
             </button>
             {!dashboardPath && (
-              <Link href="/register" onClick={() => setMobileMenuOpen(false)} className="mt-2 flex w-full items-center justify-center rounded-xl bg-slate-900/5 dark:bg-white/10 px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200">
+              <Link href="/register" onClick={() => setMobileMenuOpen(false)} className="mt-2 flex w-full items-center justify-center rounded bg-slate-900/5 dark:bg-white/10 px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200">
                 Register
               </Link>
             )}
@@ -407,7 +403,7 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
               <button 
                 onClick={() => router.push("/register")}
-                className="group relative inline-flex items-center justify-center px-8 py-4 text-base font-bold text-white transition-all duration-300 bg-gradient-to-b from-blue-500 to-blue-600 rounded shadow-[0_8px_30px_rgb(37,99,235,0.24)] hover:shadow-[0_8px_30px_rgb(37,99,235,0.4)] hover:-translate-y-0.5 overflow-hidden w-full sm:w-auto"
+                className="group relative inline-flex items-center justify-center px-8 py-4 text-base font-bold text-white transition-all duration-300 bg-gradient-to-b from-blue-500 to-blue-600 rounded hover:-translate-y-0.5 overflow-hidden w-full sm:w-auto"
               >
                 <span className="relative z-10 flex items-center gap-2">
                   Join the Platform 
@@ -417,7 +413,7 @@ export default function LandingPage() {
               
               <button 
                 onClick={() => router.push("/needs")}
-                className="group inline-flex items-center justify-center px-8 py-4 text-base font-bold text-slate-700 dark:text-slate-200 transition-all duration-300 bg-slate-900/5 dark:bg-white/10 rounded hover:bg-slate-900/10 dark:hover:bg-white/15 w-full sm:w-auto"
+                className="group inline-flex items-center justify-center px-8 py-4 text-base font-bold text-slate-700 dark:text-slate-200 transition-all duration-300 bg-slate-900/5 dark:bg-white/10 rounded-lg hover:bg-slate-900/10 dark:hover:bg-white/15 w-full sm:w-auto"
               >
                 View Open Needs
               </button>
@@ -470,7 +466,7 @@ export default function LandingPage() {
                 { icon: LayoutDashboard, tint: "bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-400", title: "Central Dashboard", text: "Track open requests, coordinate drop-offs, and generate fulfillment reports." },
                 { icon: Users, tint: "bg-orange-100 text-orange-600 dark:bg-orange-950 dark:text-orange-400", title: "Direct Matching", text: "Givers are alerted about new needs that match their location and the causes they care about." },
               ].map(({ icon: Icon, tint, title, text }) => (
-                <div key={title} className="group rounded-2xl p-6 transition-colors duration-300 hover:bg-white/70 dark:hover:bg-slate-900/40">
+                <div key={title} className="group rounded p-6 transition-colors duration-300 hover:bg-white/70 dark:hover:bg-slate-900/40">
                   <span className={`flex h-14 w-14 items-center justify-center rounded-full ${tint} transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6`}>
                     <Icon className="h-6 w-6" strokeWidth={1.75} />
                   </span>
@@ -491,7 +487,7 @@ export default function LandingPage() {
               title="Community requests."
               subtitle="Direct verified requests from non-profits, schools, and community welfare initiatives."
               action={
-                <Link href="/needs" className="btn-shine group inline-flex items-center gap-2 rounded-xl bg-slate-900 dark:bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg">
+                <Link href="/needs" className="btn-shine group inline-flex items-center gap-2 rounded-xl bg-slate-900 dark:bg-blue-600 px-5 py-3 text-sm font-bold text-white transition-all hover:-translate-y-0.5">
                   Explore all needs <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                 </Link>
               }
@@ -516,20 +512,20 @@ export default function LandingPage() {
                           <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">{need.category}</span>
                           {need.urgency === "high" ? (
                             <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 flex items-center gap-1">
-                              <Flame className="w-3 h-3 fill-red-500" /> High urgency
+                              High urgency
                             </span>
                           ) : (
                             <span className="text-xs font-bold px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400">Open</span>
                           )}
                         </div>
                         <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100 line-clamp-1">{need.title}</h3>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-3 leading-relaxed">{need.description}</p>
+                        <p className="text-justify-smart text-sm text-slate-500 dark:text-slate-400 line-clamp-3 leading-relaxed">{need.description}</p>
                         <p className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 pt-1 min-w-0">
                           <OrgLogo src={org?.logo_url} name={org?.name || "Verified Organization"} className="h-6 w-6 text-[10px]" />
                           <span className="truncate">{org?.name || "Verified Organization"}{need.location ? ` · ${need.location}` : ""}</span>
                         </p>
                       </div>
-                      <Link href={`/needs?search=${encodeURIComponent(need.title)}`} className="btn-shine inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3 px-4 text-sm font-bold text-white shadow-md shadow-blue-600/20 transition-all hover:shadow-blue-600/40">
+                      <Link href={`/needs?search=${encodeURIComponent(need.title)}`} className="btn-shine inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3 px-4 text-sm font-bold text-white transition-all">
                         Support this need <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
                       </Link>
                     </div>
@@ -618,7 +614,7 @@ export default function LandingPage() {
                 <div key={`rev-${currentStory.id}`} className="p-8 md:p-10 flex flex-col animate-in fade-in slide-in-from-right-4 duration-700">
                   <div className="flex items-center justify-between gap-3">
                     <span className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 dark:bg-blue-950 px-2.5 py-1 text-xs font-bold text-blue-600 dark:text-blue-400">
-                      <MapPin className="w-3.5 h-3.5" /> {currentStory.location}
+                      {currentStory.location}
                     </span>
                     <span className="flex gap-0.5">
                       {[...Array(currentStory.rating)].map((_, i) => (
@@ -804,20 +800,20 @@ export default function LandingPage() {
               <div className="space-y-3 pt-2">
                 <button
                   onClick={() => { setShowSupportAuthPrompt(false); setShowGuestSupportPlatform(true) }}
-                  className="w-full inline-flex items-center justify-center gap-2 py-3.5 px-4 rounded bg-pink-600 hover:bg-pink-700 text-white font-bold text-sm shadow-md shadow-pink-600/20 transition-all"
+                  className="w-full inline-flex items-center justify-center gap-2 py-3.5 px-4 rounded-lg bg-pink-600 hover:bg-pink-700 text-white font-bold text-sm transition-all"
                 >
                   <Heart className="w-4 h-4" />
                   <span>Donate without an account</span>
                 </button>
                 <button
                   onClick={() => router.push("/login")}
-                  className="w-full inline-flex items-center justify-center gap-2 py-3.5 px-4 rounded border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-800 dark:text-slate-200 font-bold text-sm transition-all"
+                  className="w-full inline-flex items-center justify-center gap-2 py-3.5 px-4 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800/60 text-slate-800 dark:text-slate-200 font-bold text-sm transition-all bg-slate-100 dark:bg-[#1A2740]"
                 >
                   <span>Sign In</span>
                 </button>
                 <button
                   onClick={() => router.push("/register")}
-                  className="w-full inline-flex items-center justify-center gap-2 py-3.5 px-4 rounded border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-800 dark:text-slate-200 font-bold text-sm transition-all"
+                  className="w-full inline-flex items-center justify-center gap-2 py-3.5 px-4 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800/60 text-slate-800 dark:text-slate-200 font-bold text-sm transition-all bg-slate-100 dark:bg-[#1A2740]"
                 >
                   <span>Register</span>
                   <ArrowRight className="w-4 h-4" />
@@ -825,7 +821,7 @@ export default function LandingPage() {
               </div>
               <button
                 onClick={() => setShowSupportAuthPrompt(false)}
-                className="text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                className="text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
               >
                 Close
               </button>
@@ -894,7 +890,7 @@ export default function LandingPage() {
                 </a>
 
                 {contactFeedback && (
-                  <div className={`mt-5 p-4 rounded-xl text-sm font-semibold ${
+                  <div className={`mt-5 p-4 rounded text-sm font-semibold ${
                     contactFeedback.type === "success"
                       ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
                       : "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300"
@@ -960,7 +956,7 @@ export default function LandingPage() {
                       <MicButton className="top-3 right-3" onText={text => setContactMessage(m => appendSpeech(m, text))} />
                     </div>
                   </div>
-                  <button type="submit" disabled={isSendingContact} data-tip="Send your message to the HelpLift team - we'll reply by email" className="btn-shine group w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition-all hover:-translate-y-0.5 hover:shadow-blue-600/40 disabled:opacity-60">
+                  <button type="submit" disabled={isSendingContact} data-tip="Send your message to the HelpLift team - we'll reply by email" className="btn-shine group w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3.5 text-sm font-bold text-white transition-all hover:-translate-y-0.5 disabled:opacity-60">
                     {isSendingContact ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                     {isSendingContact ? "Sending..." : "Send Message"}
                     {!isSendingContact && <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />}
@@ -1015,7 +1011,7 @@ export default function LandingPage() {
                   href="#contact"
                   onClick={() => setContactTopic("scam")}
                   data-tip="Tell us about anyone asking you to pay or share your login details"
-                  className="btn-shine group inline-flex h-12 items-center gap-2.5 self-start max-md:self-stretch max-md:justify-center rounded-xl bg-slate-900 dark:bg-slate-800 px-5 text-sm font-bold text-white shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg"
+                  className="btn-shine group inline-flex h-12 items-center gap-2.5 self-start max-md:self-stretch max-md:justify-center rounded-xl bg-slate-900 dark:bg-slate-800 px-5 text-sm font-bold text-white transition-all hover:-translate-y-0.5"
                 >
                   <Flag className="w-4 h-4" /> Report a scam to us
                   <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
@@ -1024,7 +1020,7 @@ export default function LandingPage() {
                   type="button"
                   onClick={() => setShowTipOff(true)}
                   data-tip="Anonymously report a registered organization for fraud, abuse or other illegal or suspicious activity - we'll investigate"
-                  className="btn-shine group inline-flex h-12 items-center gap-2.5 self-start max-md:self-stretch max-md:justify-center rounded-xl bg-gradient-to-r from-orange-500 to-red-500 px-5 text-sm font-bold text-white shadow-lg shadow-orange-500/25 transition-all hover:-translate-y-0.5 hover:shadow-orange-500/40"
+                  className="btn-shine group inline-flex h-12 items-center gap-2.5 self-start max-md:self-stretch max-md:justify-center rounded-xl bg-gradient-to-r from-orange-500 to-red-500 px-5 text-sm font-bold text-white transition-all hover:-translate-y-0.5"
                 >
                   <EyeOff className="w-4 h-4" /> Anonymous tip-off
                   <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
@@ -1032,12 +1028,12 @@ export default function LandingPage() {
                 </div>
                 <div className="flex flex-col-reverse md:flex-row md:items-center gap-3 md:gap-4">
                   <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed md:max-w-[17rem] md:text-right max-md:text-center">
-                    Donations go directly to HelpLift, not to any organization. Your support keeps it running and growing. Thank you! 💙
+                    Donations go directly to HelpLift, not to any organization. Your support keeps it running and growing. Thank you!
                   </p>
                   <button
                     onClick={handleSupportPlatformClick}
                     data-tip="Donate to HelpLift itself - it keeps the platform free for everyone"
-                    className="btn-shine group inline-flex h-12 shrink-0 items-center gap-2.5 self-start max-md:self-stretch max-md:justify-center md:self-auto rounded-xl bg-gradient-to-r from-pink-600 to-pink-500 px-5 text-sm font-bold text-white shadow-lg shadow-pink-600/25 transition-all hover:-translate-y-0.5 hover:shadow-pink-600/40"
+                    className="btn-shine group inline-flex h-12 shrink-0 items-center gap-2.5 self-start max-md:self-stretch max-md:justify-center md:self-auto rounded-xl bg-gradient-to-r from-pink-600 to-pink-500 px-5 text-sm font-bold text-white transition-all hover:-translate-y-0.5"
                   >
                     <span className="flex h-6 w-6 items-center justify-center rounded-md bg-white">
                       <Heart className="heartbeat w-3.5 h-3.5 fill-pink-600 text-pink-600" />
@@ -1140,7 +1136,7 @@ function FaqItem({
     ? "bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800"
     : "bg-white/70 dark:bg-slate-900/40 hover:bg-white dark:hover:bg-slate-900/70"
   return (
-    <div className={`rounded-xl transition-colors duration-300 ${isOpen ? "bg-blue-50/80 dark:bg-blue-950/30" : idle}`}>
+    <div className={`rounded transition-colors duration-300 ${isOpen ? "bg-blue-50/80 dark:bg-blue-950/30" : idle}`}>
       <div
         role="button"
         tabIndex={0}

@@ -107,7 +107,7 @@ export function LiveActivityFeed() {
                 )}
                 <span className="min-w-0">
                   <span className="block text-sm leading-snug text-slate-700 dark:text-slate-200">{item.text}</span>
-                  <time dateTime={item.at} className="block mt-0.5 text-xs text-slate-400 dark:text-slate-500">{timeAgo(item.at, now)}</time>
+                  <time dateTime={item.at} className="block mt-0.5 text-xs text-slate-500 dark:text-slate-500">{timeAgo(item.at, now)}</time>
                 </span>
               </>
             )

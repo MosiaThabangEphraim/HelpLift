@@ -71,7 +71,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          'bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-[200] grid grid-cols-[minmax(0,1fr)] overflow-x-hidden w-full max-w-[calc(100%-2rem)] max-h-[85vh] translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg',
+          'bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-[200] grid grid-cols-[minmax(0,1fr)] overflow-x-hidden w-full max-w-[calc(100%-1.5rem)] max-h-[85vh] translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto rounded-lg border p-6 max-md:p-4 shadow-lg duration-200 sm:max-w-lg',
           className,
           // Applied after the window's own classes so every window shares one size.
           'sm:max-w-3xl lg:max-w-5xl max-h-[90vh]',
@@ -92,7 +92,7 @@ function DialogContent({
                 // Let this window close before the previous one reopens.
                 window.setTimeout(returnTo.reopen, 120)
               }}
-              className="absolute top-4 left-6 inline-flex items-center gap-1.5 rounded px-1.5 py-1 -ml-1.5 text-xs font-bold text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/40 [&_svg]:size-3.5"
+              className="absolute top-3 left-6 -ml-3 inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-white/5 dark:hover:text-white transition-colors [&_svg]:size-3.5"
             >
               <ArrowLeftIcon /> Back to {returnTo.label}
             </button>

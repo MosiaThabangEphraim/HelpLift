@@ -45,7 +45,7 @@ export function MaximizeToggle() {
       aria-label={label}
       aria-pressed={maximized}
       data-tip={label}
-      className="absolute top-3 right-3 z-10 rounded p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-[#1A2740] dark:hover:text-slate-300"
+      className="absolute top-3 right-3 z-10 rounded-lg p-1 text-slate-500 dark:text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-[#1A2740] dark:hover:text-slate-300"
     >
       {maximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
     </button>

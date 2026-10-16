@@ -19,8 +19,8 @@ export default function TermsOfServicePage() {
     <main className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 pt-28 pb-24 px-4 md:px-8">
       <div className="max-w-3xl mx-auto space-y-10 justify-prose">
         <div className="space-y-4">
-          <Link href="/" className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 dark:text-slate-400 hover:text-blue-600 transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Back to home
+          <Link href="/" className="-ml-3 inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-white/5 dark:hover:text-white transition-colors">
+            <ArrowLeft className="h-3.5 w-3.5" /> Back to home
           </Link>
           <h1 className="text-3xl md:text-4xl font-black tracking-tight text-slate-900 dark:text-white">Terms of Service</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">Effective 18 September 2026</p>
@@ -136,7 +136,7 @@ export default function TermsOfServicePage() {
           <p>Questions about these terms? Reach us through the "Partner with us" contact form on our home page.</p>
         </Section>
 
-        <p className="text-xs text-slate-400 pt-6 border-t border-slate-200 dark:border-slate-800">
+        <p className="text-xs text-slate-500 dark:text-slate-400 pt-6 border-t border-slate-200 dark:border-slate-800">
           These terms are provided for general transparency about how HelpLift operates and do not constitute legal
           advice.
         </p>

@@ -43,14 +43,14 @@ export function VizRoot({ children }: { children: React.ReactNode }) {
 export function RangeFilter({ value, onChange }: { value: AnalyticsRange; onChange: (range: AnalyticsRange) => void }) {
   return (
     <div className="flex items-center gap-2 flex-wrap" role="group" aria-label="Time range">
-      <span className="text-xs font-bold uppercase tracking-wider text-slate-400 mr-1">Showing</span>
+      <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mr-1">Showing</span>
       {RANGE_OPTIONS.map(option => (
         <button
           key={String(option.value)}
           type="button"
           onClick={() => onChange(option.value)}
           aria-pressed={value === option.value}
-          className={`rounded px-3 py-1.5 text-xs font-bold transition-colors ${
+          className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
             value === option.value
               ? "bg-blue-600 text-white"
               : "bg-slate-100 dark:bg-[#1A2740] text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350]"
@@ -168,7 +168,7 @@ export function ChartCard({
               <button
                 type="button"
                 onClick={() => downloadChartAsImage(chartRef.current, filename)}
-                className="inline-flex items-center gap-1 rounded border border-slate-200 dark:border-[#233350] px-2.5 py-1 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350] bg-slate-100 dark:bg-[#1A2740]"
               >
                 <Download className="w-3 h-3" /> Download
               </button>
@@ -177,7 +177,7 @@ export function ChartCard({
               type="button"
               onClick={() => setShowTable(value => !value)}
               aria-pressed={showTable}
-              className="rounded border border-slate-200 dark:border-[#233350] px-2.5 py-1 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+              className="rounded-lg px-2.5 py-1 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350] bg-slate-100 dark:bg-[#1A2740]"
             >
               {showTable ? "View as chart" : "View as table"}
             </button>

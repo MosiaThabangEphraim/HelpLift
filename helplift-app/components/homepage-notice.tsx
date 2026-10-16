@@ -76,7 +76,7 @@ export function HomepageNotice({ className = "" }: { className?: string }) {
                   href={file.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded border border-blue-200 dark:border-blue-900 bg-white dark:bg-[#121B2E] px-2.5 py-1 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:underline"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:underline"
                 >
                   <Paperclip className="h-3 w-3" /> {file.name}
                 </a>
@@ -89,7 +89,7 @@ export function HomepageNotice({ className = "" }: { className?: string }) {
           onClick={dismiss}
           aria-label="Dismiss announcement"
           data-tip="Dismiss"
-          className="shrink-0 rounded p-1 text-slate-400 hover:bg-blue-100 hover:text-slate-700 dark:hover:bg-blue-900/50 dark:hover:text-slate-200"
+          className="shrink-0 rounded-lg p-1 text-slate-500 dark:text-slate-400 hover:bg-blue-100 hover:text-slate-700 dark:hover:bg-blue-900/50 dark:hover:text-slate-200"
         >
           <X className="h-4 w-4" />
         </button>

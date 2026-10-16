@@ -180,7 +180,7 @@ export function SupportPlatformDialog({ open, onOpenChange, onDone, initialAmoun
               </p>
               <p className="text-xs text-pink-700 dark:text-pink-400">
                 We don't charge organizations or givers a cent to use HelpLift. Your support is what keeps the
-                lights on and lets us keep building - thank you for believing in what we're doing. 💙
+                lights on and lets us keep building - thank you for believing in what we're doing.
               </p>
             </div>
 

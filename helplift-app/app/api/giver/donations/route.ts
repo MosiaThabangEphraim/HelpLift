@@ -59,11 +59,18 @@ export async function POST(request: Request) {
       if (!bankAccount) return NextResponse.json({ message: "Select a bank to transfer into." }, { status: 400 })
     }
 
-    const { data: need } = await supabase.from("needs").select("id, title, organization_id, status, target_amount, due_date").eq("id", need_id).single()
+    const { data: need } = await supabase.from("needs").select("id, title, organization_id, status, support_type, target_amount, amount_raised, due_date").eq("id", need_id).single()
     if (!need || !["open", "in_progress"].includes(need.status)) return NextResponse.json({ message: "This need is not open for donations." }, { status: 400 })
     if (isPastDate(need.due_date)) return NextResponse.json({ message: "This need's due date has passed, so it no longer accepts donations." }, { status: 400 })
-    if (need.target_amount === null || need.target_amount === undefined) {
+    if (need.support_type === "goods" || need.target_amount === null || need.target_amount === undefined) {
       return NextResponse.json({ message: "This need does not accept monetary donations." }, { status: 400 })
+    }
+    // Only what's still needed (the database enforces the same - see
+    // 20261013000200_need_funding_progress.sql). Confirmed donations count.
+    const stillNeeded = Math.max(0, Number(need.target_amount) - Number(need.amount_raised || 0))
+    if (stillNeeded <= 0) return NextResponse.json({ message: "This need is fully funded and no longer accepts donations." }, { status: 400 })
+    if (numericAmount > stillNeeded) {
+      return NextResponse.json({ message: `Only R${stillNeeded.toFixed(2)} is still needed for this need. Please donate that amount or less.` }, { status: 400 })
     }
 
     if (payment_method === "payfast") {

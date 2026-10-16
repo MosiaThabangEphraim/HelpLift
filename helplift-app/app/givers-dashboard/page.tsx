@@ -3,13 +3,12 @@ import { FormEvent, useEffect, useMemo, useState } from "react"
 import { fileUrl } from "@/lib/file-links"
 import { useTabTransition } from "@/lib/use-tab-transition"
 import { notPastFilter, todayInSA } from "@/lib/expiry"
-import { CountUp } from "@/components/count-up"
 import { stageFormFiles } from "@/lib/stage-uploads"
 import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { useRouter } from "next/navigation"
 import { useDashboardColorScheme } from "@/lib/color-scheme"
 import { DashboardSearch, settingsSearchItems, themeSearchItem, type DashboardSearchItem } from "@/components/dashboard-search"
-import { MobileAttentionGrid, MobileSectionHeading, MobileSectionNav, type MobileAction, type MobileSection } from "@/components/mobile-section-nav"
+import { MobileSectionHeading, MobileSectionNav, type MobileAction, type MobileSection } from "@/components/mobile-section-nav"
 import Link from "next/link"
 import { showFeedback } from "@/lib/inline-feedback"
 import {
@@ -18,26 +17,18 @@ import {
   Loader2,
   LogOut,
   Send,
-  XCircle,
   Gift,
   Plus,
-  Flame,
-  AlertTriangle,
   PackageCheck,
   ExternalLink,
-  Sparkles,
-  Pencil,
   Settings,
   Search,
   MessageSquare,
-  Bell,
   Mail,
   ClipboardList,
   Users,
   X,
   Banknote,
-  Paperclip,
-  BarChart3,
   Image as ImageIcon,
   Heart,
   Star,
@@ -45,6 +36,7 @@ import {
   MapPin,
   Home,
   Building2,
+  ChevronDown,
 } from "lucide-react"
 import { getCurrentPosition, haversineKm, NEAR_ME_RADIUS_KM, reverseGeocodePlaceNames } from "@/lib/geolocation"
 import { ViewToggle, type ListView } from "@/components/view-toggle"
@@ -86,19 +78,19 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { MessageComposeDialog } from "@/components/message-compose-dialog"
 import { MessageDetailDialog } from "@/components/message-detail-dialog"
-import { ThemeToggle } from "@/components/theme-toggle"
 import { FeedbackButton } from "@/components/feedback-button"
 import { SupportPlatformDialog } from "@/components/support-platform-dialog"
 import { SettingsDialog } from "@/components/settings-dialog"
-import { AnalogClock } from "@/components/analog-clock"
 import { TimeGreeting } from "@/components/time-greeting"
 import { setReturnTo } from "@/lib/window-return"
 import { PasskeyPrompt } from "@/components/passkey-prompt"
 import { useNotificationAlerts } from "@/hooks/use-notification-alerts"
-import { GiverAnalytics } from "@/components/analytics/giver-analytics"
 import { UserAvatar } from "@/components/user-avatar"
 import { OrgLogo } from "@/components/org-logo"
 import { SnapToPledge } from "@/components/snap-to-pledge"
+import { acceptsGoods, acceptsMoney, SupportTypeLabel } from "@/components/need-support-type"
+import { amountStillNeeded, FullyFundedTag, FundingProgress, isFullyFunded, QuantityStillNeeded } from "@/components/need-funding"
+import { TranslatableText, TranslateControl } from "@/components/translatable-text"
 import { DashboardTour } from "@/components/dashboard-tour"
 import { recordSignOut } from "@/components/activity-tracker"
 import { RefreshButton } from "@/components/refresh-button"
@@ -118,6 +110,9 @@ type Need = {
   longitude?: number | null
   quantity: string | null
   target_amount: number | null
+  amount_raised?: number | null
+  quantity_still_needed?: string | null
+  support_type?: string | null
   due_date: string | null
   urgency?: "low" | "medium" | "high" | string
   status?: string
@@ -191,6 +186,14 @@ type MyGift = {
 
 export default function GiverDashboardPage() {
   const router = useRouter()
+  // Sign out: the button shows a spinner and can't be pressed twice.
+  const [isSigningOut, setIsSigningOut] = useState(false)
+  const signOutWithSpinner = async () => {
+    if (isSigningOut) return
+    setIsSigningOut(true)
+    try { await logout() } finally { setIsSigningOut(false) }
+  }
+
   // The colour scheme chosen in Settings -> User interface (lib/color-scheme.ts).
   useDashboardColorScheme()
   const supabase = createClient()
@@ -238,7 +241,7 @@ export default function GiverDashboardPage() {
   const [isSending, setIsSending] = useState(false)
   const [activeTab, setActiveTab] = useState("needs")
   // Smooth tab transitions (lib/use-tab-transition.ts), in tab-bar order.
-  const { changeTab, tabMotion } = useTabTransition(["needs", "interests", "gifts", "fulfillments", "donations", "messages", "analytics"], activeTab, setActiveTab)
+  const { changeTab, tabMotion } = useTabTransition(["needs", "interests", "gifts", "fulfillments", "donations", "messages"], activeTab, setActiveTab)
   const [payfastBanner, setPayfastBanner] = useState<"success" | "cancelled" | null>(null)
   const [paypalBanner, setPaypalBanner] = useState<"success" | "cancelled" | null>(null)
   // Which donation the PayFast/PayPal return banner is about, once its id is
@@ -372,7 +375,7 @@ export default function GiverDashboardPage() {
     const [{ data: openNeeds }, { data: submittedInterests }, { data: giverFulfillments }] = await Promise.all([
       supabase
         .from("needs")
-        .select("id, title, description, category, location, latitude, longitude, quantity, target_amount, due_date, urgency, status, organizations(id, name, verification_status, profile_id, city, province, logo_url)")
+        .select("id, title, description, category, location, latitude, longitude, quantity, target_amount, amount_raised, quantity_still_needed, support_type, due_date, urgency, status, organizations(id, name, verification_status, profile_id, city, province, logo_url)")
         .in("status", ["open", "in_progress"])
         // Hide needs past their due date (lib/expiry.ts).
         .or(notPastFilter("due_date"))
@@ -819,6 +822,8 @@ export default function GiverDashboardPage() {
     activeFulfillments: fulfillments.filter(f => f.status === "pending" || f.status === "in_progress").length,
   }), [recommendedOpenNeedsCount, interests, myGifts, fulfillments])
 
+  // Gift Library tab count: pledges still awaiting a decision (review or claim).
+  const pendingGiftCount = myGifts.filter(g => g.status === "pending" || g.status === "pending_claim").length
   const unreadCount = notifications.filter(n => !n.read_at).length
   const messages = notifications.filter(n => ["admin_message", "org_message", "admin_announcement"].includes(n.type))
   const unreadMessages = messages.filter(m => !m.read_at).length
@@ -832,15 +837,13 @@ export default function GiverDashboardPage() {
     { id: "messages", label: "Messages", icon: Mail, count: unreadMessages, gradient: "from-sky-500 to-blue-600", hint: "Conversations with organizations and HelpLift" },
   ]
   const mobileMoreSections: MobileSection[] = [
-    { id: "gifts", label: "Gift Library", icon: Gift, gradient: "from-purple-500 to-fuchsia-600", hint: "Your pledges to the Gift Library" },
+    { id: "gifts", label: "Gift Library", icon: Gift, count: pendingGiftCount, gradient: "from-purple-500 to-fuchsia-600", hint: "Your pledges to the Gift Library" },
     { id: "fulfillments", label: "Fulfillments", icon: PackageCheck, count: stats.activeFulfillments, gradient: "from-teal-500 to-cyan-600", hint: "Your deliveries and their proof" },
-    { id: "analytics", label: "Analytics", icon: BarChart3, gradient: "from-indigo-500 to-blue-600", hint: "Your giving over time" },
   ]
   const mobileActions: MobileAction[] = [
     { id: "pledge", label: "Pledge a Gift", icon: Gift, gradient: "from-purple-500 to-violet-600", onClick: () => setShowGiftModal(true), hint: "Pledge goods, a service or funds" },
     { id: "badges", label: "Badges", icon: Star, gradient: "from-amber-400 to-yellow-500", onClick: () => setShowBadges(true), hint: "Your badges and the leaderboard" },
     { id: "organizations", label: "Organizations", icon: Building2, gradient: "from-blue-500 to-cyan-600", onClick: () => router.push("/organizations"), hint: "Browse verified organizations" },
-    { id: "message-admin", label: "Message Admin", icon: MessageSquare, gradient: "from-slate-600 to-slate-800", onClick: () => setIsMessagingAdmin(true), hint: "Message the HelpLift team" },
     { id: "support", label: "Support HelpLift", icon: Heart, gradient: "from-pink-500 to-rose-600", onClick: () => setShowSupportPlatform(true), hint: "Donate to HelpLift itself" },
   ]
 
@@ -855,6 +858,7 @@ export default function GiverDashboardPage() {
       hint: section.hint,
       onSelect: () => changeTab(section.id),
     })),
+    { id: "action-message-admin", label: "Message Admin", group: "Actions", icon: MessageSquare, hint: "Messages", keywords: "message admin contact helplift team support help", onSelect: () => { changeTab("messages"); setIsMessagingAdmin(true) } },
     ...mobileActions.map(action => ({
       id: `action-${action.id}`,
       label: action.label,
@@ -877,20 +881,20 @@ export default function GiverDashboardPage() {
     if (level === "high") {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-bold bg-red-100 text-red-700">
-          <Flame className="w-3 h-3 fill-red-600" /> High Urgency
+          High Urgency
         </span>
       )
     }
     if (level === "medium") {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-bold bg-amber-100 text-amber-700">
-          <AlertTriangle className="w-3 h-3" /> Medium
+          Medium
         </span>
       )
     }
     return (
       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-700">
-        <PackageCheck className="w-3 h-3" /> Standard
+        Standard
       </span>
     )
   }
@@ -901,69 +905,65 @@ export default function GiverDashboardPage() {
     <main className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100 max-md:pb-24">
       <div className="mx-auto max-w-[2400px] px-4 md:px-10 py-6 md:py-14 space-y-6">
 
-        {/* Greeting for the time of day, with the clock and date beside it. */}
+        {/* Greeting for the time of day. */}
         <div className="flex flex-wrap items-center justify-end max-md:flex-nowrap max-md:justify-between gap-x-8 max-md:gap-x-3 gap-y-3">
           <DashboardSearch items={searchItems} placeholder="Search sections, actions and settings..." />
           <TimeGreeting name={giver?.name} firstNameOnly />
-          <AnalogClock />
         </div>
 
         {/* --- HEADER --- */}
         <header className="flex flex-wrap items-center justify-between gap-5 max-md:gap-4">
+          {/* Kept simple: picture, name and account type. The greeting above
+              says hello, and the email address lives in Settings. */}
           <div className="flex items-center gap-4">
-            <UserAvatar src={giver?.avatar_url} name={giver?.name} className="size-14 text-xl shadow-lg shadow-blue-600/20" />
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Giver dashboard</p>
-              <h1 className="text-2xl md:text-3xl font-extrabold leading-tight">Welcome, {giver?.name}</h1>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-sm text-slate-500 dark:text-slate-400 max-md:truncate max-md:max-w-[45vw]">{giver?.email}</span>
-                <span className="inline-flex items-center rounded bg-slate-100 dark:bg-[#1A2740] px-2 py-0.5 text-[11px] font-bold capitalize">
-                  {giver?.account_type} Supporter
-                </span>
-              </div>
+            <UserAvatar src={giver?.avatar_url} name={giver?.name} className="size-12 text-lg shadow-lg shadow-blue-600/20" />
+            <div className="min-w-0">
+              <h1 className="truncate text-2xl md:text-3xl font-extrabold leading-tight">{giver?.name}</h1>
+              <p className="text-sm text-slate-500 dark:text-slate-400 capitalize">{giver?.account_type} supporter</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap mobile-toolbar">
+            {/* Desktop: Pledge a Gift, More (the extras), then Notifications, Refresh,
+                Home, Settings and Sign out. Phones: Feedback joins the icons. */}
             <button
               onClick={() => setShowGiftModal(true)}
-              className="max-md:hidden inline-flex items-center gap-2 rounded bg-purple-600 px-4 py-2 text-sm font-bold text-white hover:bg-purple-700 shadow-sm shadow-purple-600/20"
+              className="max-md:hidden inline-flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-bold text-white hover:bg-purple-700"
             >
               <Gift className="h-4 w-4" /> Pledge a Gift
             </button>
 
-            <button
-              data-tour="badges"
-              onClick={() => setShowBadges(true)}
-              data-tip="Your badges and progress toward the next one"
-              className="max-md:hidden inline-flex items-center gap-1.5 rounded border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 px-4 py-2 text-sm font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950/70"
-            >
-              <Star className="h-3.5 w-3.5" fill="currentColor" /> Badges
-            </button>
+            {/* The extras live in More (desktop). Phones have them under More in
+                the bottom bar, and Feedback stays on the phone toolbar. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  data-tour="badges"
+                  data-tip="Badges, Organizations, Support The Platform and feedback"
+                  className="max-md:hidden inline-flex items-center gap-1.5 rounded-lg bg-slate-100 dark:bg-[#1A2740] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350]"
+                >
+                  More <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64 rounded-xl border-0 p-1.5 shadow-xl">
+                <DropdownMenuItem onSelect={() => setShowBadges(true)} className="gap-2.5 rounded-lg py-2">
+                  <Star className="h-4 w-4 text-amber-500" /> Badges
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => router.push("/organizations")} className="gap-2.5 rounded-lg py-2">
+                  <Building2 className="h-4 w-4 text-blue-600" /> Organizations
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setShowSupportPlatform(true)} className="gap-2.5 rounded-lg py-2">
+                  <Heart className="h-4 w-4 text-pink-600" /> Support The Platform
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => document.querySelector<HTMLButtonElement>("[data-feedback-trigger]")?.click()} className="gap-2.5 rounded-lg py-2">
+                  <Star className="h-4 w-4 text-slate-500" /> Give feedback
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-            <Link
-              href="/organizations"
-              className="max-md:hidden inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
-            >
-              Organizations
-            </Link>
-
-            <button
-              onClick={() => setShowSupportPlatform(true)}
-              data-tip="Donate directly to HelpLift - not to any organization"
-              className="max-md:hidden inline-flex items-center gap-1.5 rounded border border-pink-200 dark:border-pink-900 bg-pink-50 dark:bg-pink-950/40 px-4 py-2 text-sm font-semibold text-pink-700 dark:text-pink-300 hover:bg-pink-100 dark:hover:bg-pink-950/70"
-            >
-              <Heart className="h-3.5 w-3.5" /> Support The Platform
-            </button>
-
-            <button
-              onClick={() => setIsMessagingAdmin(true)}
-              className="max-md:hidden inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-[#1A2740]"
-            >
-              <MessageSquare className="h-3.5 w-3.5" /> Message Admin
-            </button>
-
-            <FeedbackButton />
+            <FeedbackButton className="md:hidden" />
             <NotificationsWindow
               dataTour="notifications"
               buttonClassName="rounded"
@@ -981,50 +981,36 @@ export default function GiverDashboardPage() {
             />
 
             <RefreshButton onRefresh={refreshAll} />
-            <ThemeToggle className="h-9 w-9" />
             <Link
               href="/"
               aria-label="Home"
               data-tip="Go to the HelpLift homepage"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 dark:bg-[#1A2740] text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350] transition-colors"
             >
               <Home className="w-4 h-4" />
             </Link>
             <button
               data-tour="settings"
               aria-label="Settings"
+              data-tip="Settings - profile, security, notifications, accessibility and more"
               onClick={() => setIsSettingsOpen(true)}
-              className="max-md:h-9 max-md:w-9 max-md:justify-center max-md:px-0 inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 dark:bg-[#1A2740] text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350]"
             >
-              <Settings className="h-3.5 w-3.5" /> <span className="max-md:hidden">Settings</span>
+              <Settings className="h-4 w-4" />
             </button>
 
             <button
-              onClick={logout}
+              onClick={signOutWithSpinner} disabled={isSigningOut}
               aria-label="Sign out"
-              className="max-md:h-9 max-md:w-9 max-md:justify-center max-md:px-0 inline-flex items-center gap-2 rounded bg-slate-900 dark:bg-slate-100 px-4 py-2 text-sm font-semibold text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white"
+              className="max-md:h-9 max-md:w-9 max-md:justify-center max-md:px-0 inline-flex items-center gap-2 rounded-lg bg-slate-900 dark:bg-slate-100 px-4 py-2 text-sm font-semibold text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white"
             >
-              <LogOut className="h-4 w-4" /> <span className="max-md:hidden">Sign out</span>
+              {isSigningOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />} <span className="max-md:hidden">Sign out</span>
             </button>
           </div>
         </header>
 
         {/* --- STATS ROW --- */}
-        <MobileAttentionGrid
-          onSelect={changeTab}
-          items={[
-            { id: "needs", label: "Needs for you", value: stats.openNeeds, icon: ClipboardList, tone: "text-blue-600" },
-            { id: "interests", label: "Pending interests", value: stats.myInterests, icon: Users, tone: "text-emerald-600" },
-            { id: "gifts", label: "Active pledges", value: stats.myGifts, icon: Gift, tone: "text-purple-600" },
-            { id: "fulfillments", label: "Active fulfillments", value: stats.activeFulfillments, icon: PackageCheck, tone: "text-amber-600" },
-          ]}
-        />
-        <div className="max-md:hidden grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
-          <StatCard icon={ClipboardList} label="Needs For You" value={stats.openNeeds} accent="blue" />
-          <StatCard icon={Users} label="Pending Interests" value={stats.myInterests} accent="emerald" />
-          <StatCard icon={Gift} label="Active Gift Pledges" value={stats.myGifts} accent="purple" />
-          <StatCard icon={PackageCheck} label="Active Fulfillments" value={stats.activeFulfillments} accent="amber" />
-        </div>
+        {/* No stat tiles: a tab shows a small count only when something there is pending or new. */}
 
         {/* --- TABS --- */}
         <Tabs value={activeTab} onValueChange={changeTab} className="gap-6 max-md:gap-4">
@@ -1032,12 +1018,11 @@ export default function GiverDashboardPage() {
           <MobileSectionNav primary={mobilePrimarySections} more={mobileMoreSections} actions={mobileActions} active={activeTab} onSelect={changeTab} />
           <TabsList className="w-full flex-nowrap max-xl:flex-wrap max-xl:gap-y-1 justify-start overflow-x-auto max-md:hidden">
             <TabsTrigger value="needs" data-tour="tab-needs" className="shrink-0 gap-1.5"><ClipboardList className="w-4 h-4" />Browse Needs</TabsTrigger>
-            <TabsTrigger value="interests" data-tour="tab-interests" className="shrink-0 gap-1.5"><Users className="w-4 h-4" />My Interests</TabsTrigger>
-            <TabsTrigger value="gifts" data-tour="tab-gifts" className="shrink-0 gap-1.5"><Gift className="w-4 h-4" />Gift Library</TabsTrigger>
+            <TabsTrigger value="interests" data-tour="tab-interests" className="shrink-0 gap-1.5"><Users className="w-4 h-4" />My Interests<CountBadge value={stats.myInterests} /></TabsTrigger>
+            <TabsTrigger value="gifts" data-tour="tab-gifts" className="shrink-0 gap-1.5"><Gift className="w-4 h-4" />Gift Library<CountBadge value={pendingGiftCount} /></TabsTrigger>
             <TabsTrigger value="fulfillments" data-tour="tab-fulfillments" className="shrink-0 gap-1.5"><PackageCheck className="w-4 h-4" />Fulfillments<CountBadge value={stats.activeFulfillments} /></TabsTrigger>
             <TabsTrigger value="donations" data-tour="tab-donations" className="shrink-0 gap-1.5"><Banknote className="w-4 h-4" />My Donations<CountBadge value={pendingDonations} /></TabsTrigger>
             <TabsTrigger value="messages" data-tour="tab-messages" className="shrink-0 gap-1.5"><Mail className="w-4 h-4" />Messages<CountBadge value={unreadMessages} /></TabsTrigger>
-            <TabsTrigger value="analytics" data-tour="tab-analytics" className="shrink-0 gap-1.5"><BarChart3 className="w-4 h-4" />Analytics</TabsTrigger>
           </TabsList>
 
           {/* --- BROWSE NEEDS TAB --- */}
@@ -1079,14 +1064,14 @@ export default function GiverDashboardPage() {
                         onClick={() => changeNeedsMode(option.key)}
                         aria-pressed={needsMode === option.key}
                         data-tip={option.tip}
-                        className={`rounded px-3.5 py-1.5 text-xs font-bold transition-colors ${
+                        className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-colors ${
                           needsMode === option.key ? "bg-blue-600 text-white" : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
                         }`}
                       >
                         {option.label}
                       </button>
                     ))}
-                    {isLocatingNeeds && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400 mx-1.5" />}
+                    {isLocatingNeeds && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500 dark:text-slate-400 mx-1.5" />}
                   </div>
                   <ViewToggle view={needsView} onChange={setNeedsView} />
                 </div>
@@ -1137,11 +1122,14 @@ export default function GiverDashboardPage() {
                           tabIndex={0}
                           onClick={() => setDetailNeed(need)}
                           onKeyDown={activateOnKey}
-                          className="rounded border border-slate-200 dark:border-[#233350] p-5 space-y-3 cursor-pointer hover:border-blue-300 dark:hover:border-blue-800 hover:shadow-sm transition-all"
+                          className="rounded border border-slate-200 dark:border-[#233350] px-5 py-4 space-y-2 cursor-pointer hover:border-blue-300 dark:hover:border-blue-800 hover:shadow-sm transition-all"
                         >
                           <div className="flex items-start justify-between gap-4">
                             <div>
-                              <h3 className="font-bold text-base">{need.title}</h3>
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                <h3 className="font-bold text-base">{need.title}</h3>
+                                <SupportTypeLabel need={need} />
+                              </div>
                               <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                                 <OrgLogo src={organization?.logo_url} name={organization?.name} className="h-5 w-5 text-[10px]" />
                                 {organization?.id ? (
@@ -1169,36 +1157,41 @@ export default function GiverDashboardPage() {
                             </div>
                           </div>
 
-                          <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300 line-clamp-2">{need.description}</p>
+                          <p className="text-justify-smart text-sm leading-snug text-slate-600 dark:text-slate-300 line-clamp-2">{need.description}</p>
 
-                          <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400 pt-1">
-                            {need.location && <span>📍 {need.location}</span>}
+                          <div className="flex flex-wrap gap-x-2 gap-y-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                            {need.location && <span>{need.location}</span>}
                             {need.quantity && <span>· Qty: {need.quantity}</span>}
-                            {need.due_date && <span>· Due {need.due_date}</span>}
-                            {need.target_amount != null && (
-                              <span className="text-blue-600 dark:text-blue-400">· Target: {formatCurrency(Number(need.target_amount))}</span>
+                            {need.quantity_still_needed && (
+                              <span>· <span className="font-bold text-blue-600 dark:text-blue-400">Still needed:</span> <span className="text-slate-700 dark:text-slate-200">{need.quantity_still_needed}</span></span>
                             )}
+                            {need.due_date && <span>· Due {need.due_date}</span>}
                           </div>
+                          <FundingProgress need={need} className="max-w-md" />
 
-                          <div className="pt-2 flex flex-wrap gap-2">
-                            {need.target_amount != null && (
+                          <div className="pt-1 flex flex-wrap gap-2">
+                            {!acceptsMoney(need) ? null : isFullyFunded(need) ? (
+                              <FullyFundedTag />
+                            ) : need.target_amount != null && (
                               <button
                                 onClick={e => { e.stopPropagation(); setDonatingNeed(need) }}
-                                className="inline-flex items-center gap-2 rounded bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 shadow-sm"
+                                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700"
                               >
                                 <Banknote className="h-3.5 w-3.5" /> Donate Money
                               </button>
                             )}
-                            <button
-                              onClick={e => { e.stopPropagation(); setSelectedNeed(need) }}
-                              className="inline-flex items-center gap-2 rounded bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 shadow-sm"
-                            >
-                              <Send className="h-3.5 w-3.5" /> Express interest
-                            </button>
+                            {acceptsGoods(need) && (
+                              <button
+                                onClick={e => { e.stopPropagation(); setSelectedNeed(need) }}
+                                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
+                              >
+                                <Send className="h-3.5 w-3.5" /> Express interest
+                              </button>
+                            )}
                             {organization?.profile_id && (
                               <button
                                 onClick={e => { e.stopPropagation(); setMessagingOrg({ id: organization.profile_id!, label: organization.name }) }}
-                                className="inline-flex items-center gap-2 rounded border border-slate-200 dark:border-[#233350] px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                                className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350] bg-slate-100 dark:bg-[#1A2740]"
                               >
                                 <MessageSquare className="h-3.5 w-3.5" /> Message Organization
                               </button>
@@ -1244,17 +1237,19 @@ export default function GiverDashboardPage() {
                       </div>
                       {interest.message && <p className="text-xs text-slate-500 dark:text-slate-400 italic">"{interest.message}"</p>}
                       {interest.photos && interest.photos.length > 0 && (
-                        <div className="flex gap-1.5">
-                          {interest.photos.map(photo => (
+                        <div className="flex flex-wrap gap-x-3 gap-y-1">
+                          {interest.photos.map((photo, index) => (
                             <a
                               key={photo.id}
                               href={photo.url || undefined}
                               target="_blank"
                               rel="noreferrer"
+                              onClick={e => e.stopPropagation()}
                               data-tip="Open this photo full-size in a new tab"
-                              className="block w-12 h-12 rounded overflow-hidden border border-slate-200 dark:border-[#233350] shrink-0"
+                              className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
                             >
-                              {photo.url && <img src={photo.url} alt={photo.file_name || "Attached photo"} className="w-full h-full object-cover" />}
+                              <ImageIcon className="h-3.5 w-3.5" />
+                              {interest.photos!.length > 1 ? `Photo ${index + 1}` : "View photo"}
                             </a>
                           ))}
                         </div>
@@ -1300,7 +1295,7 @@ export default function GiverDashboardPage() {
                         key={g.id}
                         type="button"
                         onClick={() => setSelectedMyGift(g)}
-                        className="text-left rounded border border-slate-200 dark:border-[#233350] p-4 flex flex-col justify-between space-y-2 hover:border-purple-300 dark:hover:border-purple-800 hover:shadow-sm transition-all"
+                        className="text-left rounded border border-slate-200 dark:border-[#233350] p-4 flex flex-col justify-between space-y-2 hover:border-purple-300 dark:hover:border-purple-800 transition-all"
                       >
                         <div>
                           {g.photos && g.photos.length > 0 && g.photos[0].url && (
@@ -1322,7 +1317,7 @@ export default function GiverDashboardPage() {
                             </span>
                           </div>
                           <h4 className="font-bold text-sm mt-2">{g.title}</h4>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-1">{g.description}</p>
+                          <p className="text-justify-smart text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-1">{g.description}</p>
                         </div>
                         <span className="text-[10px] text-slate-400">Pledged on {new Date(g.created_at).toLocaleDateString()}</span>
                       </button>
@@ -1351,7 +1346,7 @@ export default function GiverDashboardPage() {
                       key={item.id}
                       type="button"
                       onClick={() => setSelectedFulfillment(item)}
-                      className="flex w-full flex-col md:flex-row md:items-center justify-between gap-3 rounded border border-slate-200 dark:border-[#233350] p-4 text-left hover:border-blue-300 dark:hover:border-blue-800 hover:shadow-sm transition-all"
+                      className="flex w-full flex-col md:flex-row md:items-center justify-between gap-3 rounded border border-slate-200 dark:border-[#233350] p-4 text-left hover:border-blue-300 dark:hover:border-blue-800 transition-all"
                     >
                       <div>
                         <p className="flex items-center gap-2 font-semibold text-sm">
@@ -1361,7 +1356,7 @@ export default function GiverDashboardPage() {
                         <p className="text-xs text-slate-500 dark:text-slate-400">{item.notes || "No notes yet."}</p>
                         {item.proof_storage_path && (
                           <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 mt-1">
-                            <CheckCircle2 className="w-3 h-3" /> Delivery proof attached
+                            Delivery proof attached
                           </span>
                         )}
                       </div>
@@ -1444,7 +1439,7 @@ export default function GiverDashboardPage() {
                           need_id: item.need_id,
                           gift_offering_id: item.gift_offering_id,
                         })}
-                        className="flex w-full flex-col md:flex-row md:items-center justify-between gap-3 rounded border border-slate-200 dark:border-[#233350] p-4 text-left hover:border-blue-300 dark:hover:border-blue-800 hover:shadow-sm transition-all"
+                        className="flex w-full flex-col md:flex-row md:items-center justify-between gap-3 rounded border border-slate-200 dark:border-[#233350] p-4 text-left hover:border-blue-300 dark:hover:border-blue-800 transition-all"
                       >
                         <div>
                           <p className="font-semibold text-sm">{displayTitle}</p>
@@ -1472,7 +1467,18 @@ export default function GiverDashboardPage() {
                 <CardDescription>Direct messages from HelpLift admins and organizations.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <MessageViewToggle value={messageView} onChange={setMessageView} />
+                {/* Message Admin lives here, with the rest of your conversations. */}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <MessageViewToggle value={messageView} onChange={setMessageView} />
+                  <button
+                    type="button"
+                    onClick={() => setIsMessagingAdmin(true)}
+                    data-tip="Send a message to the HelpLift team"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-blue-700"
+                  >
+                    <MessageSquare className="h-3.5 w-3.5" /> Message Admin
+                  </button>
+                </div>
                 {messageView === "inbox" && (messages.length === 0 ? (
                   <EmptyState text="No messages yet." />
                 ) : (
@@ -1488,13 +1494,13 @@ export default function GiverDashboardPage() {
                     >
                       <div className="flex items-center justify-between gap-3">
                         <p className="font-bold text-sm">{item.sender_name || "Unknown sender"}</p>
-                        <span className="text-[11px] text-slate-400 shrink-0">{new Date(item.created_at).toLocaleString()}</span>
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 shrink-0">{new Date(item.created_at).toLocaleString()}</span>
                       </div>
                       <p className="text-xs text-slate-500 dark:text-slate-400">{item.title}</p>
                       <p className="mt-1 text-sm text-slate-600 dark:text-slate-300 truncate">{item.message}</p>
                       {item.attachmentUrl && (
                         <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-blue-600">
-                          <Paperclip className="w-3 h-3" /> Attachment
+                          Attachment
                         </span>
                       )}
                     </div>
@@ -1503,9 +1509,6 @@ export default function GiverDashboardPage() {
                 {messageView === "sent" && <SentMessages refreshKey={refreshKey} canReply={true} />}
               </CardContent>
             </Card>
-          </TabsContent>
-          <TabsContent value="analytics" className={tabMotion}>
-            <GiverAnalytics donations={donations as any} interests={interests as any} fulfillments={fulfillments as any} gifts={myGifts} />
           </TabsContent>
         </Tabs>
 
@@ -1546,12 +1549,12 @@ export default function GiverDashboardPage() {
                       )}
                     </p>
 
-                    <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-200 whitespace-pre-line">{detailNeed.description}</p>
+                    <TranslatableText text={detailNeed.description} className="text-justify-smart text-sm leading-relaxed text-slate-700 dark:text-slate-200 whitespace-pre-line" />
 
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       {detailNeed.location && (
                         <div>
-                          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1"><MapPin className="h-3 w-3" /> Location</p>
+                          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1"><MapPin className="h-3 w-3" /> Location</p>
                           <p className="font-semibold">{detailNeed.location}</p>
                         </div>
                       )}
@@ -1574,16 +1577,23 @@ export default function GiverDashboardPage() {
                         </div>
                       )}
                     </div>
+                    <SupportTypeLabel need={detailNeed} />
+                    <QuantityStillNeeded value={detailNeed.quantity_still_needed} className="text-sm" />
+                    <FundingProgress need={detailNeed} />
 
                     <DialogFooter className="gap-2 pt-2">
-                      {detailNeed.target_amount != null && (
+                      {!acceptsMoney(detailNeed) ? null : isFullyFunded(detailNeed) ? (
+                        <FullyFundedTag />
+                      ) : detailNeed.target_amount != null && (
                         <Button type="button" onClick={() => { setDonatingNeed(detailNeed); setDetailNeed(null) }} className="bg-emerald-600 hover:bg-emerald-700 text-white">
                           <Banknote className="h-4 w-4" /> Donate Money
                         </Button>
                       )}
-                      <Button type="button" onClick={() => { setSelectedNeed(detailNeed); setDetailNeed(null) }} className="bg-blue-600 hover:bg-blue-700 text-white">
-                        <Send className="h-4 w-4" /> Express interest
-                      </Button>
+                      {acceptsGoods(detailNeed) && (
+                        <Button type="button" onClick={() => { setSelectedNeed(detailNeed); setDetailNeed(null) }} className="bg-blue-600 hover:bg-blue-700 text-white">
+                          <Send className="h-4 w-4" /> Express interest
+                        </Button>
+                      )}
                       {organization?.profile_id && (
                         <Button type="button" variant="outline" onClick={() => { setMessagingOrg({ id: organization.profile_id!, label: organization.name }); setDetailNeed(null) }}>
                           <MessageSquare className="h-4 w-4" /> Message Organization
@@ -1630,7 +1640,7 @@ export default function GiverDashboardPage() {
                           onClick={() => setInterestPhotos(photos => photos.filter((_, i) => i !== index))}
                           aria-label={`Remove ${file.name}`}
                           data-tip="Remove this photo"
-                          className="text-slate-400 hover:text-red-600 shrink-0 font-bold px-1"
+                          className="text-slate-500 dark:text-slate-400 hover:text-red-600 shrink-0 font-bold px-1"
                         >
                           ✕
                         </button>
@@ -1661,10 +1671,10 @@ export default function GiverDashboardPage() {
               </div>
 
               <div className="flex justify-end gap-3">
-                <button onClick={() => setSelectedNeed(null)} className="rounded border border-slate-200 dark:border-[#233350] px-4 py-2 text-xs font-bold">
+                <button onClick={() => setSelectedNeed(null)} className="rounded-lg px-4 py-2 text-xs font-bold bg-slate-100 dark:bg-[#1A2740]">
                   Cancel
                 </button>
-                <button onClick={submitInterest} disabled={isSending} className="inline-flex items-center gap-2 rounded bg-slate-900 px-5 py-2 text-xs font-bold text-white disabled:opacity-60">
+                <button onClick={submitInterest} disabled={isSending} className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-2 text-xs font-bold text-white disabled:opacity-60">
                   {isSending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                   Submit interest
                 </button>
@@ -1691,7 +1701,7 @@ export default function GiverDashboardPage() {
                     Offer goods, professional services, or direct financial support to verified organizations.
                   </p>
                 </div>
-                <button aria-label="Close" onClick={() => setShowGiftModal(false)} className="text-slate-400 hover:text-slate-600">
+                <button aria-label="Close" onClick={() => setShowGiftModal(false)} className="text-slate-500 dark:text-slate-400 hover:text-slate-600">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -1782,7 +1792,7 @@ export default function GiverDashboardPage() {
                 />
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 pl-1">Photos (optional)</label>
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 pl-1">Photos (optional)</label>
                   {giftPhotos.length > 0 && (
                     <ul className="space-y-1.5">
                       {giftPhotos.map((file, index) => (
@@ -1793,7 +1803,7 @@ export default function GiverDashboardPage() {
                             onClick={() => setGiftPhotos(photos => photos.filter((_, i) => i !== index))}
                             aria-label={`Remove ${file.name}`}
                             data-tip="Remove this photo"
-                            className="text-slate-400 hover:text-red-600 shrink-0 font-bold px-1"
+                            className="text-slate-500 dark:text-slate-400 hover:text-red-600 shrink-0 font-bold px-1"
                           >
                             ✕
                           </button>
@@ -1827,14 +1837,14 @@ export default function GiverDashboardPage() {
                   <button
                     type="button"
                     onClick={() => setShowGiftModal(false)}
-                    className="px-4 py-2 rounded border border-slate-200 dark:border-[#233350] text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                    className="px-4 py-2 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350] bg-slate-100 dark:bg-[#1A2740]"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmittingGift}
-                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-md shadow-purple-600/20 disabled:opacity-50"
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold disabled:opacity-50"
                   >
                     {isSubmittingGift ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Gift className="w-3.5 h-3.5" />}
                     <span>Submit Gift Pledge</span>
@@ -1873,7 +1883,7 @@ export default function GiverDashboardPage() {
             <button aria-label="Close"
               type="button"
               onClick={closeProfileDialog}
-              className="rounded p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
+              className="rounded-lg p-1 text-slate-500 dark:text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
             >
               <X className="w-4 h-4" />
             </button>
@@ -2056,12 +2066,12 @@ export default function GiverDashboardPage() {
                   <p className="text-sm font-semibold">{new Date(selectedInterest.created_at).toLocaleString()}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Your message</p>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Your message</p>
                   <p className="text-sm text-slate-600 dark:text-slate-300">{selectedInterest.message ? `"${selectedInterest.message}"` : "No message was included."}</p>
                 </div>
                 {selectedInterest.photos && selectedInterest.photos.length > 0 && (
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
                       Attachments ({selectedInterest.photos.length})
                     </p>
                     <div className="grid grid-cols-3 gap-2">
@@ -2124,7 +2134,7 @@ export default function GiverDashboardPage() {
                 </div>
                 {display.description && <p className="text-sm text-slate-600 dark:text-slate-300">{display.description}</p>}
                 <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  {display.location && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded">📍 {display.location}</span>}
+                  {display.location && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded">{display.location}</span>}
                   {display.quantity && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded">Qty: {display.quantity}</span>}
                   {display.dueDate && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded">Due {display.dueDate}</span>}
                   {display.conditions && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded">Terms: {display.conditions}</span>}
@@ -2168,7 +2178,7 @@ export default function GiverDashboardPage() {
                 )}
                 {(proofGallery.length > 0 || selectedFulfillment.proof_storage_path) && (
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Delivery proof</p>
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Delivery proof</p>
                     {isLoadingProof ? (
                       <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
                     ) : proofGallery.length > 0 ? (
@@ -2176,7 +2186,7 @@ export default function GiverDashboardPage() {
                         {proofGallery.map((item) => (
                           <a key={item.id} href={item.signedUrl || undefined} target="_blank" rel="noreferrer" className="block">
                             {item.signedUrl && /\.pdf($|\?)/i.test(item.signedUrl) ? (
-                              <span className="flex items-center justify-center h-24 rounded border border-slate-200 dark:border-[#233350] text-xs font-bold text-blue-600 hover:underline">📄 {item.fileName || "View file"}</span>
+                              <span className="flex items-center justify-center h-24 rounded border border-slate-200 dark:border-[#233350] text-xs font-bold text-blue-600 hover:underline">{item.fileName || "View file"}</span>
                             ) : item.signedUrl ? (
                               <img src={item.signedUrl} alt={item.fileName || "Delivery proof"} className="rounded h-24 w-full object-cover border border-slate-200 dark:border-[#233350]" />
                             ) : null}
@@ -2212,7 +2222,7 @@ export default function GiverDashboardPage() {
       <DonateDialog
         open={!!donatingNeed || !!retryNeedTarget}
         onOpenChange={(open) => { if (!open) { setDonatingNeed(null); setRetryNeedTarget(null); setRetryPrefill(null) } }}
-        need={donatingNeed ? { id: donatingNeed.id, title: donatingNeed.title } : retryNeedTarget}
+        need={donatingNeed ? { id: donatingNeed.id, title: donatingNeed.title, stillNeeded: amountStillNeeded(donatingNeed) } : retryNeedTarget}
         onDone={async () => { showFeedback("Thank you! Your proof of payment has been submitted for verification."); await loadData() }}
         initialAmount={retryPrefill?.amount}
         initialMethod={retryPrefill?.method}
@@ -2269,30 +2279,6 @@ export default function GiverDashboardPage() {
         role="giver"
       />
     </main>
-  )
-}
-
-function StatCard({ icon: Icon, label, value, accent }: { icon: React.ComponentType<{ className?: string }>; label: string; value: number; accent: "blue" | "emerald" | "amber" | "purple" | "pink" }) {
-  const accentClasses = {
-    blue: "text-blue-600 dark:text-blue-400",
-    emerald: "text-emerald-600 dark:text-emerald-400",
-    amber: "text-amber-600 dark:text-amber-400",
-    purple: "text-purple-600 dark:text-purple-400",
-    pink: "text-pink-600 dark:text-pink-400",
-  }[accent]
-
-  // Same flat design as the admin dashboard's tiles: no box or fill, just a rule above and below.
-  return (
-    <div data-stat-card className="flex items-center gap-3 max-md:gap-2 border-y border-slate-200 dark:border-[#233350] py-3 max-md:py-2">
-      {/* Animated icon (pop in, then a gentle float; wiggles on hover) - see .stat-icon in globals.css. */}
-      <span className="stat-icon inline-flex shrink-0"><Icon className={`h-5 w-5 max-md:h-4 max-md:w-4 shrink-0 ${accentClasses}`} /></span>
-      <div>
-        <p className="text-2xl max-md:text-xl font-extrabold leading-none">
-          <CountUp value={value} />
-        </p>
-        <p className="text-xs max-md:text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1 max-md:leading-tight">{label}</p>
-      </div>
-    </div>
   )
 }
 

@@ -75,9 +75,18 @@ export function useWakeWord(active: boolean, onWake: () => void) {
     let restartTimer: number | undefined
     let failures = 0
     let running = false // a recognition session is currently live
+    let startedAt = 0 // when the current session was asked to start
 
     const start = () => {
+      window.clearTimeout(restartTimer)
+      restartTimer = undefined
       if (stopped || document.visibilityState !== "visible") return
+      // Drop any earlier session that never reported back, so it can't hold the microphone.
+      if (recognition) {
+        recognition.onstart = recognition.onresult = recognition.onerror = recognition.onend = null
+        try { recognition.abort() } catch {}
+      }
+      startedAt = Date.now()
       recognition = new Ctor()
       recognition.lang = navigator.language || "en-US"
       recognition.continuous = true
@@ -105,6 +114,7 @@ export function useWakeWord(active: boolean, onWake: () => void) {
       }
       recognition.onend = () => {
         running = false
+        recognition = null
         setListening(false)
         // Hidden tab: wait for it to come back (onVisibility starts again).
         if (stopped || document.visibilityState !== "visible") return
@@ -123,11 +133,22 @@ export function useWakeWord(active: boolean, onWake: () => void) {
       }
     }
 
+    // Self-check: if no session is live and none is scheduled (the browser can
+    // silently drop a session that starts while another one - such as the voice
+    // chat's - is still releasing the microphone), start listening again.
+    const watchdog = window.setInterval(() => {
+      if (stopped || running || restartTimer !== undefined || document.visibilityState !== "visible") return
+      if (Date.now() - startedAt < 4000) return
+      start()
+    }, 3000)
+
     document.addEventListener("visibilitychange", onVisibility)
-    start()
+    // A short pause first, so a voice chat that just ended can release the microphone.
+    restartTimer = window.setTimeout(start, 800)
     return () => {
       stopped = true
       window.clearTimeout(restartTimer)
+      window.clearInterval(watchdog)
       document.removeEventListener("visibilitychange", onVisibility)
       try { recognition?.abort() } catch {}
       setListening(false)

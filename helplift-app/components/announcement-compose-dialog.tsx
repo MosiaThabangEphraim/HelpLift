@@ -207,7 +207,7 @@ export function AnnouncementComposeDialog({
                     >
                       <span className="flex items-center gap-1 text-xs font-bold">
                         {item.label}
-                        {hasMessage && <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />}
+                        {hasMessage && <ChevronDown className={`h-3.5 w-3.5 text-slate-500 dark:text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />}
                       </span>
                       <span className={`block text-[11px] text-slate-500 dark:text-slate-400 ${isOpen ? "" : "truncate"} ${hasMessage ? "group-hover:text-blue-600" : ""}`}>
                         {!hasMessage
@@ -236,7 +236,7 @@ export function AnnouncementComposeDialog({
                               href={createClient().storage.from("login-banner-attachments").getPublicUrl(file.path).data.publicUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex max-w-full items-center gap-1.5 rounded bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:underline"
+                              className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:underline"
                             >
                               <Paperclip className="h-3 w-3 shrink-0" /> <span className="truncate">{file.name}</span>
                             </a>
@@ -358,7 +358,7 @@ export function AnnouncementComposeDialog({
 
             <div className="space-y-1">
               <Label>Attachments (optional)</Label>
-              <p className="text-[11px] text-slate-400 -mt-0.5">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 -mt-0.5">
                 {[
                   includesNotification && "sent with the notification",
                   includesBanner && "shown on the login page banner",
@@ -368,7 +368,7 @@ export function AnnouncementComposeDialog({
               {attachments.map((file, index) => (
                 <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-2 rounded border border-slate-200 dark:border-[#233350] bg-slate-50 dark:bg-[#0B1220] px-3 py-2 text-sm">
                   <span className="truncate">{file.name}</span>
-                  <button aria-label="Remove" type="button" onClick={() => setAttachments(files => files.filter((_, i) => i !== index))} className="shrink-0 text-slate-400 hover:text-red-500">
+                  <button aria-label="Remove" type="button" onClick={() => setAttachments(files => files.filter((_, i) => i !== index))} className="shrink-0 text-slate-500 dark:text-slate-400 hover:text-red-500">
                     <X className="w-4 h-4" />
                   </button>
                 </div>

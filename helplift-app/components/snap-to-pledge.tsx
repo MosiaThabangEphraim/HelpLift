@@ -135,7 +135,7 @@ export function SnapToPledge({ onDraft }: { onDraft: (draft: PledgeDraft, photo:
           onClick={takePhoto}
           disabled={isAnalyzing}
           data-tip={`Take a photo of what you'd like to give and Lifty fills in the form. ${privacyTip}`}
-          className="inline-flex items-center gap-1.5 rounded bg-purple-600 px-3 py-1 text-xs font-bold text-white shadow-sm hover:bg-purple-700 disabled:opacity-60 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-1 text-xs font-bold text-white hover:bg-purple-700 disabled:opacity-60 transition-colors"
         >
           {isAnalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
           {isAnalyzing ? "Looking..." : "Snap to pledge"}
@@ -157,7 +157,7 @@ export function SnapToPledge({ onDraft }: { onDraft: (draft: PledgeDraft, photo:
             }}
           />
         </label>
-        <span className="text-[11px] text-slate-400 dark:text-slate-500">Lifty fills in the form from a photo</span>
+        <span className="text-[11px] text-slate-500 dark:text-slate-500">Lifty fills in the form from a photo</span>
         <input
           ref={fileInputRef}
           type="file"
@@ -178,7 +178,7 @@ export function SnapToPledge({ onDraft }: { onDraft: (draft: PledgeDraft, photo:
               <p className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-slate-100">
                 <Camera className="h-4 w-4 text-purple-600" /> Take a photo of your items
               </p>
-              <button type="button" onClick={stopCamera} aria-label="Close camera" className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+              <button type="button" onClick={stopCamera} aria-label="Close camera" className="text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -210,7 +210,7 @@ export function SnapToPledge({ onDraft }: { onDraft: (draft: PledgeDraft, photo:
                 onClick={capture}
                 disabled={!cameraReady}
                 autoFocus
-                className="inline-flex items-center gap-2 rounded bg-purple-600 px-5 py-2.5 text-sm font-bold text-white shadow-md hover:bg-purple-700 disabled:opacity-50 transition-colors"
+                className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-purple-700 disabled:opacity-50 transition-colors"
               >
                 <Camera className="h-4 w-4" /> Capture
               </button>
@@ -254,7 +254,7 @@ export function SnapToPledge({ onDraft }: { onDraft: (draft: PledgeDraft, photo:
         </div>
       )}
 
-      {note?.type === "success" && <p className="text-[10px] text-slate-400 dark:text-slate-500">{privacyTip}</p>}
+      {note?.type === "success" && <p className="text-[10px] text-slate-500 dark:text-slate-500">{privacyTip}</p>}
     </div>
   )
 }

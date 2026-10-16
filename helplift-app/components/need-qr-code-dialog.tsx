@@ -89,7 +89,7 @@ export function NeedQrCodeDialog({
             )}
           </div>
 
-          <p className="text-xs text-slate-400 break-all">{needUrl}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 break-all">{needUrl}</p>
 
           <div className="flex gap-2">
             <Button type="button" variant="outline" onClick={copyLink} data-tip="Copy this need's link to your clipboard" className="flex-1">

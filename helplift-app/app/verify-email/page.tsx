@@ -3,7 +3,7 @@
 import { useState, Suspense, FormEvent } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { CheckCircle2, XCircle, Loader2, ShieldCheck, HeartHandshake } from "lucide-react"
+import { CheckCircle2, XCircle, Loader2, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { createClient } from "@/lib/supabase/client"
@@ -110,7 +110,7 @@ function VerifyEmailContent() {
 
                   <Button
                     type="submit"
-                    className="w-full h-14 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-lg rounded transition-all shadow-xl shadow-primary/20 active:scale-[0.98]"
+                    className="w-full h-14 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-lg rounded-lg transition-all shadow-primary/20 active:scale-[0.98]"
                   >
                     Complete Verification
                   </Button>
@@ -127,7 +127,7 @@ function VerifyEmailContent() {
                   <Button
                     variant="outline"
                     onClick={() => setStatus("idle")}
-                    className="rounded px-6 border-border hover:bg-muted text-xs font-bold"
+                    className="rounded-lg px-6 border-border hover:bg-muted text-xs font-bold"
                   >
                     Try Again
                   </Button>

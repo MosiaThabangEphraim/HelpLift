@@ -62,7 +62,7 @@ export function ChangeEmailFlow({ currentEmail, onBack, onUpdated }: { currentEm
 
   return (
     <div className="space-y-4 pt-2">
-      <button type="button" onClick={onBack} className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+      <button type="button" onClick={onBack} className="-ml-3 inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-white/5 dark:hover:text-white transition-colors">
         <ArrowLeft className="w-3.5 h-3.5" /> Back to profile
       </button>
       {error && <div className="rounded bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">{error}</div>}
@@ -154,7 +154,7 @@ export function ChangePasswordFlow({ onBack, onUpdated }: { onBack: () => void; 
 
   return (
     <div className="space-y-4 pt-2">
-      <button type="button" onClick={onBack} className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+      <button type="button" onClick={onBack} className="-ml-3 inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-white/5 dark:hover:text-white transition-colors">
         <ArrowLeft className="w-3.5 h-3.5" /> Back to profile
       </button>
       {error && <div className="rounded bg-red-50 dark:bg-red-950/40 p-3 text-sm font-semibold text-red-700 dark:text-red-300">{error}</div>}
@@ -243,7 +243,7 @@ export function DeleteAccountFlow({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="space-y-4 pt-2">
-      <button type="button" onClick={onBack} className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+      <button type="button" onClick={onBack} className="-ml-3 inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-white/5 dark:hover:text-white transition-colors">
         <ArrowLeft className="w-3.5 h-3.5" /> Back to profile
       </button>
       <div className="flex items-start gap-2 rounded border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 p-3 text-sm font-semibold text-red-700 dark:text-red-300">

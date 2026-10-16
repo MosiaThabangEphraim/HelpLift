@@ -13,8 +13,6 @@ import {
   Building2,
   CheckCircle2,
   AlertCircle,
-  AlertTriangle,
-  Flame,
   HeartHandshake,
   Send,
   Loader2,
@@ -22,7 +20,6 @@ import {
   X,
   LogIn,
   ArrowRight,
-  PackageCheck,
   Banknote,
   Image as ImageIcon
 } from "lucide-react"
@@ -34,6 +31,8 @@ import { BackButton } from "@/components/back-button"
 import { formatCurrency } from "@/lib/banking"
 import { MicButton } from "@/components/mic-button"
 import { GrammarCheckButton } from "@/components/grammar-check-button"
+import { acceptsGoods, acceptsMoney, SupportTypeLabel } from "@/components/need-support-type"
+import { amountStillNeeded, FullyFundedTag, FundingProgress, isFullyFunded } from "@/components/need-funding"
 import { ReadAloudButton } from "@/components/read-aloud-button"
 import { appendSpeech } from "@/lib/speech-to-text"
 import { getCurrentPosition, haversineKm, NEAR_ME_RADIUS_KM, reverseGeocodePlaceNames } from "@/lib/geolocation"
@@ -41,7 +40,9 @@ import { LocateFixed } from "lucide-react"
 import { ViewToggle, type ListView } from "@/components/view-toggle"
 import { OrgLogo } from "@/components/org-logo"
 import { RefreshButton } from "@/components/refresh-button"
+import { TranslatableText, TranslateControl } from "@/components/translatable-text"
 import { MaximizeToggle } from "@/components/maximize-toggle"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 type OrganizationInfo = {
   id: string
@@ -63,6 +64,9 @@ type PublicNeed = {
   longitude?: number | null
   quantity: string | null
   target_amount: number | null
+  amount_raised?: number | null
+  quantity_still_needed?: string | null
+  support_type?: string | null
   due_date: string | null
   urgency: "low" | "medium" | "high" | string
   status?: string
@@ -117,6 +121,8 @@ export default function PublicNeedsPage() {
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null)
   const [showAuthPrompt, setShowAuthPrompt] = useState(false)
   const [donatingNeed, setDonatingNeed] = useState<PublicNeed | null>(null)
+  // The need whose full details are open (click a card).
+  const [viewingNeed, setViewingNeed] = useState<PublicNeed | null>(null)
 
   useEffect(() => {
     fetchNeeds()
@@ -343,12 +349,37 @@ export default function PublicNeedsPage() {
     }
   }
 
+  const renderNeedActions = (need: PublicNeed) => (
+    <div className="flex gap-2" onClick={e => e.stopPropagation()}>
+      {!acceptsMoney(need) ? null : isFullyFunded(need) ? (
+        <FullyFundedTag className="flex-1 py-3 text-sm" />
+      ) : need.target_amount != null && (
+        <button
+          onClick={() => { setViewingNeed(null); handleDonateClick(need) }}
+          className="flex-1 inline-flex items-center justify-center gap-2 py-3 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition-all active:scale-[0.98]"
+        >
+          <Banknote className="w-4 h-4 shrink-0" />
+          <span>Donate Money</span>
+        </button>
+      )}
+      {acceptsGoods(need) && (
+        <button
+          onClick={() => { setViewingNeed(null); handleSupportClick(need) }}
+          className="flex-1 inline-flex items-center justify-center gap-2 py-3 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm transition-all active:scale-[0.98]"
+        >
+          <Send className="w-4 h-4 shrink-0" />
+          <span>Support this Need</span>
+        </button>
+      )}
+    </div>
+  )
+
   const renderUrgencyBadge = (urgency?: string) => {
     const level = (urgency || "medium").toLowerCase()
     if (level === "high") {
       return (
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400">
-          <Flame className="w-3.5 h-3.5 fill-red-500" />
+          
           High Urgency
         </span>
       )
@@ -356,36 +387,36 @@ export default function PublicNeedsPage() {
     if (level === "medium") {
       return (
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400">
-          <AlertTriangle className="w-3.5 h-3.5" />
+          
           Medium
         </span>
       )
     }
     return (
       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400">
-        <PackageCheck className="w-3.5 h-3.5" />
+        
         Standard
       </span>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100 pt-28 pb-20 px-4 md:px-8 transition-colors">
-      <div className="max-w-[2400px] mx-auto space-y-10">
+    <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100 pt-28 pb-20 max-md:pt-20 max-md:pb-24 px-4 md:px-8 transition-colors">
+      <div className="max-w-[2400px] mx-auto space-y-10 max-md:space-y-4">
         <div>
           <BackButton fallbackHref="/" />
         </div>
 
         {/* --- HEADER --- */}
-        <header className="space-y-4 text-center max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900 text-blue-600 dark:text-blue-400 text-xs font-bold uppercase tracking-wider">
+        <header className="space-y-4 max-md:space-y-2 text-center max-w-3xl mx-auto">
+          <div className="max-md:hidden inline-flex items-center gap-2 px-4 py-1.5 rounded bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900 text-blue-600 dark:text-blue-400 text-xs font-bold uppercase tracking-wider">
             <HeartHandshake className="w-4 h-4" />
             <span>Community Support Needs</span>
           </div>
-          <h1 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900 dark:text-white">
+          <h1 className="text-2xl sm:text-4xl md:text-5xl font-black tracking-tight text-slate-900 dark:text-white">
             Discover & Fulfill Needs
           </h1>
-          <p className="text-slate-600 dark:text-slate-400 text-base md:text-lg">
+          <p className="text-slate-600 dark:text-slate-400 text-base md:text-lg max-md:text-sm max-md:line-clamp-2">
             Explore verified requests from vetted non-profits, schools, and community groups.
             Contribute supplies, professional services, or direct assistance where it matters most.
           </p>
@@ -412,10 +443,10 @@ export default function PublicNeedsPage() {
         )}
 
         {/* --- SEARCH & FILTERS BAR --- */}
-        <div className="rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E]/80 p-6 shadow-sm space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+        <div className="rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E]/80 p-6 max-md:p-3 shadow-sm space-y-5 max-md:space-y-3">
+          <div className="grid grid-cols-2 md:grid-cols-12 gap-4 max-md:gap-2">
             {/* Search Input */}
-            <div className="md:col-span-5 relative">
+            <div className="col-span-2 md:col-span-5 relative">
               <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
               <input
                 type="text"
@@ -441,7 +472,7 @@ export default function PublicNeedsPage() {
             </div>
 
             {/* Location Filter */}
-            <div className="md:col-span-3 relative">
+            <div className="col-span-2 max-md:order-1 md:col-span-3 relative">
               <MapPin className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
               <input
                 type="text"
@@ -476,18 +507,18 @@ export default function PublicNeedsPage() {
             onChange={setSelectedCategory}
           />
           <div className="max-md:hidden flex items-center gap-2 overflow-x-auto pb-1 pt-1 no-scrollbar text-xs">
-            <span className="text-slate-400 font-bold uppercase tracking-wider text-[11px] mr-1 shrink-0 flex items-center gap-1">
-              <Filter className="w-3 h-3" /> Category:
+            <span className="text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider text-[11px] mr-1 shrink-0 flex items-center gap-1">
+              Category:
             </span>
             {categoryOptions.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-3.5 py-1.5 rounded font-bold transition-all shrink-0 ${
-                  selectedCategory === cat
-                    ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
-                    : "bg-slate-100 dark:bg-[#1A2740] text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350]"
-                }`}
+                className={`px-3.5 py-1.5 rounded-lg font-bold transition-all shrink-0 ${
+ selectedCategory === cat
+ ? "bg-blue-600 text-white "
+ : "bg-slate-100 dark:bg-[#1A2740] text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350]"
+ }`}
               >
                 {cat}
               </button>
@@ -549,7 +580,7 @@ export default function PublicNeedsPage() {
           </div>
         ) : filteredNeeds.length === 0 ? (
           <div className="text-center py-20 rounded border border-dashed border-slate-300 dark:border-[#233350] p-8 space-y-4 bg-white dark:bg-[#121B2E]/40">
-            <AlertCircle className="w-12 h-12 text-slate-400 mx-auto" />
+            <AlertCircle className="w-12 h-12 text-slate-500 dark:text-slate-400 mx-auto" />
             <h3 className="text-xl font-bold">No needs match your search criteria</h3>
             <p className="text-slate-500 dark:text-slate-400 text-sm max-w-md mx-auto">
               Try adjusting your category, urgency level, or search keyword to view open needs.
@@ -563,7 +594,7 @@ export default function PublicNeedsPage() {
                 setSortBy("newest")
                 setMatchesOnly(false)
               }}
-              className="px-5 py-2.5 rounded bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-sm hover:opacity-90 transition-opacity"
+              className="px-5 py-2.5 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-sm hover:opacity-90 transition-opacity"
             >
               Reset All Filters
             </button>
@@ -578,25 +609,35 @@ export default function PublicNeedsPage() {
               return (
                 <article
                   key={need.id}
-                  className="rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] overflow-hidden flex flex-col justify-between shadow-sm hover:shadow-md hover:border-slate-300 dark:hover:border-[#233350] transition-all"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setViewingNeed(need)}
+                  onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setViewingNeed(need) } }}
+                  data-tip="See all the details of this need"
+                  className="cursor-pointer rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] overflow-hidden flex flex-col justify-between shadow-sm hover:shadow-md hover:border-slate-300 dark:hover:border-[#233350] transition-all"
                 >
                   {coverImage && (
                     <div className="h-40 w-full overflow-hidden bg-slate-100 dark:bg-[#1A2740]">
                       <img src={coverImage.url} alt={need.title} className="w-full h-full object-cover" />
                     </div>
                   )}
-                  <div className="space-y-4 p-6">
+                  <div className="space-y-3 p-5">
                     {/* Top Badges */}
                     <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <span className="px-3 py-1 rounded bg-slate-100 dark:bg-[#1A2740] text-slate-700 dark:text-slate-300 text-xs font-bold">
-                        {need.category}
-                      </span>
-                      {need.status === "in_progress" && (
-                        <span className="px-3 py-1 rounded bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 text-xs font-bold">
-                          In Progress
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="px-3 py-1 rounded bg-slate-100 dark:bg-[#1A2740] text-slate-700 dark:text-slate-300 text-xs font-bold">
+                          {need.category}
                         </span>
-                      )}
-                      {renderUrgencyBadge(need.urgency)}
+                        <SupportTypeLabel need={need} />
+                      </span>
+                      <span className="ml-auto inline-flex items-center gap-1.5">
+                        {need.status === "in_progress" && (
+                          <span className="px-3 py-1 rounded bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 text-xs font-bold">
+                            In Progress
+                          </span>
+                        )}
+                        {renderUrgencyBadge(need.urgency)}
+                      </span>
                     </div>
 
                     {/* Title & Description */}
@@ -604,10 +645,10 @@ export default function PublicNeedsPage() {
                       <h3 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white line-clamp-2">
                         {need.title}
                       </h3>
-                      <p className="mt-2 text-sm text-slate-600 dark:text-slate-400 line-clamp-3 leading-relaxed text-justify-smart">
+                      <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-400 line-clamp-3 leading-snug text-justify-smart">
                         {need.description}
                       </p>
-                      <div className="mt-2">
+                      <div className="mt-1.5" onClick={e => e.stopPropagation()}>
                         <ReadAloudButton text={`${need.title}. ${need.description}`} label="Listen to this need" />
                       </div>
                     </div>
@@ -616,6 +657,7 @@ export default function PublicNeedsPage() {
                     {org ? (
                       <Link
                         href={`/organizations/${org.id}`}
+                        onClick={e => e.stopPropagation()}
                         className="group inline-flex items-center gap-2 p-2.5 rounded bg-slate-50 dark:bg-[#0B1220]/60 border border-slate-100 dark:border-[#233350] hover:border-blue-300 dark:hover:border-blue-800 transition-colors w-full"
                       >
                         <OrgLogo src={org.logo_url} name={org.name} className="h-6 w-6 text-[10px]" />
@@ -634,7 +676,7 @@ export default function PublicNeedsPage() {
                     )}
 
                     {/* Metadata tags */}
-                    <div className="flex flex-wrap gap-2 text-xs font-medium text-slate-500 dark:text-slate-400 pt-1">
+                    <div className="flex flex-wrap gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
                       {need.location && (
                         <span className="inline-flex items-center gap-1 bg-slate-100 dark:bg-[#1A2740]/80 px-2.5 py-1 rounded">
                           <MapPin className="w-3 h-3 text-slate-400" />
@@ -652,39 +694,95 @@ export default function PublicNeedsPage() {
                           Due {need.due_date}
                         </span>
                       )}
-                      {need.target_amount != null && (
-                        <span className="inline-flex items-center gap-1 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 px-2.5 py-1 rounded font-bold">
-                          <Banknote className="w-3 h-3" />
-                          Target: {formatCurrency(Number(need.target_amount))}
+                      {need.quantity_still_needed && (
+                        <span className="inline-flex items-center gap-1 bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 rounded font-semibold text-blue-700 dark:text-blue-300">
+                          Still needed: {need.quantity_still_needed}
                         </span>
                       )}
                     </div>
+                    <FundingProgress need={need} />
                   </div>
 
                   {/* Action CTA */}
-                  <div className="mt-6 pt-4 px-6 pb-6 border-t border-slate-100 dark:border-[#233350] space-y-2">
-                    {need.target_amount != null && (
-                      <button
-                        onClick={() => handleDonateClick(need)}
-                        className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition-all shadow-md shadow-emerald-600/10 active:scale-[0.98]"
-                      >
-                        <Banknote className="w-4 h-4" />
-                        <span>Donate Money</span>
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleSupportClick(need)}
-                      className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm transition-all shadow-md shadow-blue-600/10 active:scale-[0.98]"
-                    >
-                      <Send className="w-4 h-4" />
-                      <span>Support this Need</span>
-                    </button>
+                  <div className="mt-2 pt-4 px-5 pb-5 border-t border-slate-100 dark:border-[#233350]">
+                    {renderNeedActions(need)}
                   </div>
                 </article>
               )
             })}
           </div>
         )}
+
+        {/* --- NEED DETAILS (click a card) --- */}
+        <Dialog open={!!viewingNeed} onOpenChange={open => !open && setViewingNeed(null)}>
+          <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+            {viewingNeed && (() => {
+              const need = viewingNeed
+              const org = Array.isArray(need.organizations) ? need.organizations[0] : need.organizations
+              const images = (need.need_attachments || []).filter(a => /\.(png|jpe?g|gif|webp)$/i.test(a.file_name || a.url))
+              const files = (need.need_attachments || []).filter(a => !images.includes(a))
+              return (
+                <>
+                  <DialogHeader>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="px-3 py-1 rounded bg-slate-100 dark:bg-[#1A2740] text-slate-700 dark:text-slate-300 text-xs font-bold">{need.category}</span>
+                      <SupportTypeLabel need={need} />
+                      <span className="ml-auto inline-flex items-center gap-1.5">
+                        {need.status === "in_progress" && (
+                          <span className="px-3 py-1 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 text-xs font-bold">In Progress</span>
+                        )}
+                        {renderUrgencyBadge(need.urgency)}
+                      </span>
+                    </div>
+                    <DialogTitle className="text-2xl">{need.title}</DialogTitle>
+                    {org && (
+                      <DialogDescription asChild>
+                        <Link href={`/organizations/${org.id}`} className="inline-flex items-center gap-2 font-semibold text-blue-600 hover:underline">
+                          <OrgLogo src={org.logo_url} name={org.name} className="h-5 w-5 text-[10px]" />
+                          {org.name}
+                          {org.verification_status === "approved" && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />}
+                        </Link>
+                      </DialogDescription>
+                    )}
+                  </DialogHeader>
+
+                  {images.length > 0 && (
+                    <div className={`grid gap-2 ${images.length === 1 ? "grid-cols-1" : "grid-cols-2 sm:grid-cols-3"}`}>
+                      {images.map(image => (
+                        <a key={image.id} href={image.url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded bg-slate-100 dark:bg-[#1A2740]">
+                          <img src={image.url} alt={image.file_name || need.title} className={`w-full object-cover ${images.length === 1 ? "max-h-72" : "aspect-square"}`} />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+
+                  <TranslatableText text={need.description} className="text-justify-smart whitespace-pre-line text-sm leading-relaxed text-slate-700 dark:text-slate-300" />
+                  <ReadAloudButton text={`${need.title}. ${need.description}`} label="Listen to this need" />
+
+                  <dl className="grid grid-cols-2 gap-3 text-sm">
+                    {need.location && (<div><dt className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Location</dt><dd className="font-semibold">{need.location}</dd></div>)}
+                    {need.quantity && (<div><dt className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Quantity</dt><dd className="font-semibold">{need.quantity}</dd></div>)}
+                    {need.quantity_still_needed && (<div><dt className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Still needed</dt><dd className="font-semibold text-blue-600 dark:text-blue-400">{need.quantity_still_needed}</dd></div>)}
+                    {need.due_date && (<div><dt className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Due</dt><dd className="font-semibold">{need.due_date}</dd></div>)}
+                  </dl>
+                  <FundingProgress need={need} />
+
+                  {files.length > 0 && (
+                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                      {files.map(file => (
+                        <a key={file.id} href={file.url} target="_blank" rel="noreferrer" className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline">
+                          {file.file_name || "Attachment"}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+
+                  {renderNeedActions(need)}
+                </>
+              )
+            })()}
+          </DialogContent>
+        </Dialog>
 
         {/* --- EXPRESS INTEREST MODAL FOR LOGGED-IN GIVERS --- */}
         {selectedNeed && (
@@ -706,7 +804,7 @@ export default function PublicNeedsPage() {
                 </div>
                 <button aria-label="Close"
                   onClick={() => setSelectedNeed(null)}
-                  className="p-2 rounded hover:bg-slate-100 dark:hover:bg-[#1A2740] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                  className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-[#1A2740] text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -744,7 +842,7 @@ export default function PublicNeedsPage() {
                           onClick={() => setInterestPhotos(photos => photos.filter((_, i) => i !== index))}
                           aria-label={`Remove ${file.name}`}
                           data-tip="Remove this photo"
-                          className="text-slate-400 hover:text-red-600 shrink-0 font-bold px-1"
+                          className="text-slate-500 dark:text-slate-400 hover:text-red-600 shrink-0 font-bold px-1"
                         >
                           ✕
                         </button>
@@ -777,14 +875,14 @@ export default function PublicNeedsPage() {
               <div className="flex justify-end gap-3">
                 <button
                   onClick={() => setSelectedNeed(null)}
-                  className="px-5 py-2.5 rounded border border-slate-200 dark:border-[#233350] text-slate-700 dark:text-slate-300 font-bold text-sm hover:bg-slate-100 dark:hover:bg-[#1A2740] transition-colors"
+                  className="px-5 py-2.5 rounded-lg text-slate-700 dark:text-slate-300 font-bold text-sm hover:bg-slate-100 dark:hover:bg-[#233350] transition-colors bg-slate-100 dark:bg-[#1A2740]"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={submitInterest}
                   disabled={isSubmittingInterest}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm transition-all shadow-md shadow-blue-600/20 disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm transition-all disabled:opacity-50"
                 >
                   {isSubmittingInterest ? (
                     <>
@@ -824,14 +922,14 @@ export default function PublicNeedsPage() {
               <div className="space-y-3 pt-2">
                 <button
                   onClick={() => router.push("/login")}
-                  className="w-full inline-flex items-center justify-center gap-2 py-3.5 px-4 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md shadow-blue-600/20 transition-all"
+                  className="w-full inline-flex items-center justify-center gap-2 py-3.5 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm transition-all"
                 >
                   <LogIn className="w-4 h-4" />
                   <span>Sign In to Your Account</span>
                 </button>
                 <button
                   onClick={() => router.push("/register")}
-                  className="w-full inline-flex items-center justify-center gap-2 py-3.5 px-4 rounded border border-slate-200 dark:border-[#233350] hover:bg-slate-50 dark:hover:bg-[#1A2740]/60 text-slate-800 dark:text-slate-200 font-bold text-sm transition-all"
+                  className="w-full inline-flex items-center justify-center gap-2 py-3.5 px-4 rounded-lg hover:bg-slate-200 dark:hover:bg-[#1A2740]/60 text-slate-800 dark:text-slate-200 font-bold text-sm transition-all bg-slate-100 dark:bg-[#1A2740]"
                 >
                   <span>Create a Free Giver Account</span>
                   <ArrowRight className="w-4 h-4" />
@@ -840,7 +938,7 @@ export default function PublicNeedsPage() {
 
               <button
                 onClick={() => setShowAuthPrompt(false)}
-                className="text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                className="text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
               >
                 Close and continue browsing
               </button>
@@ -853,7 +951,7 @@ export default function PublicNeedsPage() {
       <DonateDialog
         open={!!donatingNeed}
         onOpenChange={(open) => !open && setDonatingNeed(null)}
-        need={donatingNeed ? { id: donatingNeed.id, title: donatingNeed.title } : null}
+        need={donatingNeed ? { id: donatingNeed.id, title: donatingNeed.title, stillNeeded: amountStillNeeded(donatingNeed) } : null}
         onDone={() => setFeedback({ type: "success", text: "Thank you! Your proof of payment has been submitted for verification." })}
       />
     </div>

@@ -155,12 +155,15 @@ export function NeedsMap({ needs }: { needs: MapNeed[] }) {
       }
 
       if (groups.length > 0) {
-        map!.fitBounds(L.latLngBounds(groups.map(group => [group.lat, group.lng])), { padding: [40, 40], maxZoom: 8 })
+        // No animation: leaving the page mid-zoom made Leaflet throw ("_leaflet_pos").
+        map!.fitBounds(L.latLngBounds(groups.map(group => [group.lat, group.lng])), { padding: [40, 40], maxZoom: 8, animate: false })
       }
     })
 
     return () => {
       cancelled = true
+      map?.stop()
+      map?.off()
       map?.remove()
     }
   }, [groups])

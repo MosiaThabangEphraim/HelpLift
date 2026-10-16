@@ -10,7 +10,7 @@ export function PasswordRequirements({ password }: { password: string }) {
       {PASSWORD_REQUIREMENTS.map(req => {
         const met = req.test(password)
         return (
-          <li key={req.key} className={`flex items-center gap-1.5 text-xs font-medium ${met ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"}`}>
+          <li key={req.key} className={`flex items-center gap-1.5 text-xs font-medium ${met ? "text-emerald-600 dark:text-emerald-400" : "text-slate-500 dark:text-slate-500"}`}>
             {met ? <Check className="w-3.5 h-3.5 shrink-0" /> : <X className="w-3.5 h-3.5 shrink-0" />}
             <span>{req.label}</span>
           </li>

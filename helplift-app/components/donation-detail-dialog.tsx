@@ -294,7 +294,7 @@ export function DonationDetailDialog({ open, onOpenChange, donation, role, onCha
 
           {donation.payer_notes && (
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Donor notes</p>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Donor notes</p>
               <p className="text-sm text-slate-600 dark:text-slate-300">{donation.payer_notes}</p>
             </div>
           )}
@@ -309,14 +309,14 @@ export function DonationDetailDialog({ open, onOpenChange, donation, role, onCha
               always sees it, for either reason. */}
           {donation.admin_notes && (role === "admin" || donation.status === "unsuccessful") && (
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Admin notes</p>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Admin notes</p>
               <p className="text-sm text-slate-600 dark:text-slate-300">{donation.admin_notes}</p>
             </div>
           )}
 
           {(role !== "organization" || isOwnPayer) && donation.proof_storage_path && (
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
                 Proof of payment{proofs.length > 1 ? ` (${proofs.length} files)` : ""}
               </p>
               {isLoadingProof ? (
@@ -327,7 +327,7 @@ export function DonationDetailDialog({ open, onOpenChange, donation, role, onCha
                     <div key={proof.id} className="relative">
                       <a href={proof.url || "#"} target="_blank" rel="noreferrer" className="block">
                         {proof.url && /\.pdf($|\?)/i.test(proof.url) ? (
-                          <span className="flex h-24 items-center justify-center rounded border border-slate-200 dark:border-[#233350] text-xs font-bold text-blue-600 hover:underline text-center px-2">📄 {proof.file_name || "View PDF"}</span>
+                          <span className="flex h-24 items-center justify-center rounded border border-slate-200 dark:border-[#233350] text-xs font-bold text-blue-600 hover:underline text-center px-2">{proof.file_name || "View PDF"}</span>
                         ) : (
                           <img src={proof.url || undefined} alt={proof.file_name || "Proof of payment"} className="rounded h-24 w-full object-cover border border-slate-200 dark:border-[#233350]" />
                         )}
@@ -349,7 +349,7 @@ export function DonationDetailDialog({ open, onOpenChange, donation, role, onCha
               ) : proofSignedUrl ? (
                 <a href={proofSignedUrl} target="_blank" rel="noreferrer" className="block">
                   {/\.pdf($|\?)/i.test(proofSignedUrl) ? (
-                    <span className="inline-flex items-center gap-2 text-xs font-bold text-blue-600 hover:underline">📄 View uploaded PDF</span>
+                    <span className="inline-flex items-center gap-2 text-xs font-bold text-blue-600 hover:underline">View uploaded PDF</span>
                   ) : (
                     <img src={proofSignedUrl} alt="Proof of payment" className="rounded max-h-64 w-full object-cover border border-slate-200 dark:border-[#233350]" />
                   )}
@@ -473,7 +473,7 @@ export function DonationDetailDialog({ open, onOpenChange, donation, role, onCha
               <DialogFooter className="gap-2">
                 {!showRejectForm ? (
                   <>
-                    <Button type="button" variant="outline" onClick={() => setShowRejectForm(true)} disabled={isReviewing} className="text-red-600 border-red-200 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/30">
+                    <Button type="button" variant="outline" onClick={() => setShowRejectForm(true)} disabled={isReviewing} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30">
                       <ThumbsDown className="w-4 h-4" /> Reject
                     </Button>
                     <Button type="button" onClick={() => review("successful")} disabled={isReviewing} className="bg-emerald-600 hover:bg-emerald-700 text-white">

@@ -132,7 +132,7 @@ export function MessageComposeDialog({ open, onOpenChange, recipientLabel, targe
               {attachments.map((file, index) => (
                 <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-2 rounded border border-slate-200 dark:border-[#233350] bg-slate-50 dark:bg-[#0B1220] px-3 py-2 text-sm">
                   <span className="truncate">{file.name}</span>
-                  <button aria-label="Remove" type="button" onClick={() => setAttachments(files => files.filter((_, i) => i !== index))} className="shrink-0 text-slate-400 hover:text-red-500">
+                  <button aria-label="Remove" type="button" onClick={() => setAttachments(files => files.filter((_, i) => i !== index))} className="shrink-0 text-slate-500 dark:text-slate-400 hover:text-red-500">
                     <X className="w-4 h-4" />
                   </button>
                 </div>

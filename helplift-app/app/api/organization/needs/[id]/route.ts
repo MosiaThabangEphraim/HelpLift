@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { supportFieldsProblem } from "@/lib/need-support-type"
 import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/staged-uploads"
 import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { logUserAction } from "@/lib/activity-log"
@@ -9,7 +10,7 @@ import { getActiveCategoryNames } from "@/lib/need-categories"
 import { forwardGeocodePlace } from "@/lib/geolocation"
 import { notifyAdminsOfNeedChange, notifyNeedSupporters } from "@/lib/need-notifications"
 
-const EDITABLE_FIELDS = new Set(["title", "description", "category", "location", "quantity", "target_amount", "due_date", "urgency"])
+const EDITABLE_FIELDS = new Set(["title", "description", "category", "location", "support_type", "quantity", "quantity_still_needed", "target_amount", "due_date", "urgency"])
 // A need can still be edited while it's being worked on, or fixed up after a
 // rejection for another admin look; once it's finished (fulfilled/closed)
 // its record is treated as a historical log entry.
@@ -28,7 +29,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (!organization) return NextResponse.json({ message: "Organization profile not found." }, { status: 404 })
 
     const { id } = await context.params
-    const { data: existing } = await supabase.from("needs").select("id, status, due_date").eq("id", id).eq("organization_id", organization.id).single()
+    const { data: existing } = await supabase.from("needs").select("id, status, due_date, support_type, quantity, target_amount").eq("id", id).eq("organization_id", organization.id).single()
     if (!existing) return NextResponse.json({ message: "Need not found." }, { status: 404 })
 
     const contentType = request.headers.get("content-type") || ""
@@ -107,6 +108,20 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         if (body[field] !== undefined) {
           update[field] = body[field] === "" ? null : body[field]
         }
+      }
+
+      // Goods, money or both: check the need as it will be after this edit.
+      if (["support_type", "quantity", "target_amount"].some(field => field in update)) {
+        const merged = {
+          support_type: "support_type" in update ? update.support_type : existing.support_type,
+          quantity: "quantity" in update ? update.quantity : existing.quantity,
+          target_amount: "target_amount" in update ? update.target_amount : existing.target_amount,
+        }
+        const supportProblem = supportFieldsProblem({ ...merged, quantity: merged.quantity ?? "" })
+        if (supportProblem) return NextResponse.json({ message: supportProblem }, { status: 400 })
+        if (merged.support_type === "goods") update.target_amount = null
+        if (merged.support_type === "money" && "support_type" in update) update.quantity = null
+        if (update.target_amount !== undefined && update.target_amount !== null) update.target_amount = Number(update.target_amount)
       }
 
       // Best-effort re-geocode whenever the location text actually changed -

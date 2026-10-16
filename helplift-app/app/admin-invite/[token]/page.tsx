@@ -137,7 +137,7 @@ export default function AdminInvitePage({ params }: { params: Promise<{ token: s
             <div className="flex justify-center py-8"><Loader2 className="w-8 h-8 text-blue-600 animate-spin" /></div>
           ) : loadError || !invite ? (
             <div className="text-center space-y-3">
-              <AlertCircle className="w-10 h-10 text-slate-400 mx-auto" />
+              <AlertCircle className="w-10 h-10 text-slate-500 dark:text-slate-400 mx-auto" />
               <h1 className="text-xl font-bold">Invitation not found</h1>
               <p className="text-sm text-slate-500 dark:text-slate-400">{loadError || "This invitation link isn't valid."}</p>
             </div>
@@ -168,7 +168,7 @@ export default function AdminInvitePage({ params }: { params: Promise<{ token: s
                 <button
                   onClick={handleJoinSignedIn}
                   disabled={isWorking}
-                  className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold disabled:opacity-60"
+                  className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold disabled:opacity-60"
                 >
                   {isWorking ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                   Accept invitation
@@ -178,7 +178,7 @@ export default function AdminInvitePage({ params }: { params: Promise<{ token: s
                   <p className="text-slate-600 dark:text-slate-300">
                     You're signed in as <strong>{signedInEmail}</strong>, but this invitation is for <strong>{invite.email}</strong>.
                   </p>
-                  <button onClick={signOut} className="px-5 py-2.5 rounded bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold">
+                  <button onClick={signOut} className="px-5 py-2.5 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold">
                     Sign out and continue
                   </button>
                 </div>
@@ -191,7 +191,7 @@ export default function AdminInvitePage({ params }: { params: Promise<{ token: s
                 <form onSubmit={handleSignInAndJoin} className="space-y-4">
                   <p className="text-sm text-slate-600 dark:text-slate-300">Sign in as <strong>{invite.email}</strong> to accept.</p>
                   <input type="password" required placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className={inputClass} />
-                  <button type="submit" disabled={isWorking} className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold disabled:opacity-60">
+                  <button type="submit" disabled={isWorking} className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold disabled:opacity-60">
                     {isWorking && <Loader2 className="w-4 h-4 animate-spin" />}
                     Sign in and accept
                   </button>
@@ -204,7 +204,7 @@ export default function AdminInvitePage({ params }: { params: Promise<{ token: s
                     <input type="password" required placeholder="Choose a password" value={password} onChange={e => setPassword(e.target.value)} className={inputClass} />
                     <PasswordRequirements password={password} />
                   </div>
-                  <button type="submit" disabled={isWorking} className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold disabled:opacity-60">
+                  <button type="submit" disabled={isWorking} className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold disabled:opacity-60">
                     {isWorking && <Loader2 className="w-4 h-4 animate-spin" />}
                     Create account and continue
                   </button>

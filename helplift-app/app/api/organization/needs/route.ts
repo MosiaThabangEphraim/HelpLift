@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { supportFieldsProblem } from "@/lib/need-support-type"
 import { readUploadedFile, readUploadedFiles, isStagedReference } from "@/lib/staged-uploads"
 import { checkUploadLimits, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { logUserAction } from "@/lib/activity-log"
@@ -45,6 +46,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: `Invalid category. Must be one of: ${activeCategories.join(", ")}.` }, { status: 400 })
     }
 
+    // Goods, money or both - decides which of quantity / money target is required.
+    const supportProblem = supportFieldsProblem(body)
+    if (supportProblem) return NextResponse.json({ message: supportProblem }, { status: 400 })
+    const supportType = body.support_type as "goods" | "money" | "both"
+
     const urgency = ["low", "medium", "high"].includes(body.urgency) ? body.urgency : "medium"
     if (isPastDate(body.due_date)) return NextResponse.json({ message: "The due date can't be in the past." }, { status: 400 })
 
@@ -54,8 +60,9 @@ export async function POST(request: Request) {
       description: body.description,
       category: body.category,
       location: body.location || null,
-      quantity: body.quantity || null,
-      target_amount: body.target_amount || null,
+      support_type: supportType,
+      quantity: supportType === "money" ? null : (body.quantity || "").trim() || null,
+      target_amount: supportType === "goods" ? null : Number(body.target_amount),
       due_date: body.due_date || null,
       urgency,
       status: "draft",

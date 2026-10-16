@@ -132,7 +132,7 @@ export default function DevelopersPage() {
           <Link
             href="/"
             aria-label="Go to the HelpLift homepage"
-            className="inline-flex items-center gap-2 rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740] transition-colors"
+            className="inline-flex items-center gap-2 rounded-lg bg-slate-100 dark:bg-[#1A2740] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350] transition-colors"
           >
             <Home className="h-4 w-4" /> Home
           </Link>
@@ -164,7 +164,7 @@ export default function DevelopersPage() {
                 <p className="text-sm text-slate-600 dark:text-slate-400">
                   The team will review it. {contactEmail ? "We may contact you at the email you gave if we need more detail." : "Since it's anonymous, we won't be able to reply - but every report is read."}
                 </p>
-                <button type="button" onClick={reset} className="rounded border border-slate-200 dark:border-[#233350] px-4 py-2 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-[#1A2740]">
+                <button type="button" onClick={reset} className="rounded-lg px-4 py-2 text-sm font-semibold hover:bg-slate-200 dark:hover:bg-[#233350] bg-slate-100 dark:bg-[#1A2740]">
                   Send another report
                 </button>
               </div>
@@ -243,7 +243,7 @@ export default function DevelopersPage() {
                       {files.map((file, index) => (
                         <li key={`${file.name}-${index}`} className="flex items-center justify-between gap-2 rounded border border-slate-200 dark:border-[#233350] px-3 py-1.5 text-xs">
                           <span className="truncate">{file.name}</span>
-                          <button type="button" onClick={() => setFiles(current => current.filter((_, i) => i !== index))} aria-label={`Remove ${file.name}`} className="text-slate-400 hover:text-red-600">
+                          <button type="button" onClick={() => setFiles(current => current.filter((_, i) => i !== index))} aria-label={`Remove ${file.name}`} className="text-slate-500 dark:text-slate-400 hover:text-red-600">
                             <X className="h-3.5 w-3.5" />
                           </button>
                         </li>
@@ -271,7 +271,7 @@ export default function DevelopersPage() {
 
                 {error && <p role="alert" className="text-sm font-semibold text-red-600 dark:text-red-400">{error}</p>}
 
-                <button type="submit" disabled={isSending} className="inline-flex items-center gap-2 rounded bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60">
+                <button type="submit" disabled={isSending} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60">
                   {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   {isSending ? progress || "Sending..." : "Send report"}
                 </button>

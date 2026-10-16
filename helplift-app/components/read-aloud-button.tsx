@@ -52,10 +52,10 @@ export function ReadAloudButton({
           onClick={toggle}
           aria-label={speaking ? "Stop reading aloud" : `${label} - read aloud`}
           data-tip={speaking ? "Stop reading" : "Read this aloud"}
-          className={`inline-flex shrink-0 items-center justify-center rounded p-1 transition-colors ${
+          className={`inline-flex shrink-0 items-center justify-center rounded-lg p-1 transition-colors ${
             speaking
               ? "bg-blue-600 text-white hover:bg-blue-700"
-              : "text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+ : "text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"
           }`}
         >
           {speaking ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
@@ -71,10 +71,10 @@ export function ReadAloudButton({
         onClick={toggle}
         aria-label={speaking ? "Stop reading aloud" : `${label} - read aloud`}
         data-tip={speaking ? "Stop reading" : "Read this aloud"}
-        className={`inline-flex shrink-0 items-center gap-1 rounded px-2 py-1 text-[11px] font-bold transition-colors ${
+        className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold transition-colors ${
           speaking
             ? "bg-blue-600 text-white hover:bg-blue-700"
-            : "bg-slate-100 dark:bg-[#1A2740] text-slate-500 dark:text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+ : "bg-slate-100 dark:bg-[#1A2740] text-slate-500 dark:text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"
         }`}
       >
         {speaking ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}

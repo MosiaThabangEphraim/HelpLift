@@ -74,7 +74,7 @@ function OutcomeContent({ variant, message, onDismiss, detail }: OutcomeBannerPr
         <h3 className="text-xl font-extrabold text-slate-900 dark:text-slate-100">{v.heading}</h3>
         {v.pill && (
           <span className={`inline-flex items-center gap-1.5 rounded px-3 py-1 text-xs font-bold ${v.pill}`}>
-            <Check className="h-3.5 w-3.5" /> {v.pillText}
+            {v.pillText}
           </span>
         )}
       </div>

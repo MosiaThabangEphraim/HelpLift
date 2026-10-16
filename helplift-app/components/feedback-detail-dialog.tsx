@@ -60,7 +60,7 @@ export function FeedbackDetailDialog({
             </div>
 
             {feedback.message ? (
-              <p className="whitespace-pre-line text-sm text-slate-700 dark:text-slate-300">{feedback.message}</p>
+              <p className="text-justify-smart whitespace-pre-line text-sm text-slate-700 dark:text-slate-300">{feedback.message}</p>
             ) : (
               <p className="text-sm italic text-slate-400">No comment.</p>
             )}

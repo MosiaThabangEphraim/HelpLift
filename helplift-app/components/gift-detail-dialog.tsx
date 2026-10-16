@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { AdminDeleteButton } from "@/components/admin-delete-button"
 import { stageFormFiles } from "@/lib/stage-uploads"
 import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
-import { FileText, Gift, Loader2, MapPin, Calendar, ThumbsDown, ThumbsUp, UploadCloud, X, XCircle } from "lucide-react"
+import { FileText, Gift, Loader2, MapPin, Calendar, ThumbsDown, ThumbsUp, UploadCloud, XCircle } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -181,7 +181,7 @@ export function GiftDetailDialog({ open, onOpenChange, gift, role, canClaim, onM
             )}
           </div>
 
-          <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-line">{gift.description}</p>
+          <p className="text-justify-smart text-sm text-slate-600 dark:text-slate-300 whitespace-pre-line">{gift.description}</p>
 
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
@@ -206,14 +206,14 @@ export function GiftDetailDialog({ open, onOpenChange, gift, role, canClaim, onM
 
           {gift.conditions && (
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Conditions</p>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Conditions</p>
               <p className="text-sm text-slate-600 dark:text-slate-300">{gift.conditions}</p>
             </div>
           )}
 
           {gift.photos && gift.photos.length > 0 && (
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Photos</p>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Photos</p>
               <div className="grid grid-cols-3 gap-2">
                 {gift.photos.map(photo => (
                   <a
@@ -263,7 +263,7 @@ export function GiftDetailDialog({ open, onOpenChange, gift, role, canClaim, onM
               <p className="text-xs text-amber-600 dark:text-amber-400 font-semibold flex-1">
                 Awaiting payment confirmation - this pledge is approved automatically once its donation is confirmed.
               </p>
-              <Button type="button" variant="outline" onClick={() => run(() => onModerate("rejected"))} disabled={isSubmitting} className="text-red-600 border-red-200 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/30">
+              <Button type="button" variant="outline" onClick={() => run(() => onModerate("rejected"))} disabled={isSubmitting} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30">
                 <XCircle className="w-4 h-4" /> Cancel pledge
               </Button>
             </DialogFooter>
@@ -271,7 +271,7 @@ export function GiftDetailDialog({ open, onOpenChange, gift, role, canClaim, onM
 
           {role === "admin" && gift.status === "pending" && gift.offering_type !== "financial" && onModerate && (
             <DialogFooter className="gap-2 pt-1">
-              <Button type="button" variant="outline" onClick={() => run(() => onModerate("rejected"))} disabled={isSubmitting} className="text-red-600 border-red-200 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/30">
+              <Button type="button" variant="outline" onClick={() => run(() => onModerate("rejected"))} disabled={isSubmitting} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30">
                 <XCircle className="w-4 h-4" /> Reject listing
               </Button>
               <Button type="button" onClick={() => run(() => onModerate("approved"))} disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 text-white">
@@ -303,7 +303,7 @@ export function GiftDetailDialog({ open, onOpenChange, gift, role, canClaim, onM
                           target="_blank"
                           rel="noreferrer"
                           data-tip="Open this supporting document in a new tab"
-                          className="inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] bg-slate-50 dark:bg-[#0B1220] px-2.5 py-1.5 text-[11px] font-bold text-blue-600 hover:underline"
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 dark:bg-[#0B1220] px-2.5 py-1.5 text-[11px] font-bold text-blue-600 hover:underline"
                         >
                           <FileText className="w-3 h-3 shrink-0" /> {doc.file_name || "Document"}
                         </a>
@@ -338,7 +338,7 @@ export function GiftDetailDialog({ open, onOpenChange, gift, role, canClaim, onM
                         </div>
                         <div className="flex justify-end gap-2">
                           <Button type="button" variant="outline" size="sm" onClick={() => setReviewingClaimId(null)} disabled={isSubmitting}>Cancel</Button>
-                          <Button type="button" variant="outline" size="sm" onClick={() => reviewClaim(claim.id, false)} disabled={isSubmitting} className="text-red-600 border-red-200 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/30">
+                          <Button type="button" variant="outline" size="sm" onClick={() => reviewClaim(claim.id, false)} disabled={isSubmitting} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30">
                             {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
                             <span>Confirm decline</span>
                           </Button>
@@ -346,7 +346,7 @@ export function GiftDetailDialog({ open, onOpenChange, gift, role, canClaim, onM
                       </div>
                     ) : (
                       <div className="flex justify-end gap-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => setReviewingClaimId(claim.id)} disabled={isSubmitting} className="text-red-600 border-red-200 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/30">
+                        <Button type="button" variant="outline" size="sm" onClick={() => setReviewingClaimId(claim.id)} disabled={isSubmitting} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30">
                           <ThumbsDown className="w-3.5 h-3.5" /> Decline
                         </Button>
                         <Button type="button" size="sm" onClick={() => reviewClaim(claim.id, true)} disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 text-white">
@@ -400,7 +400,7 @@ export function GiftDetailDialog({ open, onOpenChange, gift, role, canClaim, onM
                               onClick={() => setClaimDocuments(docs => docs.filter((_, i) => i !== index))}
                               aria-label={`Remove ${file.name}`}
                               data-tip="Remove this document"
-                              className="text-slate-400 hover:text-red-600 shrink-0 font-bold px-1"
+                              className="text-slate-500 dark:text-slate-400 hover:text-red-600 shrink-0 font-bold px-1"
                             >
                               ✕
                             </button>

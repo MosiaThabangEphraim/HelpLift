@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Award, Banknote, CheckCircle2, ChevronLeft, ChevronRight, Heart, Loader2, Megaphone, Plus, Tag, Trash2, Trophy, Wrench } from "lucide-react"
+import { Award, Banknote, CheckCircle2, ChevronLeft, ChevronRight, Heart, Loader2, Plus, Tag, Trash2, Trophy, Wrench } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -518,7 +518,7 @@ export function PlatformSettingsAdmin() {
                 type="button"
                 onClick={() => loadSpotlight(shiftPeriod(spotlightData.period, -1))}
                 data-tip="Previous month"
-                className="p-1.5 rounded border border-slate-200 dark:border-[#233350] hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-[#233350] bg-slate-100 dark:bg-[#1A2740]"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -527,7 +527,7 @@ export function PlatformSettingsAdmin() {
                 type="button"
                 onClick={() => loadSpotlight(shiftPeriod(spotlightData.period, 1))}
                 data-tip="Next month"
-                className="p-1.5 rounded border border-slate-200 dark:border-[#233350] hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-[#233350] bg-slate-100 dark:bg-[#1A2740]"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -566,10 +566,10 @@ export function PlatformSettingsAdmin() {
                               type="button"
                               onClick={() => selectSpotlightCandidate(subjectType, c.subjectId)}
                               disabled={busySpotlightKey === `${subjectType}:${c.subjectId}`}
-                              className="w-full flex items-center justify-between gap-2 rounded px-2.5 py-1.5 text-xs hover:bg-slate-50 dark:hover:bg-[#1A2740] disabled:opacity-50"
+                              className="w-full flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-xs hover:bg-slate-50 dark:hover:bg-[#1A2740] disabled:opacity-50"
                             >
                               <span className="truncate font-semibold">{c.name}</span>
-                              <span className="text-slate-400 shrink-0">
+                              <span className="text-slate-500 dark:text-slate-400 shrink-0">
                                 {busySpotlightKey === `${subjectType}:${c.subjectId}` ? <Loader2 className="w-3 h-3 animate-spin" /> : c.metric}
                               </span>
                             </button>

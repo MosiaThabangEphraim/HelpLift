@@ -259,7 +259,7 @@ export function AdminLoginActivity({ refreshKey = 0 }: { refreshKey?: number }) 
                 <button
                   type="button"
                   onClick={() => { setFrom(""); setTo("") }}
-                  className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                  className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"
                 >
                   <X className="h-3 w-3" /> Clear dates
                 </button>

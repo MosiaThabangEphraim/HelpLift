@@ -5,7 +5,6 @@ import { useRouter, usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
 import {
-  Info,
   LogIn,
   UserPlus,
   Home,
@@ -14,10 +13,6 @@ import {
   HeartHandshake,
   Gift,
   Building2,
-  Contrast,
-  Moon,
-  Palette,
-  Sun,
   LayoutDashboard,
   Menu,
   X,
@@ -25,7 +20,6 @@ import {
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { getSessionUser } from "@/lib/session-user"
-import { logClientAction } from "@/components/activity-tracker"
 import { BrandLogo } from "@/components/brand-logo"
 
 const DASHBOARD_PATH: Record<string, string> = {
@@ -34,23 +28,15 @@ const DASHBOARD_PATH: Record<string, string> = {
   admin: "/admin-dashboard",
 }
 
-// Same light → dark → high-contrast → grayscale cycle as
-// components/theme-toggle.tsx - see that file's comment for why this navbar
-// keeps its own copy of the control instead of just rendering the shared one.
+// No theme switch here: visitors always get light mode, and members choose
+// their theme in Settings (see components/signed-out-light-theme.tsx).
 type ThemeMode = "light" | "dark" | "high-contrast" | "grayscale"
-const NEXT_THEME: Record<ThemeMode, ThemeMode> = { light: "dark", dark: "high-contrast", "high-contrast": "grayscale", grayscale: "light" }
-const THEME_LABEL: Record<ThemeMode, string> = {
-  light: "Switch to dark mode",
-  dark: "Switch to high-contrast mode",
-  "high-contrast": "Switch to grayscale mode",
-  grayscale: "Switch to light mode",
-}
 
 export default function PublicNavbar() {
   const router = useRouter()
   const pathname = usePathname()
 
-  const { theme, resolvedTheme, setTheme } = useTheme()
+  const { theme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   // Signed-in state for this shared navbar - shown on /needs, /gift-library,
   // /organizations, etc. Someone browsing those while already signed in
@@ -87,11 +73,6 @@ export default function PublicNavbar() {
     return null
   }
 
-  const toggleDarkMode = () => {
-    setTheme(NEXT_THEME[themeMode])
-    logClientAction("Changed the theme", `Switched to ${String(NEXT_THEME[themeMode]).replace("-", " ")} mode`)
-  }
-
   const handleLoginRedirect = () => router.push("/login")
 
   const isLoginPage = pathnameLower === "/login"
@@ -125,7 +106,7 @@ export default function PublicNavbar() {
               asChild
               variant="ghost"
               size="sm"
-              className={`rounded px-4 gap-2 font-bold text-sm ${
+              className={`rounded-lg px-4 gap-2 font-bold text-sm ${
                 isNeedsPage ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
               }`}
             >
@@ -138,7 +119,7 @@ export default function PublicNavbar() {
               asChild
               variant="ghost"
               size="sm"
-              className={`rounded px-4 gap-2 font-bold text-sm ${
+              className={`rounded-lg px-4 gap-2 font-bold text-sm ${
                 isGiftLibraryPage ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
               }`}
             >
@@ -151,7 +132,7 @@ export default function PublicNavbar() {
               asChild
               variant="ghost"
               size="sm"
-              className={`rounded px-4 gap-2 font-bold text-sm ${
+              className={`rounded-lg px-4 gap-2 font-bold text-sm ${
                 isOrganizationsPage ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
               }`}
             >
@@ -164,18 +145,6 @@ export default function PublicNavbar() {
 
           {/* Right Buttons */}
           <div className="flex items-center gap-2">
-            {/* Light / Dark / High-contrast / Grayscale toggle */}
-            <button
-              onClick={toggleDarkMode}
-              aria-label={THEME_LABEL[themeMode]}
-              className="p-2 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-all active:scale-90"
-            >
-              {themeMode === "light" && <Moon className="w-6 h-6 md:w-5 md:h-5" />}
-              {themeMode === "dark" && <Contrast className="w-6 h-6 md:w-5 md:h-5" />}
-              {themeMode === "high-contrast" && <Palette className="w-6 h-6 md:w-5 md:h-5" />}
-              {themeMode === "grayscale" && <Sun className="w-6 h-6 md:w-5 md:h-5" />}
-            </button>
-
             {/* Verification Button */}
             {(isLoginPage || isRegisterPage) && (
               <Button
@@ -210,12 +179,7 @@ export default function PublicNavbar() {
               </Button>
             )}
 
-            {/* About Button - links to the homepage's #about section, so it
-                only makes sense to show there; on other public pages like
-                /needs or /gift-library there's no matching anchor and it was
-                just a dead link. On the admin portal it becomes a plain "Home"
-                link back to the main site instead, since there's no about
-                section to jump to from there. */}
+            {/* Homepage button - takes visitors back to the HelpLift homepage. */}
             {!isNeedsPage && !isGiftLibraryPage && !isOrganizationsPage && (
               <>
                 <Button
@@ -226,10 +190,10 @@ export default function PublicNavbar() {
                   } gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded px-2 md:px-4 transition-all overflow-hidden group`}
                   asChild
                 >
-                  <a href={isAdminLoginPage ? "/" : "/#about"}>
-                    {isAdminLoginPage ? <Home className="w-7 h-7 md:w-4 md:h-4 shrink-0" /> : <Info className="w-7 h-7 md:w-4 md:h-4 shrink-0" />}
-                    <span className="font-bold max-w-0 md:max-w-[100px] inline-block transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden">
-                      {isAdminLoginPage ? "Home" : "About"}
+                  <a href="/">
+                    <Home className="w-7 h-7 md:w-4 md:h-4 shrink-0" />
+                    <span className="font-bold max-w-0 md:max-w-[120px] inline-block transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden">
+                      Homepage
                     </span>
                   </a>
                 </Button>
@@ -313,7 +277,7 @@ export default function PublicNavbar() {
               onClick={() => setMenuOpen(open => !open)}
               aria-label={menuOpen ? "Close menu" : "Open menu"}
               aria-expanded={menuOpen}
-              className="md:hidden inline-flex h-10 w-10 items-center justify-center rounded bg-slate-900 dark:bg-blue-600 text-white"
+              className="md:hidden inline-flex h-10 w-10 items-center justify-center rounded-lg bg-slate-900 dark:bg-blue-600 text-white"
             >
               {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -346,7 +310,7 @@ export default function PublicNavbar() {
                 <button
                   type="button"
                   onClick={() => { setMenuOpen(false); router.push(dashboardPath) }}
-                  className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/25"
+                  className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-bold text-white"
                 >
                   <LayoutDashboard className="h-4 w-4" /> My Dashboard
                 </button>
@@ -356,7 +320,7 @@ export default function PublicNavbar() {
                     <button
                       type="button"
                       onClick={() => { setMenuOpen(false); handleLoginRedirect() }}
-                      className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-blue-600/25"
+                      className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-bold text-white"
                     >
                       <LogIn className="h-4 w-4" /> Log In
                     </button>

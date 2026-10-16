@@ -46,7 +46,7 @@ export function MonthlySpotlight() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {data.giver && (
-            <div className="rounded-2xl bg-white/70 dark:bg-slate-900/40 p-6 flex items-center gap-5 transition-all duration-300 hover:-translate-y-1 hover:bg-white dark:hover:bg-slate-900/70">
+            <div className="rounded bg-white/70 dark:bg-slate-900/40 p-6 flex items-center gap-5 transition-all duration-300 hover:-translate-y-1 hover:bg-white dark:hover:bg-slate-900/70">
               <UserAvatar src={data.giver.avatarUrl} name={data.giver.name} className="size-16 text-2xl shadow-lg shadow-amber-500/30 ring-2 ring-white dark:ring-[#0B1220]" />
               <div className="min-w-0">
                 <p className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Giver of the Month</p>
@@ -59,7 +59,7 @@ export function MonthlySpotlight() {
           )}
 
           {data.organization && (
-            <div className="rounded-2xl bg-white/70 dark:bg-slate-900/40 p-6 flex items-center gap-5 transition-all duration-300 hover:-translate-y-1 hover:bg-white dark:hover:bg-slate-900/70">
+            <div className="rounded bg-white/70 dark:bg-slate-900/40 p-6 flex items-center gap-5 transition-all duration-300 hover:-translate-y-1 hover:bg-white dark:hover:bg-slate-900/70">
               <div className="shrink-0 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 p-4 text-white shadow-lg shadow-blue-500/30 overflow-hidden">
                 {data.organization.logoUrl ? (
                   <img src={data.organization.logoUrl} alt={data.organization.name} className="w-7 h-7 object-cover rounded" />
@@ -71,7 +71,7 @@ export function MonthlySpotlight() {
                 <p className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Organization of the Month</p>
                 <Link href={`/organizations/${data.organization.id}`} className="flex items-center gap-1.5 group">
                   <h3 className="text-xl font-extrabold text-slate-900 dark:text-slate-100 truncate group-hover:underline">{data.organization.name}</h3>
-                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
                 </Link>
                 <p className="text-sm text-slate-600 dark:text-slate-300 mt-0.5">
                   Fulfilled {data.organization.needsFulfilled} need{data.organization.needsFulfilled === 1 ? "" : "s"} this month

@@ -7,7 +7,7 @@ import { ProfilePicturePicker } from "@/components/profile-picture-picker"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Building2, HandHeart, HeartHandshake, FileText, AlertCircle, Loader2 } from "lucide-react"
+import { ArrowRight, Building2, HandHeart, FileText, AlertCircle, Loader2 } from "lucide-react"
 import { PasswordRequirements } from "@/components/password-requirements"
 import { isPasswordValid, isValidEmail } from "@/lib/password"
 import { useNeedCategories } from "@/lib/use-need-categories"
@@ -23,7 +23,7 @@ function FieldLabel({ children, required = true }: { children: React.ReactNode; 
   return (
     <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1.5">
       {children}
-      {required ? <span className="text-red-500 ml-0.5">*</span> : <span className="text-slate-400 dark:text-slate-500 normal-case font-medium"> (optional)</span>}
+      {required ? <span className="text-red-500 ml-0.5">*</span> : <span className="text-slate-500 dark:text-slate-500 normal-case font-medium"> (optional)</span>}
     </label>
   )
 }
@@ -200,7 +200,7 @@ export default function RegisterPage() {
             <TermsAgreementCheckbox checked={agreedToTerms} onCheckedChange={setAgreedToTerms} />
             {role === "giver" && <AgeConfirmationCheckbox checked={confirmedAdult} onCheckedChange={setConfirmedAdult} />}
           </div>
-          <p className="text-center text-xs text-slate-400 dark:text-slate-500">
+          <p className="text-center text-xs text-slate-500 dark:text-slate-500">
             Once registered, you can also sign in with Google, LinkedIn or Microsoft using the same email.
           </p>
         </div>
@@ -211,7 +211,7 @@ export default function RegisterPage() {
           {errorMsg && <div className="p-4 rounded bg-red-50 border border-red-100 flex items-center gap-3 text-red-700 text-sm font-semibold"><AlertCircle className="h-5 w-5 shrink-0" />{errorMsg}</div>}
           {successMsg && <div className="p-4 rounded bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm font-semibold">{successMsg}</div>}
 
-          <p className="text-xs text-slate-400 dark:text-slate-500">
+          <p className="text-xs text-slate-500 dark:text-slate-500">
             Fields marked <span className="text-red-500 font-bold">*</span> are required.
           </p>
 
@@ -283,7 +283,7 @@ export default function RegisterPage() {
               <div className="pt-2">
                 <div className="space-y-0.5 mb-3">
                   <label className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                    Banking Details <span className="text-slate-400 dark:text-slate-500 normal-case font-medium">(optional)</span>
+                    Banking Details <span className="text-slate-500 dark:text-slate-500 normal-case font-medium">(optional)</span>
                   </label>
                   <p className="text-xs text-slate-500 dark:text-slate-400 text-justify">
                     Where donations are forwarded to you. You can also add this later from your dashboard. Attaching a bank confirmation letter or statement below (as a Proof of Banking Details) speeds up admin review.
@@ -316,7 +316,7 @@ export default function RegisterPage() {
               <div className="space-y-4 pt-2">
                 <div className="space-y-0.5">
                   <label className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                    Supporting Verification Documents <span className="text-slate-400 dark:text-slate-500 normal-case font-medium">(optional)</span>
+                    Supporting Verification Documents <span className="text-slate-500 dark:text-slate-500 normal-case font-medium">(optional)</span>
                   </label>
                   <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Recommended for quick approval</p>
                 </div>
@@ -356,7 +356,7 @@ export default function RegisterPage() {
                         <button
                           type="button"
                           onClick={() => setDocuments(docs => docs.filter((_, i) => i !== index))}
-                          className="text-slate-400 hover:text-red-600 font-bold shrink-0 px-1"
+                          className="text-slate-500 dark:text-slate-400 hover:text-red-600 font-bold shrink-0 px-1"
                         >
                           ✕
                         </button>
@@ -379,7 +379,7 @@ export default function RegisterPage() {
               <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Giver Information</h2>
               <div className="flex gap-4 p-1 bg-slate-100 dark:bg-slate-800 rounded">
                 {["individual", "business", "group"].map((type) => (
-                  <button key={type} type="button" onClick={() => setAccountType(type as any)} className={`flex-1 py-3 rounded capitalize text-sm font-bold transition-all ${accountType === type ? 'bg-white dark:bg-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>
+                  <button key={type} type="button" onClick={() => setAccountType(type as any)} className={`flex-1 py-3 rounded-lg capitalize text-sm font-bold transition-all ${accountType === type ? 'bg-white dark:bg-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>
                     {type}
                   </button>
                 ))}
@@ -462,7 +462,7 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <Button type="submit" disabled={isLoading || !canSubmit} className="w-full py-6 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded shadow-lg transition-all disabled:opacity-50">
+          <Button type="submit" disabled={isLoading || !canSubmit} className="w-full py-6 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg transition-all disabled:opacity-50">
             {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <ArrowRight className="mr-2 h-5 w-5" />}
             {isLoading ? "Creating account..." : "Complete Registration"}
           </Button>

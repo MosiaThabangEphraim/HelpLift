@@ -58,7 +58,7 @@ export function ProfilePicturePicker({
     <div>
       <label className="block mb-2 text-sm font-bold text-slate-800 dark:text-slate-200">
         {isLogo ? "Organization Logo" : "Display Picture"}{" "}
-        <span className="text-slate-400 dark:text-slate-500 font-medium">(optional)</span>
+        <span className="text-slate-500 dark:text-slate-500 font-medium">(optional)</span>
       </label>
       <div className="flex items-center gap-4">
         <div className={`flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 ${isLogo ? "rounded" : "rounded-full"}`}>
@@ -86,7 +86,7 @@ export function ProfilePicturePicker({
               <button
                 type="button"
                 onClick={() => { setError(""); onChange(null) }}
-                className="inline-flex items-center gap-1 rounded px-2 py-2 text-xs font-bold text-slate-500 hover:text-red-600"
+                className="inline-flex items-center gap-1 rounded-lg px-2 py-2 text-xs font-bold text-slate-500 hover:text-red-600"
               >
                 <X className="h-3.5 w-3.5" /> Remove
               </button>

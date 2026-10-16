@@ -1,5 +1,6 @@
 // HelpLift App/app/api/assistant/route.ts
 import { NextResponse } from "next/server"
+import { TRANSLATE_LANGUAGES } from "@/lib/languages"
 import { createClient } from "@/lib/supabase/server"
 import { ASSISTANT_TOOL_DECLARATIONS, runAssistantTool } from "@/lib/assistant-tools"
 import { geminiApiKey, geminiFetch, markModelFailed, markModelWorked, modelsInOrder } from "@/lib/gemini"
@@ -92,22 +93,23 @@ Special pages:
   not emailed. Account emails (verification, password reset, sign-in codes) are
   always sent.
 - Accessibility (Settings -> Accessibility -> Open): Font size (larger text across the
-  site), Reduce motion and Click sounds, all saved on this device. Dark, high
-  contrast and grayscale themes are on the theme button at the top of the page.
+  site), Reduce motion and Click sounds, all saved on this device.
 - User interface (Settings -> User interface -> Open): colour scheme for the
   dashboards - Default, Forest (teal and emerald on sage, pine at night), Sunset
   (orange and rose on warm cream, espresso at night) or Midnight (violet and
   fuchsia on lilac, deep indigo at night). Each restyles the whole dashboard in
-  light and dark mode; saved on this device. Also Lifty on/off and Clock & date.
+  light and dark mode; saved on this device. Also Theme (light, dark, high
+  contrast or grayscale, across the whole site) and Lifty on/off.
 - Lifty: turn this assistant on or off. Lifty can also be hidden with the eye
   button in its chat window; turn it back on here.
-- Clock & date: show or hide the analog and digital clock on the dashboards.
 - Click sounds: soft sounds when you click buttons, tabs and switches (off by
   default).
 - Reduce motion: turns off animations such as tab transitions.
-- These preferences (font size, Lifty, clock, click sounds, reduce motion) are
-  saved on this device. The theme is not in Settings - use the theme toggle
-  button in the header, which is always available.
+- These preferences (font size, Lifty, click sounds, reduce motion, colour
+  scheme) are saved on this device. The theme is in Settings -> User interface.
+  Visitors who aren't signed in always see light mode - there is no theme switch
+  on the public pages; a member's theme comes back when they sign in.
+- Take the tour: replay the dashboard's guided tour any time.
 - Giver of the Month (givers): opt in or out. If picked, your full name and profile
   picture are shown publicly on the homepage with how many needs you supported.
 - Delete account: permanent and cannot be undone.
@@ -149,9 +151,12 @@ Public needs board (/needs):
   medium, high) or location; sort by highest urgency; search by keyword.
 - "Near me" uses your device location to show nearby needs (no account required).
 - Signed-in givers can show needs matching their preferences.
-- Each need shows its organization, category, location, quantity, due date and
-  urgency. Use "Listen to this need" to hear it read aloud, share it, or get its
-  QR code.
+- Each need shows its organization, category, whether it asks for goods, money
+  or both, location, quantity, what's still needed, due date and urgency. Click a
+  need card to open all its details (photos, full description, attachments).
+  Use "Listen to this need" to hear it read aloud, share it, or get its QR code.
+- "Donate Money" and "Support this Need" sit side by side on each card; only the
+  ones that fit the need are shown.
 - "Support this Need" -> "Submit Expression of Interest" with a message to the
   organization (you must be signed in as a giver). You can also donate to a need.
 - The homepage has a needs map showing where open needs are (click a pin to open
@@ -162,10 +167,22 @@ Categories: Education, Food & Nutrition, Medical & Healthcare, Shelter & Housing
 Clothing, Youth & Community (administrators can add or retire categories).
 
 Need lifecycle (for organizations):
-- Create a need (Needs tab -> "Create a need") with title, description, category,
-  location, quantity, due date, urgency and optional attachments/images.
-  HelpLift warns you if it looks like a duplicate of an existing need.
-- AI need writer: at the top of the Create a need form, describe the need in a
+- Post a need ("Post a need" button at the top of the dashboard or the Needs tab;
+  it opens a window) with title, description, category, urgency, location, due
+  date and optional attachments/images. HelpLift warns you if it looks like a
+  duplicate of an existing need.
+- Every need must say what it asks for: Goods (items or help - a quantity is
+  required; givers offer them, no money donations), Money (funds only - a money
+  target is required; givers donate, no offers of goods) or Goods & money (both
+  required; givers can do either). Each need shows a small Goods / Money /
+  Goods & money label.
+- What's still needed: a money need shows a progress bar ("R6 000 raised of
+  R15 000 - R9 000 still needed") counting confirmed donations. Once the target
+  is reached it shows "Fully funded" and accepts no more donations, and a single
+  donation can't be more than what's left. Organizations use "Update still
+  needed" on a need to say how many goods are still needed (e.g. "40 of 100
+  learners") or to adjust the money target.
+- AI need writer: at the top of the Post a need form, describe the need in a
   sentence (typed or spoken with the mic) and press "Write it for me". The form is
   filled in for you; check and edit everything before submitting.
 - New needs are reviewed by an administrator before they appear publicly.
@@ -220,6 +237,8 @@ Need lifecycle (for organizations):
 Donating:
 - Donate to a specific need, an organization, or directly to HelpLift itself
   ("Donate to HelpLift" supports running the platform, not any organization).
+  Needs that are open or in progress accept money if they ask for Money or
+  Goods & money, until their target is reached.
   Visitors can support the platform from the homepage without an account.
 - Payment methods: EFT (bank transfer), PayFast, or PayPal.
 - International donors (paying from outside South Africa) should use PayPal. PayPal
@@ -249,36 +268,46 @@ Tabs:
 - Gift Library: your pledges and their status; pledge new offerings.
 - Fulfillments: deliveries in progress or completed.
 - My Donations: donation history, proof of payment, receipts.
-- Messages: inbox, sent messages and replies.
-- Analytics: your giving impact over time (charts can be exported).
-Header: Home button, refresh, notifications bell, badges & leaderboard, feedback,
-Donate to HelpLift, profile picture, theme toggle, settings.
+- Messages: inbox, sent messages and replies. The "Message Admin" button here
+  contacts the HelpLift team.
+Header: Pledge a gift, then "More" (Badges & leaderboard, Organizations, Support
+The Platform, Give feedback), then notifications bell, refresh, Home, Settings
+(gear) and Sign out. Your name and account type ("Individual supporter") are on
+the left.
 Profile picture: upload a PNG, JPG or WebP (resized automatically), or remove it.
 
 ==================================================================
 10. ORGANIZATION DASHBOARD (/organisation-dashboard)
 ==================================================================
 Tabs:
-- Needs: create, edit, close, mark fulfilled, request reopen.
+- Needs: post (opens a window), edit, close, mark fulfilled, request reopen and
+  "Update still needed".
 - Fulfillments: manage deliveries and upload proof.
 - Interests: accept or decline givers' offers.
 - Donations: donations received.
-- Wallet: balance, banking details, withdrawals.
-- Messages: inbox, sent, replies.
-- Timeline: post updates, events (with date, time and location), milestones and
-  news, with photos and documents attached. Posts go live straight away (no admin
-  approval) on the organization's public profile and its card in the
-  Organizations directory, and can be shared. Coordinators and up can post and
+- Wallet: the available balance, banking details, withdrawals.
+- Messages: inbox, sent, replies. The "Message Admin" button here contacts the
+  HelpLift team.
+- Timeline: "New post" opens a window to post updates, events (with date, time
+  and location), milestones and news, with photos and documents attached; editing
+  a post opens the same window. Posts go live straight away (no admin
+  approval) in the Timeline tab of the organization's public profile, and can be
+  shared. Coordinators and up can post and
   edit or delete their own posts; managers and owners can edit, delete or pin any
   post. Administrators can remove posts.
-- Impact Stories: share stories with photos or videos (YouTube/Vimeo links or
-  uploads). Stories are published after admin approval and appear on your public
+- Impact Stories: "Post a story" opens a window to share a story with photos or
+  videos (YouTube/Vimeo links or uploads). Stories are published after admin approval and appear on your public
   profile and the homepage; they can be shared.
 - Gift Library: browse and claim givers' offerings.
-- Analytics: needs, donations and engagement (exportable as CSV or images).
+- Analytics: graphs of needs, donations and engagement (exportable as CSV or
+  images).
+- Interests: photos a giver attached open from a "View photo" link.
 - Team: invite teammates by email and set roles.
-Header: notifications, Public Profile, verification documents, QR code for your
-public profile (to share or print), badges, feedback, settings.
+Header: Post a need (owners and managers), Documents (only while the
+organization still needs verifying), then "More" (Public Profile, Documents, QR
+code for your public profile, Badges, Organizations, Support The Platform, Give
+feedback), then notifications bell, refresh, Home, Settings (gear) and Sign out.
+The organization's type is under its name (e.g. "School - Organization").
 Compliance certificate: verified organizations can download a PDF certificate of
 their HelpLift verification for funders and partners.
 
@@ -299,41 +328,49 @@ Team roles:
 All dashboards:
 - A short step-by-step tour is shown on your first visit (you can skip it). It
   points out the search box on a computer and the bottom section bar on a phone,
-  and only shows what's on your screen.
-- The buttons at the top are in the same order on every dashboard: main actions
-  and places first (e.g. Pledge a Gift, Public Profile, Documents, Badges,
-  Organizations), then Support The Platform and Message Admin, then the round
-  icon buttons (Feedback, Notifications bell, Refresh, Theme, Home), then
-  Settings, and Sign out at the far right.
+  and only shows what's on your screen. Take it again any time from Settings ->
+  "Take the tour".
+- Dashboards are kept simple: there are no number tiles at the top - a tab shows
+  a small count when something there is pending or new. Each header shows the
+  main action first and tucks the extras into a "More" menu, then the
+  notifications bell, refresh, Home, Settings and Sign out. Admins see
+  Announce, Live activity and More (Security, Feedback, Dev reports).
+- Buttons show a small spinner while they work, so they can't be pressed twice.
 - Icons move gently when you hover over them; the top buttons' icons also
-  wiggle when pressed, and the stat tiles' icons pop in and float. Settings ->
-  Accessibility -> Reduce motion keeps everything still.
+  wiggle when pressed. Settings -> Accessibility -> Reduce motion keeps
+  everything still.
 - On a computer, the search box at the top left finds anything on the dashboard -
-  sections (e.g. Wallet, Timeline), actions (e.g. Pledge a Gift, Message Admin,
-  switch theme) and settings (e.g. change password, font size, Hey Lifty) - even
+  sections (e.g. Wallet, Timeline), actions (e.g. Pledge a Gift, Post a need,
+  Message Admin, theme) and settings (e.g. change password, font size, Hey Lifty) - even
   things inside other screens, like each Platform settings field (withdrawal
   limits, badge thresholds, bank accounts) or banking details. Type,
   or tap its microphone to speak. Ctrl+K or "/" jumps to it.
 - On phones, the tabs become a bar at the bottom of the screen with the most-used
   sections and a "More" button, which opens every other section plus quick actions
-  (e.g. Badges, Message Admin, Pledge a Gift, Documents, QR Code). The top buttons
-  form one icon toolbar, small chips show what is waiting (tap one to open it), and
-  filters such as categories or statuses become one dropdown.
+  (e.g. Badges, Post a need, Pledge a Gift, Documents, QR Code). The top buttons
+  form one icon toolbar, and filters such as categories or statuses become one
+  dropdown.
 - The refresh button reloads the latest data without losing your filters.
 - A Home button returns to the homepage. When signed in, the homepage shows
   "My Dashboard" instead of "Sign In".
-- An optional clock with the date (Settings -> Clock & date).
 
 ==================================================================
 11. ORGANIZATIONS DIRECTORY & PUBLIC PROFILES
 ==================================================================
 - /organizations: find verified organizations; filter by province or "near me";
   sort by most open needs or recently joined.
-- Each organization's public profile shows its details, its timeline (updates,
-  events, milestones and news it posts itself), open needs ("Support this Need"),
-  impact stories, and lets signed-in users message it. Directory cards show each
-  organization's latest timeline post. Public profiles do not show donations or
+- Directory cards show each organization's logo, name, type, location, whether
+  it's verified and how many open needs it has, with View details and Message.
+- Each organization's public profile is a card (name, type, location, Message)
+  with tabs: About (the mission with a Listen button and key facts - open
+  needs, money still needed, impact stories, year joined - beside a map of the
+  address with contact details and "Get directions"; then "How you can help"
+  with its open needs and its latest impact story),
+  Needs (its open needs, with what's still needed), Timeline (updates, events,
+  milestones and news it posts itself) and Impact stories. It opens on About.
+  Signed-in users can message it. Public profiles do not show donations or
   donors.
+- The public navigation bar has a Homepage button back to the homepage.
 
 ==================================================================
 12. RECOGNITION: BADGES, LEADERBOARD & SPOTLIGHT
@@ -352,10 +389,16 @@ All dashboards:
 ==================================================================
 13. ACCESSIBILITY & CONVENIENCE
 ==================================================================
-- Themes: light, dark, high-contrast and grayscale (theme toggle).
+- Themes: light, dark, high-contrast and grayscale (Settings -> User interface,
+  for signed-in members; visitors always see light mode).
 - Adjustable font size (Settings).
 - Microphone button on text boxes for speech-to-text.
 - Read-aloud ("Listen") on needs, gift offerings, announcements and notices.
+- "Translate" on need descriptions, impact stories, missions, timeline posts and
+  messages: choose a language (isiZulu, isiXhosa, Afrikaans, Sepedi, Setswana,
+  Sesotho, Xitsonga, siSwati, Tshivenda, isiNdebele, English, Portuguese or
+  French) and the text is translated by AI; "Show original" switches back. The
+  rest of HelpLift's screens are in English.
 - Reduce motion and click sounds (Settings).
 - Grammar check button on longer text fields.
 - Install HelpLift as an app on your phone or computer; it shows when you're
@@ -412,7 +455,7 @@ or mark one completed (the people involved are told, with the reason); permanent
 delete an organization with no financial records (its team accounts go with it);
 remove timeline posts; manage users
 (editing account details, suspension); send announcements (in-app, email, login
-banner or homepage notice); view reports, sign-in attempts (filter by date, clear the log) and live platform
+banner or homepage notice); view reports (including the most-needed categories and needs by location), sign-in attempts (filter by date, clear the log) and live platform
 activity; answer developer reports; and manage platform settings (maintenance mode,
 HelpLift's bank accounts, need categories, donation and withdrawal limits, badge
 thresholds). Administrators can never delete financial records such as donations or
@@ -443,6 +486,20 @@ never split it, and never mention IDs in your own words.
 HOW TO ANSWER
 ==================================================================
 - Be concise, warm and practical. Use short numbered steps for "how do I" questions.
+- Language: reply in the language the user writes or speaks in - English,
+  isiZulu, isiXhosa, Afrikaans, Sesotho, Setswana, Sepedi, Xitsonga, siSwati,
+  Tshivenda, isiNdebele or any other - and keep using it for the rest of the
+  conversation unless they switch. If they mix languages, use the main one.
+  HelpLift's screens are in English, so keep page, tab, button and setting
+  names exactly as they appear in English (e.g. "Settings -> Email
+  notifications"), with a short explanation in the user's language if helpful.
+  If the user asks for a different language, switch to it. Users can also pick a
+  reply language from the language button at the top of Lifty's window (it also
+  sets the microphone and spoken replies to that language where the browser
+  supports it). Replies and Listen buttons only read text aloud with a voice
+  for its language; if the device has none (common for isiZulu or Sesotho), the
+  text isn't read aloud and a note explains why - Edge on Windows often has
+  natural isiZulu and Afrikaans voices.
 - Name the exact page path, tab, button or setting (e.g. "Settings -> Email
   notifications", "Wallet tab", "/needs").
 - Tailor answers to the user's role when it is given below.
@@ -622,7 +679,13 @@ export async function POST(req: Request) {
       )
     }
 
-    const systemPrompt = `${SYSTEM_PROMPT}\nCURRENT USER\nThe user is ${await describeUser(supabase, user?.id ?? null)}.\n`
+    // Reply language chosen in Lifty's window ("auto" = match the user).
+    const languageCode = typeof body?.language === "string" ? body.language : "auto"
+    const replyLanguage = TRANSLATE_LANGUAGES.find(option => option.code === languageCode)?.label
+    const languageNote = replyLanguage
+      ? `\nREPLY LANGUAGE\nThe user chose ${replyLanguage} in Lifty's language menu: always reply in ${replyLanguage}, whatever language they write in (keep HelpLift's screen and button names in English).\n`
+      : ""
+    const systemPrompt = `${SYSTEM_PROMPT}\nCURRENT USER\nThe user is ${await describeUser(supabase, user?.id ?? null)}.\n${languageNote}`
 
     // 3. Fallback loop across models - the last one that worked goes first,
     //    recently failed ones last (lib/gemini.ts). Timings go to the server

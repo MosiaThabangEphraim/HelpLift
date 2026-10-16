@@ -153,7 +153,7 @@ export function AdminFeedback({ refreshKey = 0 }: { refreshKey?: number }) {
                     </div>
                   </div>
                   {item.message ? (
-                    <p className="line-clamp-2 whitespace-pre-line text-sm text-slate-700 dark:text-slate-300">{item.message}</p>
+                    <p className="text-justify-smart line-clamp-2 whitespace-pre-line text-sm text-slate-700 dark:text-slate-300">{item.message}</p>
                   ) : (
                     <p className="text-sm italic text-slate-400">No comment.</p>
                   )}

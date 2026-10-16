@@ -10,6 +10,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { TranslatableText, TranslateControl } from "@/components/translatable-text"
+import { SupportTypeLabel } from "@/components/need-support-type"
+import { FundingProgress, QuantityStillNeeded } from "@/components/need-funding"
 import { formatCurrency } from "@/lib/banking"
 import { MicButton } from "@/components/mic-button"
 import { GrammarCheckButton } from "@/components/grammar-check-button"
@@ -27,7 +30,10 @@ export type NeedDetailSummary = {
   organization_name?: string | null
   location?: string | null
   quantity?: string | null
+  quantity_still_needed?: string | null
+  support_type?: string | null
   target_amount?: number | string | null
+  amount_raised?: number | string | null
   due_date?: string | null
   created_at: string
   attachments?: { id: string; file_name: string | null; url: string }[]
@@ -98,6 +104,7 @@ export function NeedDetailDialog({
             <span className={`text-[11px] font-bold px-2.5 py-1 rounded capitalize ${statusBadgeClassesForNeed(need.status)}`}>{need.status.replace(/_/g, " ")}</span>
             {need.urgency === "high" && <span className="text-[11px] font-bold px-2.5 py-1 rounded bg-red-100 text-red-700">High Urgency</span>}
             <span className="text-[11px] font-bold px-2.5 py-1 rounded bg-slate-100 dark:bg-[#1A2740]">{need.category}</span>
+            <SupportTypeLabel need={need} />
           </div>
 
           <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -107,45 +114,51 @@ export function NeedDetailDialog({
           <div className="grid grid-cols-2 gap-3 text-sm">
             {need.location && (
               <div className="flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <MapPin className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
                 <span>{need.location}</span>
               </div>
             )}
             {need.quantity && (
               <div className="flex items-center gap-1.5">
-                <Package className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <Package className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
                 <span>{need.quantity}</span>
               </div>
             )}
             {need.target_amount != null && need.target_amount !== "" && (
               <div className="flex items-center gap-1.5">
-                <Banknote className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <Banknote className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
                 <span>{formatCurrency(Number(need.target_amount))} target</span>
               </div>
             )}
+            {need.quantity_still_needed && (
+              <QuantityStillNeeded value={need.quantity_still_needed} className="col-span-2" />
+            )}
+            {need.target_amount != null && need.target_amount !== "" && (
+              <FundingProgress need={need} className="col-span-2" />
+            )}
             {need.due_date && (
               <div className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <Calendar className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
                 <span>Due {new Date(need.due_date).toLocaleDateString()}</span>
               </div>
             )}
           </div>
 
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Description</p>
-            <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-line">{need.description}</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Description</p>
+            <TranslatableText text={need.description} className="text-justify-smart text-sm leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-line" />
           </div>
 
           {need.attachments && need.attachments.length > 0 && (
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Attachments</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Attachments</p>
               <div className="flex flex-wrap gap-2">
                 {need.attachments.map(att => (
                   <a key={att.id} href={att.url} target="_blank" rel="noreferrer" className="block">
                     {/\.(png|jpe?g|gif|webp)$/i.test(att.file_name || att.url) ? (
                       <img src={att.url} alt={att.file_name || "Attachment"} className="h-16 w-16 rounded object-cover border border-slate-200 dark:border-[#233350]" />
                     ) : (
-                      <span className="flex items-center justify-center h-16 w-16 rounded border border-slate-200 dark:border-[#233350] text-[10px] font-bold text-blue-600 text-center px-1">📄 {att.file_name?.slice(0, 10) || "File"}</span>
+                      <span className="flex items-center justify-center h-16 w-16 rounded border border-slate-200 dark:border-[#233350] text-[10px] font-bold text-blue-600 text-center px-1">{att.file_name?.slice(0, 10) || "File"}</span>
                     )}
                   </a>
                 ))}
@@ -188,7 +201,7 @@ export function NeedDetailDialog({
                     variant="outline"
                     disabled={isSubmitting}
                     onClick={() => run(() => onUpdate(need.id, isReopenRequest ? "closed" : "rejected", rejectReason.trim() || undefined))}
-                    className="text-red-600 border-red-200 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/30"
+                    className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
                   >
                     {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
                     <span>{isReopenRequest ? "Confirm decline" : "Confirm reject"}</span>
@@ -196,7 +209,7 @@ export function NeedDetailDialog({
                 </>
               ) : (
                 <>
-                  <Button type="button" variant="outline" onClick={() => setShowRejectForm(true)} disabled={isSubmitting} className="text-red-600 border-red-200 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/30">
+                  <Button type="button" variant="outline" onClick={() => setShowRejectForm(true)} disabled={isSubmitting} className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30">
                     <ThumbsDown className="w-4 h-4" /> {isReopenRequest ? "Decline" : "Reject"}
                   </Button>
                   <Button type="button" onClick={() => run(() => onUpdate(need.id, "open"))} disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white">

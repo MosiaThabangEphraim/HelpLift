@@ -144,7 +144,7 @@ export default function AdminLoginPage() {
 
           <Button
             type="submit"
-            className="w-full py-6 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded shadow-lg shadow-blue-600/20 transition-all"
+            className="w-full py-6 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg transition-all"
             disabled={isLoading}
           >
             Sign In to Admin Panel <ArrowRight className="ml-2 h-5 w-5" />
@@ -165,7 +165,7 @@ export default function AdminLoginPage() {
 
         <Link
           href="/login"
-          className="mt-6 flex items-center justify-center gap-2 rounded border border-blue-200 dark:border-blue-900 bg-blue-50/60 dark:bg-blue-950/30 px-6 py-3 text-sm font-bold text-blue-700 dark:text-blue-300 transition-colors hover:bg-blue-100 dark:hover:bg-blue-950/50"
+          className="mt-6 flex items-center justify-center gap-2 rounded bg-blue-50/60 dark:bg-blue-950/30 px-6 py-3 text-sm font-bold text-blue-700 dark:text-blue-300 transition-colors hover:bg-blue-100 dark:hover:bg-blue-950/50"
         >
           <LogIn className="h-4 w-4" />
           Not an admin? User login

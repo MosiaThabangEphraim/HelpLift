@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { AdminDeleteButton } from "@/components/admin-delete-button"
-import { FileText, Loader2, PackageCheck, Trash2 } from "lucide-react"
+import { Loader2, PackageCheck } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { firstOf } from "@/lib/utils"
@@ -61,7 +61,7 @@ export function AdminFulfillmentsView({ fulfillments, onDelete, onChanged }: { f
               <button
                 key={key}
                 onClick={() => setFilter(key)}
-                className={`rounded px-3 py-1.5 capitalize ${filter === key ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-[#1A2740]"}`}
+                className={`rounded-lg px-3 py-1.5 capitalize ${filter === key ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-[#1A2740]"}`}
               >
                 {key.replace("_", " ")}
               </button>
@@ -90,7 +90,7 @@ export function AdminFulfillmentsView({ fulfillments, onDelete, onChanged }: { f
                   <div className="flex items-center gap-2">
                     <span className={`rounded px-3 py-1 text-xs font-bold capitalize ${STATUS_STYLES[f.status]}`}>{f.status.replace("_", " ")}</span>
                     <span className="inline-flex items-center gap-1 rounded bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-xs font-bold">
-                      <FileText className="h-3 w-3" /> {f.proof_count} proof file{f.proof_count === 1 ? "" : "s"}
+                      {f.proof_count} proof file{f.proof_count === 1 ? "" : "s"}
                     </span>
                   </div>
                 </div>
@@ -215,7 +215,7 @@ function FulfillmentDetail({
             {fulfillment.notes && (
               <div>
                 <p className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">Notes</p>
-                <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-line">{fulfillment.notes}</p>
+                <p className="text-justify-smart text-sm text-slate-600 dark:text-slate-300 whitespace-pre-line">{fulfillment.notes}</p>
               </div>
             )}
 
@@ -232,7 +232,7 @@ function FulfillmentDetail({
                   {proofs.map(item => (
                     <a key={item.id} href={item.signedUrl || undefined} target="_blank" rel="noreferrer" className="block">
                       {isPdf(item.signedUrl) ? (
-                        <span className="flex h-24 items-center justify-center rounded border border-slate-200 dark:border-[#233350] text-xs font-bold text-blue-600">📄 {item.fileName || "Document"}</span>
+                        <span className="flex h-24 items-center justify-center rounded border border-slate-200 dark:border-[#233350] text-xs font-bold text-blue-600">{item.fileName || "Document"}</span>
                       ) : item.signedUrl ? (
                         <img src={item.signedUrl} alt={item.fileName || "Delivery proof"} className="h-24 w-full rounded border border-slate-200 dark:border-[#233350] object-cover" />
                       ) : (
@@ -244,7 +244,7 @@ function FulfillmentDetail({
               ) : legacyUrl ? (
                 <a href={legacyUrl} target="_blank" rel="noreferrer" className="block">
                   {isPdf(legacyUrl) ? (
-                    <span className="flex h-24 items-center justify-center rounded border text-xs font-bold text-blue-600">📄 Open document</span>
+                    <span className="flex h-24 items-center justify-center rounded border text-xs font-bold text-blue-600">Open document</span>
                   ) : (
                     <img src={legacyUrl} alt="Delivery proof" className="max-h-64 w-full rounded border border-slate-200 dark:border-[#233350] object-cover" />
                   )}

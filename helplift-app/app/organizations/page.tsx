@@ -20,7 +20,6 @@ import { useCanMessage } from "@/hooks/use-can-message"
 import { BackButton } from "@/components/back-button"
 import { getCurrentPosition, reverseGeocodePlaceNames } from "@/lib/geolocation"
 import { LocateFixed, Newspaper } from "lucide-react"
-import { timelinePostTypeLabel } from "@/lib/org-timeline"
 import { ViewToggle, type ListView } from "@/components/view-toggle"
 
 type DirectoryOrganization = {
@@ -45,7 +44,7 @@ type DirectoryOrganization = {
 type SortKey = "name" | "needs" | "newest"
 
 const selectClass =
-  "w-full px-4 py-3 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded text-sm font-semibold outline-none focus:border-blue-500 transition-colors text-slate-700 dark:text-slate-300"
+  "w-full px-4 py-3 bg-slate-50 dark:bg-[#0B1220] rounded text-sm font-semibold outline-none focus:ring-2 focus:ring-blue-500/30 transition-colors text-slate-700 dark:text-slate-300"
 
 export default function OrganizationsDirectoryPage() {
   const [organizations, setOrganizations] = useState<DirectoryOrganization[]>([])
@@ -153,18 +152,18 @@ export default function OrganizationsDirectoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100 pt-28 pb-20 px-4 md:px-8 transition-colors">
-      <div className="max-w-[2400px] mx-auto space-y-10">
+    <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100 pt-28 pb-20 max-md:pt-20 max-md:pb-24 px-4 md:px-8 transition-colors">
+      <div className="max-w-[2400px] mx-auto space-y-10 max-md:space-y-4">
         <div>
           <BackButton fallbackHref="/" />
         </div>
-        <header className="space-y-4 text-center max-w-3xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-900 text-blue-600 dark:text-blue-400 text-xs font-bold uppercase tracking-wider">
+        <header className="space-y-4 max-md:space-y-2 text-center max-w-3xl mx-auto">
+          <div className="max-md:hidden inline-flex items-center gap-2 px-4 py-1.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 text-xs font-bold uppercase tracking-wider">
             <Building2 className="w-4 h-4" />
             <span>Organizations</span>
           </div>
-          <h1 className="text-4xl md:text-5xl font-black tracking-tight">Find an organization</h1>
-          <p className="text-slate-600 dark:text-slate-400 text-base md:text-lg">
+          <h1 className="text-2xl sm:text-4xl md:text-5xl font-black tracking-tight">Find an organization</h1>
+          <p className="text-slate-600 dark:text-slate-400 text-base md:text-lg max-md:text-sm max-md:line-clamp-2">
             Browse the schools, charities and community groups on HelpLift. Every organization listed here has been verified by a HelpLift administrator.
           </p>
           <div className="flex justify-center">
@@ -173,9 +172,9 @@ export default function OrganizationsDirectoryPage() {
         </header>
 
         {/* --- SEARCH & FILTERS --- */}
-        <div className="rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E]/80 p-6 shadow-sm space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-            <div className="md:col-span-5 relative">
+        <div className="rounded bg-white dark:bg-[#121B2E]/80 p-6 max-md:p-3 shadow-sm space-y-4 max-md:space-y-3">
+          <div className="grid grid-cols-2 md:grid-cols-12 gap-4 max-md:gap-2">
+            <div className="col-span-2 md:col-span-5 relative">
               <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-400" />
               <input
                 type="text"
@@ -183,7 +182,7 @@ export default function OrganizationsDirectoryPage() {
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 aria-label="Search organizations"
-                className="w-full pl-12 pr-4 py-3 bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-[#233350] rounded text-sm outline-none focus:border-blue-500 transition-colors"
+                className="w-full pl-12 pr-4 py-3 bg-slate-50 dark:bg-[#0B1220] rounded text-sm outline-none focus:ring-2 focus:ring-blue-500/30 transition-colors"
               />
             </div>
             <div className="md:col-span-2">
@@ -198,7 +197,7 @@ export default function OrganizationsDirectoryPage() {
                 {provinces.map(province => <option key={province} value={province}>{province}</option>)}
               </select>
             </div>
-            <div className="md:col-span-2">
+            <div className="col-span-2 md:col-span-2">
               <select value={sortBy} onChange={e => setSortBy(e.target.value as SortKey)} aria-label="Sort organizations" className={selectClass}>
                 <option value="name">Name (A-Z)</option>
                 <option value="needs">Most open needs</option>
@@ -240,9 +239,9 @@ export default function OrganizationsDirectoryPage() {
         </div>
 
         {needSignIn && (
-          <div className="max-w-3xl mx-auto rounded border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-4 text-sm font-semibold text-amber-800 dark:text-amber-300 flex items-center justify-between gap-3 flex-wrap">
+          <div className="max-w-3xl mx-auto rounded bg-amber-50 dark:bg-amber-950/30 p-4 text-sm font-semibold text-amber-800 dark:text-amber-300 flex items-center justify-between gap-3 flex-wrap">
             <span>Sign in to send a message to {needSignIn}.</span>
-            <Link href="/login" className="rounded bg-amber-600 hover:bg-amber-700 text-white px-4 py-1.5 text-xs font-bold">Sign in</Link>
+            <Link href="/login" className="rounded-lg bg-amber-600 hover:bg-amber-700 text-white px-4 py-1.5 text-xs font-bold">Sign in</Link>
           </div>
         )}
 
@@ -258,11 +257,11 @@ export default function OrganizationsDirectoryPage() {
             <p className="text-sm font-semibold text-red-600">{loadError}</p>
           </div>
         ) : visible.length === 0 ? (
-          <div className="text-center py-20 rounded border border-dashed border-slate-300 dark:border-[#233350] p-8 space-y-3 bg-white dark:bg-[#121B2E]/40">
-            <Building2 className="w-12 h-12 text-slate-400 mx-auto" />
+          <div className="text-center py-20 rounded p-8 space-y-3 bg-white dark:bg-[#121B2E]/40">
+            <Building2 className="w-12 h-12 text-slate-500 dark:text-slate-400 mx-auto" />
             <h3 className="text-xl font-bold">{organizations.length === 0 ? "No organizations yet" : "No organizations match your search"}</h3>
             {hasFilters && (
-              <button onClick={resetFilters} className="px-5 py-2.5 rounded bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-sm hover:opacity-90">
+              <button onClick={resetFilters} className="px-5 py-2.5 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-sm hover:opacity-90">
                 Reset filters
               </button>
             )}
@@ -272,11 +271,11 @@ export default function OrganizationsDirectoryPage() {
             {visible.map(org => {
               const place = [org.city, org.province].filter(Boolean).join(", ")
               return (
-                <article key={org.id} className="rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] p-6 flex flex-col justify-between gap-5 shadow-sm hover:shadow-md transition-shadow">
+                <article key={org.id} className="rounded bg-white dark:bg-[#121B2E] p-6 flex flex-col justify-between gap-5 shadow-sm hover:shadow-md transition-shadow">
                   <div className="space-y-3">
                     <div className="flex items-start gap-3">
                       {org.logo_url ? (
-                        <img src={org.logo_url} alt="" className="h-12 w-12 rounded object-cover border border-slate-200 dark:border-[#233350] shrink-0" />
+                        <img src={org.logo_url} alt="" className="h-12 w-12 rounded object-cover shrink-0" />
                       ) : (
                         <div className="h-12 w-12 rounded bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white font-bold shrink-0">
                           {org.name.charAt(0).toUpperCase()}
@@ -310,28 +309,12 @@ export default function OrganizationsDirectoryPage() {
                         <MapPin className="w-3.5 h-3.5 shrink-0" /> {place}
                       </p>
                     )}
-                    {org.mission && <p className="text-sm text-slate-600 dark:text-slate-300 line-clamp-3 leading-relaxed">{org.mission}</p>}
-                    {org.latest_post && (
-                      <Link
-                        href={`/organizations/${org.id}#post-${org.latest_post.id}`}
-                        data-tip="Read the latest post on this organization's timeline"
-                        className="block rounded-xl bg-blue-50/70 dark:bg-blue-950/30 p-3 transition-colors hover:bg-blue-50 dark:hover:bg-blue-950/50"
-                      >
-                        <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">
-                          <Newspaper className="h-3.5 w-3.5" /> Latest {timelinePostTypeLabel(org.latest_post.post_type).toLowerCase()}
-                          <span className="font-semibold normal-case tracking-normal text-slate-400">· {new Date(org.latest_post.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}</span>
-                        </span>
-                        <span className="mt-1 block text-sm text-slate-700 dark:text-slate-200 line-clamp-2">
-                          {org.latest_post.title ? <strong>{org.latest_post.title}: </strong> : null}{org.latest_post.body}
-                        </span>
-                      </Link>
-                    )}
                   </div>
 
                   <div className="flex items-center gap-2">
                     <Link
                       href={`/organizations/${org.id}`}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 rounded bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2.5 text-sm font-bold hover:opacity-90 transition-opacity"
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2.5 text-sm font-bold hover:opacity-90 transition-opacity"
                     >
                       View details <ArrowRight className="w-4 h-4" />
                     </Link>
@@ -341,7 +324,7 @@ export default function OrganizationsDirectoryPage() {
                       <span
                         aria-disabled="true"
                         data-tip="Coordinators can't message other organizations. Ask an owner or manager."
-                        className="inline-flex cursor-not-allowed items-center justify-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] px-4 py-2.5 text-sm font-bold text-slate-400 dark:text-slate-500 opacity-70"
+                        className="inline-flex cursor-not-allowed items-center justify-center gap-1.5 rounded px-4 py-2.5 text-sm font-bold text-slate-500 dark:text-slate-500 opacity-70"
                       >
                         <MessageSquare className="w-4 h-4" /> Message
                       </span>
@@ -349,7 +332,7 @@ export default function OrganizationsDirectoryPage() {
                       <button
                         type="button"
                         onClick={() => handleMessage(org)}
-                        className="inline-flex items-center justify-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1A2740] transition-colors"
+                        className="inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#233350] transition-colors bg-slate-100 dark:bg-[#1A2740]"
                         data-tip={signedIn ? `Send a message to ${org.name}` : "Sign in to message this organization"}
                       >
                         <MessageSquare className="w-4 h-4" /> Message

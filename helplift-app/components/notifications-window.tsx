@@ -69,7 +69,7 @@ export function NotificationsWindow({
         onClick={() => setOpen(true)}
         aria-label="Notifications"
         data-tip={buttonTip}
-        className={`relative inline-flex h-9 w-9 items-center justify-center border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740] transition-colors ${buttonClassName}`}
+        className={`relative inline-flex h-9 w-9 items-center justify-center bg-slate-100 dark:bg-[#1A2740] text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350] transition-colors ${buttonClassName}`}
       >
         <Bell className="w-4 h-4" />
         {unreadCount > 0 && (
@@ -98,7 +98,7 @@ export function NotificationsWindow({
                   type="button"
                   onClick={() => setFilter(option)}
                   aria-pressed={filter === option}
-                  className={`rounded px-3 py-1 text-xs font-bold capitalize transition-colors ${filter === option ? "bg-blue-600 text-white" : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#1A2740]"}`}
+                  className={`rounded-lg px-3 py-1 text-xs font-bold capitalize transition-colors ${filter === option ? "bg-blue-600 text-white" : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#1A2740]"}`}
                 >
                   {option}
                 </button>

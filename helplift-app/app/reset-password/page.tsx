@@ -145,7 +145,7 @@ function ResetPasswordContent() {
               className="w-full rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 text-center text-lg font-bold tracking-[0.3em] text-slate-900 dark:text-slate-100 outline-none focus:border-blue-500"
               required
             />
-            <Button type="submit" disabled={isVerifying} className="w-full rounded bg-slate-900 py-6 font-bold hover:bg-slate-800">
+            <Button type="submit" disabled={isVerifying} className="w-full rounded-lg bg-slate-900 py-6 font-bold hover:bg-slate-800">
               {isVerifying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Verify code
             </Button>
             <p className="text-center text-sm text-slate-500 dark:text-slate-400">
@@ -162,7 +162,7 @@ function ResetPasswordContent() {
             )}
             <input type="password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="New password" className="w-full rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 text-slate-900 dark:text-slate-100 outline-none focus:border-blue-500" required />
             <input type="password" minLength={8} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="Confirm new password" className="w-full rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 text-slate-900 dark:text-slate-100 outline-none focus:border-blue-500" required />
-            <Button type="submit" disabled={isLoading} className="w-full rounded bg-slate-900 py-6 font-bold hover:bg-slate-800">{isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Update password</Button>
+            <Button type="submit" disabled={isLoading} className="w-full rounded-lg bg-slate-900 py-6 font-bold hover:bg-slate-800">{isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Update password</Button>
           </form>
         )}
         <p className="text-center text-sm text-slate-500 dark:text-slate-400"><Link href="/login" className="font-bold text-blue-600 hover:underline">Back to sign in</Link></p>

@@ -15,7 +15,6 @@ import {
   PinOff,
   Plus,
   Send,
-  Sparkles,
   Trash2,
   Trophy,
   X,
@@ -27,7 +26,9 @@ import { MicButton } from "@/components/mic-button"
 import { GrammarCheckButton } from "@/components/grammar-check-button"
 import { ReadAloudButton } from "@/components/read-aloud-button"
 import { ShareButtons } from "@/components/share-buttons"
+import { TranslatableText, TranslateControl } from "@/components/translatable-text"
 import { AdminDeleteButton } from "@/components/admin-delete-button"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   TIMELINE_POST_TYPES,
   isImageAttachment,
@@ -119,7 +120,7 @@ function Composer({ initial, onSaved, onCancel }: { initial?: TimelinePost; onSa
   }
 
   return (
-    <div className="space-y-3 rounded-2xl bg-white dark:bg-[#121B2E] p-4 shadow-sm">
+    <div className="space-y-3">
       <div className="flex flex-wrap gap-1.5" role="group" aria-label="Post type">
         {TIMELINE_POST_TYPES.map(option => {
           const Icon = TYPE_STYLE[option.value].icon
@@ -170,7 +171,7 @@ function Composer({ initial, onSaved, onCancel }: { initial?: TimelinePost; onSa
           {keptAttachments.map(file => (
             <li key={file.path} className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-xs font-semibold">
               <Paperclip className="h-3 w-3 shrink-0" /> <span className="truncate">{file.name}</span>
-              <button type="button" onClick={() => setRemoving(list => [...list, file.path])} aria-label={`Remove ${file.name}`} className="text-slate-400 hover:text-red-600"><X className="h-3.5 w-3.5" /></button>
+              <button type="button" onClick={() => setRemoving(list => [...list, file.path])} aria-label={`Remove ${file.name}`} className="text-slate-500 dark:text-slate-400 hover:text-red-600"><X className="h-3.5 w-3.5" /></button>
             </li>
           ))}
           {files.map((file, index) => (
@@ -208,6 +209,26 @@ function Composer({ initial, onSaved, onCancel }: { initial?: TimelinePost; onSa
   )
 }
 
+/** The composer in its own window: "New post", or "Edit post" for an existing one. */
+function ComposerWindow({ open, onOpenChange, initial, onSaved }: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  initial?: TimelinePost
+  onSaved: (post: TimelinePost) => void
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{initial ? "Edit post" : "New timeline post"}</DialogTitle>
+          <DialogDescription>Posts go live straight away on your public profile&apos;s Timeline.</DialogDescription>
+        </DialogHeader>
+        {open && <Composer initial={initial} onSaved={onSaved} onCancel={() => onOpenChange(false)} />}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // --- One post --------------------------------------------------------------------
 
 function PostCard({ post, viewer, organizationName, onChanged, onRemoved }: {
@@ -218,6 +239,7 @@ function PostCard({ post, viewer, organizationName, onChanged, onRemoved }: {
   onRemoved: (id: string) => void
 }) {
   const [editing, setEditing] = useState(false)
+  const [translatedBody, setTranslatedBody] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -258,22 +280,20 @@ function PostCard({ post, viewer, organizationName, onChanged, onRemoved }: {
     }
   }
 
-  if (editing) {
-    return <Composer initial={post} onSaved={saved => { onChanged(saved); setEditing(false) }} onCancel={() => setEditing(false)} />
-  }
-
   const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/organizations/${post.organization_id}#post-${post.id}` : ""
 
   return (
-    <article id={`post-${post.id}`} className="relative scroll-mt-28 rounded-2xl bg-white dark:bg-[#121B2E] p-4 md:p-5 shadow-sm">
+    <>
+    <ComposerWindow open={editing} onOpenChange={setEditing} initial={post} onSaved={saved => { onChanged(saved); setEditing(false) }} />
+    <article id={`post-${post.id}`} className="relative scroll-mt-28 rounded bg-white dark:bg-[#121B2E] p-4 md:p-5 shadow-sm">
       <div className="flex items-start gap-3">
-        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${style.gradient} text-white shadow-md`}>
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded bg-gradient-to-br ${style.gradient} text-white shadow-md`}>
           <Icon className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${style.chip}`}>{timelinePostTypeLabel(post.post_type)}</span>
-            {post.pinned && <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-[#1A2740] px-2.5 py-0.5 text-[11px] font-bold text-slate-600 dark:text-slate-300"><Pin className="h-3 w-3" /> Pinned</span>}
+            {post.pinned && <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-[#1A2740] px-2.5 py-0.5 text-[11px] font-bold text-slate-600 dark:text-slate-300">Pinned</span>}
           </div>
           {post.title && <h3 className="mt-1.5 text-base font-extrabold leading-snug text-slate-900 dark:text-slate-100 break-words">{post.title}</h3>}
           <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400" title={fullDate(post.created_at)}>
@@ -285,16 +305,17 @@ function PostCard({ post, viewer, organizationName, onChanged, onRemoved }: {
       </div>
 
       {post.post_type === "event" && post.event_starts_at && (
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 px-3 py-2 text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded bg-emerald-50 dark:bg-emerald-950/30 px-3 py-2 text-sm font-semibold text-emerald-800 dark:text-emerald-300">
           <span className="inline-flex items-center gap-1.5"><CalendarDays className="h-4 w-4" /> {fullDate(post.event_starts_at)}</span>
           {post.event_location && <span className="inline-flex items-center gap-1.5"><MapPin className="h-4 w-4" /> {post.event_location}</span>}
           {new Date(post.event_starts_at).getTime() < Date.now() && <span className="text-xs font-bold text-emerald-700/70 dark:text-emerald-400/70">Past event</span>}
         </div>
       )}
 
-      <p className={`mt-3 whitespace-pre-line break-words text-sm leading-relaxed text-slate-700 dark:text-slate-300 ${long && !expanded ? "line-clamp-6" : ""}`}>{post.body}</p>
+      <p className={`mt-3 whitespace-pre-line break-words text-sm leading-relaxed text-slate-700 dark:text-slate-300 ${long && !expanded ? "line-clamp-6" : ""}`}>{translatedBody ?? post.body}</p>
+      <TranslateControl text={post.body} onResult={setTranslatedBody} className="mt-2" />
       {long && (
-        <button type="button" onClick={() => setExpanded(value => !value)} className="mt-1 text-xs font-bold text-blue-600 dark:text-blue-400">
+        <button type="button" onClick={() => setExpanded(value => !value)} className="text-justify-smart mt-1 text-xs font-bold text-blue-600 dark:text-blue-400">
           {expanded ? "Show less" : "Read more"}
         </button>
       )}
@@ -302,8 +323,8 @@ function PostCard({ post, viewer, organizationName, onChanged, onRemoved }: {
       {images.length > 0 && (
         <div className={`mt-3 grid gap-2 ${images.length === 1 ? "grid-cols-1" : "grid-cols-2 sm:grid-cols-3"}`}>
           {images.map(file => (
-            <a key={file.path} href={file.url} target="_blank" rel="noopener noreferrer" className="group block overflow-hidden rounded-xl bg-slate-100 dark:bg-[#1A2740]">
-              <img src={file.url} alt={file.name} loading="lazy" className={`w-full object-cover transition-transform duration-300 group-hover:scale-[1.03] ${images.length === 1 ? "max-h-96" : "aspect-square"}`} />
+            <a key={file.path} href={file.url} target="_blank" rel="noopener noreferrer" className="group block overflow-hidden rounded bg-slate-100 dark:bg-[#1A2740]">
+              <img src={file.url} alt={file.name} loading="lazy" className={`w-full object-cover transition-transform duration-300 group-hover:scale-[1.03] ${images.length === 1 ? "aspect-video max-h-[480px]" : "aspect-square max-h-72"}`} />
             </a>
           ))}
         </div>
@@ -344,6 +365,7 @@ function PostCard({ post, viewer, organizationName, onChanged, onRemoved }: {
       </div>
       {error && <p role="alert" className="mt-2 text-xs font-semibold text-red-600 dark:text-red-400">{error}</p>}
     </article>
+    </>
   )
 }
 
@@ -396,39 +418,44 @@ export function OrgTimeline({
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-              <Sparkles className="h-5 w-5 text-blue-600" /> Timeline
+              Timeline
             </h2>
             <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400">Updates, events and news from {organizationName}.</p>
           </div>
         </div>
       )}
 
-      {viewer.canPost && (composing ? (
-        <Composer onSaved={post => { setPosts(list => sorted([post, ...(list || [])])); setComposing(false) }} onCancel={() => setComposing(false)} />
-      ) : (
-        <button
-          type="button"
-          onClick={() => setComposing(true)}
-          className="flex w-full items-center gap-3 rounded-2xl bg-white dark:bg-[#121B2E] p-4 text-left shadow-sm transition-shadow hover:shadow-md"
-        >
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white"><Plus className="h-5 w-5" /></span>
-          <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">Share an update, event, milestone or news...</span>
-        </button>
-      ))}
+      {viewer.canPost && (
+        <>
+          <button
+            type="button"
+            onClick={() => setComposing(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" /> New post
+          </button>
+          <ComposerWindow
+            open={composing}
+            onOpenChange={setComposing}
+            onSaved={post => { setPosts(list => sorted([post, ...(list || [])])); setComposing(false) }}
+          />
+        </>
+      )}
 
       {error && <p className="text-sm font-semibold text-red-600 dark:text-red-400">{error}</p>}
 
       {posts === null ? (
         <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-blue-600" /></div>
       ) : posts.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-2xl bg-white/70 dark:bg-[#121B2E]/60 p-8 text-center">
+        <div className="flex flex-col items-center gap-2 rounded bg-white/70 dark:bg-[#121B2E]/60 p-8 text-center">
           <Flag className="h-6 w-6 text-slate-400" />
           <p className="text-sm text-slate-500 dark:text-slate-400">
             {viewer.canPost ? "Nothing posted yet. Share your first update with your supporters." : `${organizationName} hasn't posted anything yet.`}
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        // A feed reads best at a fixed width - full-page posts stretched photos edge to edge.
+        <div className="max-w-3xl space-y-3">
           {posts.map(post => (
             <PostCard
               key={post.id}

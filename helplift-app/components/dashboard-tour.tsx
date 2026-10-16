@@ -1,7 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
-import { ArrowLeft, ArrowRight, Sparkles, X } from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { ArrowLeft, ArrowRight, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { getSessionUser } from "@/lib/session-user"
 import { logClientAction } from "@/components/activity-tracker"
@@ -27,60 +27,57 @@ function stepsFor(role: TourRole, name?: string | null): TourStep[] {
   const hello = name ? `Welcome, ${name}!` : "Welcome to HelpLift!"
   if (role === "admin") {
     return [
-      { title: `${hello} 🛡️`, body: "This is the HelpLift admin dashboard, where you keep the platform safe and moving. Here's a quick tour - you can skip it any time." },
+      { title: `${hello}`, body: "This is the HelpLift admin dashboard, where you keep the platform safe and moving. Here's a quick tour - you can skip it any time." },
       { target: '[data-tour="search"]', title: "Search anything", body: "Looking for something? Type or speak here to jump straight to any section, action or setting - for example \"password\" or \"font size\". Press Ctrl+K from anywhere." },
       { target: '[data-tour="mobile-nav"]', title: "Your sections", body: "On your phone, the sections you use most are on this bar. Tap More for everything else, plus quick actions." },
-      { target: '[data-tour="admin-stats"]', title: "What needs you right now", body: "These cards count everything waiting on an admin - approvals, needs to review, donations to confirm, withdrawals, stories and unread messages." },
-      { target: '[data-tour="tab-users"]', title: "Users and organization approvals", body: "Verify new organizations and check their documents here. Switch to Givers, Admins (where you invite other administrators) or All users." },
+      { target: '[data-tour="tab-users"]', title: "Users and organization approvals", body: "A small number on a tab means something there is waiting for you. Verify new organizations and check their documents here. Switch to Givers, Admins (where you invite other administrators) or All users." },
       { target: '[data-tour="tab-needs"]', title: "Review needs", body: "Approve or reject needs before they go public, and decide on requests to reopen closed needs." },
       { target: '[data-tour="tab-donations"]', title: "Confirm donations", body: "Check EFT proof of payment and confirm donations - the giver's receipt is emailed automatically. The Gift Library and Fulfillments tabs work the same way for pledges and deliveries." },
       { target: '[data-tour="tab-withdrawals"]', title: "Pay out organizations", body: "Review withdrawal requests and attach proof of payment once the money is sent." },
       { target: '[data-tour="tab-stories"]', title: "Approve impact stories", body: "Organizations' stories are published on their profiles and the homepage only after you approve them." },
       { target: '[data-tour="tab-inquiries"]', title: "Inquiries and tip-offs", body: "Anonymous tip-offs about organizations arrive here, with any evidence, for you to investigate. Messages from the homepage contact form are here too." },
-      { target: '[data-tour="tab-reports"]', title: "Reports", body: "All-time totals, site visits and charts for any date range - with CSV and image exports." },
+      { target: '[data-tour="tab-reports"]', title: "Reports", body: "All-time totals, site visits, the most-needed categories and where needs are posted, with charts for any date range - and CSV and image exports." },
       { target: '[data-tour="live-activity"]', title: "Live activity", body: "See who's online right now and what signed-in users are doing - pages opened and actions taken - updated every 10 seconds." },
-      { target: '[data-tour="security"]', title: "Security", body: "Every sign-in attempt, successful or not - with IP address, location and device - plus warnings about repeated failures." },
-      { target: '[data-tour="dev-reports"]', title: "Feedback and dev reports", body: "Dev reports holds the anonymous bugs and ideas sent from the Developers page. Feedback, just beside it, has ratings from givers and organizations." },
-      { target: '[data-tour="settings"]', title: "Settings, announcements and more", body: "Settings covers your login, Platform settings (maintenance mode, bank accounts, need categories and limits), Accessibility, and User interface, where you can pick a colour scheme. The megaphone sends announcements, and the bell lists what needs review." },
-      { title: "You're all set", body: "Need more help? Download the user manual from Settings for a step-by-step guide to the whole app, or just ask Lifty." },
+      { target: '[data-tour="security"]', title: "More: security, feedback and dev reports", body: "More holds Security (every sign-in attempt, with IP address, location and device), Feedback (ratings from givers and organizations) and Dev reports (anonymous bugs and ideas from the Developers page)." },
+      { target: '[data-tour="settings"]', title: "Settings, announcements and more", body: "Settings covers your login, Platform settings (maintenance mode, bank accounts, need categories and limits), Accessibility, and User interface, where you choose light or dark mode and a colour scheme. Announce sends announcements, and the bell lists what needs review." },
+      { title: "You're all set", body: "Need more help? Download the user manual from Settings, ask Lifty, or take this tour again any time from Settings -> Take the tour." },
     ]
   }
   if (role === "giver") {
     return [
-      { title: `${hello} 👋`, body: "Here's a quick tour of everything on your dashboard - about a minute. You can skip it any time." },
+      { title: `${hello}`, body: "Here's a quick tour of everything on your dashboard - about a minute. You can skip it any time." },
       { target: '[data-tour="search"]', title: "Search anything", body: "Looking for something? Type or speak here to jump straight to any section, action or setting - for example \"password\" or \"font size\". Press Ctrl+K from anywhere." },
       { target: '[data-tour="mobile-nav"]', title: "Your sections", body: "On your phone, the sections you use most are on this bar. Tap More for everything else, plus quick actions." },
-      { target: '[data-tour="tab-needs"]', title: "Find needs to support", body: "Browse Needs shows verified needs matched to your preferred causes and locations - or switch on \"near me\". Open one to offer help or donate." },
+      { target: '[data-tour="tab-needs"]', title: "Find needs to support", body: "Browse Needs shows verified needs matched to your preferred causes and locations - or switch on \"near me\". Each need says whether it wants goods, money or both, and how much is still needed. Open one to offer help or donate." },
       { target: '[data-tour="tab-interests"]', title: "Your offers to help", body: "Every need you've offered to help with, and whether the organization has accepted, is tracked in My Interests." },
       { target: '[data-tour="tab-gifts"]', title: "Pledge to the Gift Library", body: "Have goods, a service or funds to give before a need exists? Pledge them here - or snap a photo and let Lifty fill in the details." },
       { target: '[data-tour="tab-fulfillments"]', title: "Follow your deliveries", body: "Once an offer is accepted, Fulfillments tracks the delivery - including the proof photos the organization uploads." },
       { target: '[data-tour="tab-donations"]', title: "Track your donations", body: "Every donation, its status, your proof of payment and your PDF receipts live in My Donations." },
-      { target: '[data-tour="tab-messages"]', title: "Messages", body: "Chat with organizations and HelpLift's team. Replies show up here and in your notifications." },
-      { target: '[data-tour="tab-analytics"]', title: "See your impact", body: "Analytics charts your giving over time - you can export the charts too." },
+      { target: '[data-tour="tab-messages"]', title: "Messages", body: "Chat with organizations, or tap Message Admin to reach HelpLift's team. Replies show up here and in your notifications." },
       { target: '[data-tour="notifications"]', title: "Stay in the loop", body: "The bell shows updates as they happen - accepted offers, confirmed donations, new messages and more." },
-      { target: '[data-tour="badges"]', title: "Earn badges", body: "Badges celebrate your giving milestones, with your progress to the next one and the top givers leaderboard." },
-      { target: '[data-tour="settings"]', title: "Settings and handy buttons", body: "Settings is where you edit your profile, turn on two-factor sign-in and choose your notifications. Open Accessibility for text size and motion, and User interface to pick a colour scheme or hide Lifty and the clock. Nearby, ↻ refreshes your data and the house icon takes you home." },
+      { target: '[data-tour="badges"]', title: "More: badges and extras", body: "More holds your Badges (giving milestones, progress to the next one and the top givers leaderboard), Organizations, Support The Platform and feedback." },
+      { target: '[data-tour="settings"]', title: "Settings and handy buttons", body: "Settings is where you edit your profile, turn on two-factor sign-in and choose your notifications. Open Accessibility for text size and motion, and User interface for light or dark mode, a colour scheme, or to hide Lifty. Nearby, ↻ refreshes your data and the house icon takes you home." },
       { target: '[data-tour="lifty"]', title: "Ask Lifty anything", body: "Lifty, your AI assistant, answers questions and finds needs for you - type, or tap the headphones and just talk." },
-      { title: "You're all set", body: "Need more help? Download the user manual from Settings for a step-by-step guide to the whole app, or just ask Lifty." },
+      { title: "You're all set", body: "Need more help? Download the user manual from Settings, ask Lifty, or take this tour again any time from Settings -> Take the tour." },
     ]
   }
   return [
-    { title: `${hello} 🎉`, body: "Your organization is verified and ready to go. Here's a quick tour of everything on your dashboard - you can skip it any time." },
+    { title: `${hello}`, body: "Your organization is verified and ready to go. Here's a quick tour of everything on your dashboard - you can skip it any time." },
     { target: '[data-tour="search"]', title: "Search anything", body: "Looking for something? Type or speak here to jump straight to any section, action or setting - for example \"password\" or \"font size\". Press Ctrl+K from anywhere." },
     { target: '[data-tour="mobile-nav"]', title: "Your sections", body: "On your phone, the sections you use most are on this bar. Tap More for everything else, plus quick actions." },
-    { target: '[data-tour="need-writer"]', title: "Post your first need", body: "Fill in the Create a need form - or tap \"Let Lifty write it\", describe it in a sentence, and Lifty fills it in. An admin reviews each need before it goes live." },
+    { target: '[data-tour="need-writer"]', title: "Post your first need", body: "Post a need opens a short form: say whether you need goods, money or both, fill in the details - or tap \"Let Lifty write it\" and describe it in a sentence. An admin reviews each need before it goes live, and \"Update still needed\" keeps givers up to date." },
     { target: '[data-tour="tab-interests"]', title: "Accept offers to help", body: "When givers offer to help with a need, accept or decline them here." },
     { target: '[data-tour="tab-fulfillments"]', title: "Manage deliveries", body: "Accepted offers and claimed gifts become fulfillments. Track them here and upload proof once items arrive." },
     { target: '[data-tour="tab-wallet"]', title: "Donations and your wallet", body: "Donations shows every gift of money you receive. Wallet holds your balance, banking details and withdrawal requests." },
-    { target: '[data-tour="tab-messages"]', title: "Messages", body: "Chat with givers and HelpLift's team. New replies also appear in your notifications." },
-    { target: '[data-tour="tab-timeline"]', title: "Your public timeline", body: "Post updates, events, milestones and news with photos or documents. They go live straight away on your public profile and in the Organizations directory." },
-    { target: '[data-tour="tab-stories"]', title: "Share your impact", body: "Post impact stories with photos or videos. Once approved they appear on your public profile and the HelpLift homepage." },
+    { target: '[data-tour="tab-messages"]', title: "Messages", body: "Chat with givers, or tap Message Admin to reach HelpLift's team. New replies also appear in your notifications." },
+    { target: '[data-tour="tab-timeline"]', title: "Your public timeline", body: "Tap New post to share updates, events, milestones and news with photos or documents. They go live straight away in the Timeline tab of your public profile." },
+    { target: '[data-tour="tab-stories"]', title: "Share your impact", body: "Tap Post a story to share an impact story with photos or videos. Once approved it appears on your public profile and the HelpLift homepage." },
     { target: '[data-tour="tab-gifts"]', title: "Claim from the Gift Library", body: "Givers pledge goods, services and funds before a need exists. Browse them here and claim what helps you." },
     { target: '[data-tour="tab-team"]', title: "Bring in your team", body: "Invite teammates by email as Owners, Managers or Coordinators (who handle deliveries, messages and stories), so the whole team can work on HelpLift." },
     { target: '[data-tour="notifications"]', title: "Stay in the loop", body: "The bell shows new interests, donations, messages and approvals as they happen." },
-    { target: '[data-tour="settings"]', title: "Settings and your profile", body: "Settings is for your organization's details, two-factor sign-in and notifications, plus Accessibility and User interface (colour schemes). The header also has your Public Profile, Documents, QR code, Badges and ↻ refresh - and Analytics is in the tabs." },
+    { target: '[data-tour="settings"]', title: "Settings and your profile", body: "Settings is for your organization's details, two-factor sign-in and notifications, plus Accessibility and User interface (light or dark mode and colour schemes). More, at the top, holds your Public Profile, Documents, QR code, Badges and Organizations; ↻ refreshes your data, and Analytics is in the tabs." },
     { target: '[data-tour="lifty"]', title: "Ask Lifty anything", body: "Lifty, your AI assistant, can explain any part of HelpLift - type, or tap the headphones and just talk." },
-    { title: "You're all set", body: "Need more help? Download the user manual from Settings for a step-by-step guide to the whole app, or just ask Lifty." },
+    { title: "You're all set", body: "Need more help? Download the user manual from Settings, ask Lifty, or take this tour again any time from Settings -> Take the tour." },
   ]
 }
 
@@ -94,6 +91,12 @@ function findTarget(step: TourStep | undefined): HTMLElement | null {
   return rect.width > 0 && rect.height > 0 ? element : null
 }
 
+// Settings -> "Take the tour" restarts it on whichever dashboard is open.
+const START_TOUR_EVENT = "helplift:start-tour"
+export function startDashboardTour() {
+  window.dispatchEvent(new Event(START_TOUR_EVENT))
+}
+
 const CARD_WIDTH = 320
 const GAP = 12
 
@@ -101,6 +104,20 @@ export function DashboardTour({ role, name }: { role: TourRole; name?: string | 
   const [steps, setSteps] = useState<TourStep[] | null>(null)
   const [index, setIndex] = useState(0)
   const [rect, setRect] = useState<DOMRect | null>(null)
+  const nameRef = useRef(name)
+  nameRef.current = name
+
+  // Taking the tour again from Settings: start from the first step.
+  useEffect(() => {
+    const restart = () => {
+      setIndex(0)
+      setRect(null)
+      // A moment for the Settings window to close first.
+      window.setTimeout(() => setSteps(stepsFor(role, nameRef.current)), 300)
+    }
+    window.addEventListener(START_TOUR_EVENT, restart)
+    return () => window.removeEventListener(START_TOUR_EVENT, restart)
+  }, [role])
 
   // Decide whether to show it.
   useEffect(() => {
@@ -221,16 +238,16 @@ export function DashboardTour({ role, name }: { role: TourRole; name?: string | 
       >
         <div className="flex items-start justify-between gap-3">
           <p className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
-            <Sparkles className="h-3.5 w-3.5" /> Step {visibleNumber} of {visibleCount}
+            Step {visibleNumber} of {visibleCount}
           </p>
-          <button type="button" onClick={() => { logClientAction("Skipped the dashboard tour"); finish() }} aria-label="Skip the tour" className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+          <button type="button" onClick={() => { logClientAction("Skipped the dashboard tour"); finish() }} aria-label="Skip the tour" className="text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
             <X className="h-4 w-4" />
           </button>
         </div>
         <h3 className="mt-2 text-base font-bold text-slate-900 dark:text-slate-100">{step.title}</h3>
         <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{step.body}</p>
         <div className="mt-4 flex items-center justify-between gap-2">
-          <button type="button" onClick={() => { logClientAction("Skipped the dashboard tour"); finish() }} className="text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+          <button type="button" onClick={() => { logClientAction("Skipped the dashboard tour"); finish() }} className="text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
             Skip tour
           </button>
           <div className="flex items-center gap-2">
@@ -238,7 +255,7 @@ export function DashboardTour({ role, name }: { role: TourRole; name?: string | 
               <button
                 type="button"
                 onClick={() => move(-1)}
-                className="inline-flex items-center gap-1 rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                className="inline-flex items-center gap-1 rounded-lg bg-slate-100 dark:bg-[#1A2740] px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350]"
               >
                 <ArrowLeft className="h-3.5 w-3.5" /> Back
               </button>
@@ -251,7 +268,7 @@ export function DashboardTour({ role, name }: { role: TourRole; name?: string | 
                 finish()
               }}
               autoFocus
-              className="inline-flex items-center gap-1 rounded bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
+              className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
             >
               {isLast ? "Got it" : index === 0 ? "Show me around" : "Next"}
               {!isLast && <ArrowRight className="h-3.5 w-3.5" />}

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Award, AtSign, Banknote, Bell, BookOpen, Bot, Clock, CornerDownLeft, Landmark, Tags, Trophy, Wallet, Wrench, Fingerprint, KeyRound, Mail, Mic, MousePointerClick, Palette, Search, ShieldCheck, SlidersHorizontal, Sparkles, Star, Trash2, Type, UserRound, X } from "lucide-react"
+import { Award, AtSign, Banknote, Bell, BookOpen, Bot, Compass, CornerDownLeft, Landmark, Tags, Trophy, Wallet, Wrench, Fingerprint, KeyRound, Mail, Mic, MousePointerClick, Palette, Search, ShieldCheck, SlidersHorizontal, Star, Trash2, Type, UserRound, X, Pause } from "lucide-react"
 import { MicButton } from "@/components/mic-button"
 import { openAccessibilitySettings, openInterfaceSettings } from "@/components/settings-dialog"
 
@@ -162,7 +162,7 @@ export function DashboardSearch({ items, placeholder = "Search this dashboard...
           className="w-full rounded-full bg-white dark:bg-[#121B2E] py-2.5 pl-10 pr-24 text-sm shadow-sm outline-none ring-blue-500/30 transition-shadow placeholder:text-slate-400 focus:ring-4"
         />
         {query ? (
-          <button type="button" onClick={() => { setQuery(""); inputRef.current?.focus() }} aria-label="Clear search" className="absolute right-12 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 hover:text-slate-600">
+          <button type="button" onClick={() => { setQuery(""); inputRef.current?.focus() }} aria-label="Clear search" className="absolute right-12 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-500 dark:text-slate-400 hover:text-slate-600">
             <X className="h-4 w-4" />
           </button>
         ) : (
@@ -172,7 +172,7 @@ export function DashboardSearch({ items, placeholder = "Search this dashboard...
       </div>
 
       {open && (
-        <div id="dashboard-search-results" role="listbox" className="absolute left-0 right-0 top-full z-[160] mt-2 max-h-[60vh] overflow-y-auto rounded-2xl bg-white dark:bg-[#121B2E] p-1.5 shadow-2xl animate-in fade-in slide-in-from-top-1 duration-150">
+        <div id="dashboard-search-results" role="listbox" className="absolute left-0 right-0 top-full z-[160] mt-2 max-h-[60vh] overflow-y-auto rounded bg-white dark:bg-[#121B2E] p-1.5 shadow-2xl animate-in fade-in slide-in-from-top-1 duration-150">
           {results.length === 0 ? (
             <p className="px-3 py-6 text-center text-sm text-slate-500 dark:text-slate-400">Nothing matches &ldquo;{query}&rdquo;. Try another word, or ask Lifty.</p>
           ) : results.map((item, index) => {
@@ -220,16 +220,17 @@ export function settingsSearchItems(openSettings: () => void, options: { editPro
     { title: "Two-factor sign-in", icon: ShieldCheck, keywords: "2fa two factor code otp security verification" },
     { title: "Notification sounds", icon: Bell, keywords: "sound audio alert ding mute" },
     { title: "Email notifications", icon: Mail, keywords: "emails inbox notify", show: options.emailNotifications },
-    { title: "User interface", icon: Palette, keywords: "user interface ui appearance look layout colour color scheme lifty clock", window: "interface" },
+    { title: "User interface", icon: Palette, keywords: "user interface ui appearance look layout colour color scheme lifty", window: "interface" },
+    { title: "Theme", icon: Palette, keywords: "theme dark mode light mode night high contrast grayscale greyscale appearance", window: "interface" },
     { title: "Colour scheme", icon: Palette, keywords: "colour color scheme theme look forest sunset midnight green orange purple palette appearance", window: "interface" },
     { title: "Lifty (AI assistant)", icon: Bot, keywords: "lifty assistant chatbot ai hide show", window: "interface" },
     { title: "Hey Lifty", icon: Mic, keywords: "wake word voice microphone hands free speak" },
-    { title: "Clock & date", icon: Clock, keywords: "time clock date hide show", window: "interface" },
     { title: "Accessibility", icon: Type, keywords: "accessibility a11y readable vision hearing motion font text size sounds", window: "accessibility" },
     { title: "Click sounds", icon: MousePointerClick, keywords: "click tap sound feedback" , window: "accessibility" },
-    { title: "Reduce motion", icon: Sparkles, keywords: "animations motion accessibility" , window: "accessibility" },
+    { title: "Reduce motion", icon: Pause, keywords: "animations motion accessibility" , window: "accessibility" },
     { title: "Font size", icon: Type, keywords: "text size bigger larger smaller zoom accessibility" , window: "accessibility" },
     { title: "User manual", icon: BookOpen, keywords: "help guide manual pdf download instructions" },
+    { title: "Take the tour", icon: Compass, keywords: "tour guided walkthrough tutorial introduction help again restart onboarding" },
     { title: "Giver of the Month", icon: Star, keywords: "spotlight privacy featured homepage", show: options.giverSpotlight },
     { title: "Delete account", icon: Trash2, keywords: "delete remove close account", show: options.deleteAccount },
   ]
@@ -249,7 +250,7 @@ export function settingsSearchItems(openSettings: () => void, options: { editPro
     }))
 }
 
-/** Switches the theme by pressing the page's theme button. */
+/** Opens Settings -> User interface at the Theme row. */
 export const themeSearchItem: DashboardSearchItem = {
   id: "action-theme",
   label: "Switch theme",
@@ -257,7 +258,7 @@ export const themeSearchItem: DashboardSearchItem = {
   icon: Palette,
   keywords: "theme dark mode light mode night high contrast grayscale appearance colours colors",
   hint: "Light, dark, high contrast or grayscale",
-  onSelect: () => document.querySelector<HTMLButtonElement>("[data-theme-toggle]")?.click(),
+  onSelect: () => jumpTo(openInterfaceSettings, "Theme"),
 }
 
 /**

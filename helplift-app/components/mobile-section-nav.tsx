@@ -233,7 +233,7 @@ export function MobileAttentionGrid({ items, onSelect }: {
           type="button"
           onClick={() => { onSelect(id); window.scrollTo({ top: 0, behavior: "smooth" }) }}
           data-tip={`Open ${label}`}
-          className="inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-[#121B2E] px-2.5 py-1 text-xs font-semibold shadow-sm transition-transform active:scale-95"
+          className="inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-[#121B2E] px-2.5 py-1 text-xs font-semibold transition-transform active:scale-95"
         >
           <span className="stat-icon inline-flex"><Icon className={`h-3.5 w-3.5 ${tone}`} /></span>
           <span className="font-extrabold">{value}</span>

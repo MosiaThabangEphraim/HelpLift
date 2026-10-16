@@ -9,8 +9,7 @@ import {
   Mail, 
   ChevronLeft, 
   Loader2, 
-  Send,
-  HeartHandshake
+  Send
 } from "lucide-react"
 
 export default function ForgotPasswordPage() {
@@ -104,7 +103,7 @@ export default function ForgotPasswordPage() {
                 <Button 
                   type="submit" 
                   disabled={isLoading}
-                  className="w-full h-14 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-lg rounded transition-all shadow-xl shadow-primary/20 active:scale-[0.98]"
+                  className="w-full h-14 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-lg rounded-lg transition-all shadow-primary/20 active:scale-[0.98]"
                 >
                   {isLoading ? (
                     <div className="flex items-center gap-3">
@@ -145,14 +144,14 @@ export default function ForgotPasswordPage() {
             <div className="pt-4 space-y-4">
               <Button
                 onClick={() => router.push(`/reset-password?email=${encodeURIComponent(email)}`)}
-                className="w-full h-14 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-lg rounded transition-all shadow-xl shadow-primary/20 active:scale-[0.98]"
+                className="w-full h-14 bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-lg rounded-lg transition-all shadow-primary/20 active:scale-[0.98]"
               >
                 Enter Verification Code
               </Button>
               <Button
                 variant="outline"
                 onClick={() => setIsSubmitted(false)}
-                className="rounded px-8 border-border hover:bg-muted font-bold"
+                className="rounded-lg px-8 border-border hover:bg-muted font-bold"
               >
                 Try a different email
               </Button>

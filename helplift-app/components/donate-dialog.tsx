@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { stageFormFiles } from "@/lib/stage-uploads"
 import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
-import { Banknote, CheckCircle2, CreditCard, Loader2, Sparkles, UploadCloud } from "lucide-react"
+import { Banknote, CheckCircle2, CreditCard, Loader2, UploadCloud } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -23,7 +23,7 @@ import { OutcomeContentInline } from "@/components/outcome-banner"
 type DonateDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  need: { id: string; title: string } | null
+  need: { id: string; title: string; stillNeeded?: number | null } | null
   onDone?: () => void
   /** Retrying a donation that never went through - prefills the amount and
    * payment method so the giver doesn't have to re-enter them. This still
@@ -160,11 +160,17 @@ export function DonateDialog({ open, onOpenChange, need, onDone, initialAmount, 
               <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Donation amount (ZAR)
               </label>
+              {need?.stillNeeded != null && (
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <span className="font-bold text-blue-600 dark:text-blue-400">{formatCurrency(need.stillNeeded)}</span> is still needed - you can give up to that amount.
+                </p>
+              )}
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">R</span>
                 <input
                   type="number"
                   min="1"
+                  max={need?.stillNeeded ?? undefined}
                   step="0.01"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
@@ -254,7 +260,7 @@ export function DonateDialog({ open, onOpenChange, need, onDone, initialAmount, 
             <DialogFooter className="pt-2 gap-2">
               <Button type="button" variant="outline" onClick={close}>Cancel</Button>
               <Button type="button" onClick={createDonation} disabled={isSubmitting || (method === "eft" && !bank)} className="bg-blue-600 hover:bg-blue-700 text-white">
-                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                 <span>{isSubmitting ? "Preparing..." : method === "eft" ? "Get banking details" : method === "payfast" ? "Continue to PayFast" : "Continue to PayPal"}</span>
               </Button>
             </DialogFooter>

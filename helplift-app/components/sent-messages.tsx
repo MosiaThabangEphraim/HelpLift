@@ -112,7 +112,7 @@ export function MessageViewToggle({ value, onChange }: { value: "inbox" | "sent"
           type="button"
           onClick={() => onChange(option)}
           aria-pressed={value === option}
-          className={`rounded px-4 py-1.5 text-xs font-bold capitalize transition-colors ${
+          className={`rounded-lg px-4 py-1.5 text-xs font-bold capitalize transition-colors ${
             value === option
               ? "bg-blue-600 text-white"
               : "bg-slate-100 dark:bg-[#1A2740] text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350]"

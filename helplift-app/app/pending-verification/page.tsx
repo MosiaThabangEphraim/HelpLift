@@ -209,7 +209,7 @@ export default function PendingVerificationPage() {
               <input type="file" multiple accept=".pdf,.png,.jpg,.jpeg" onChange={event => setSelectedFiles(Array.from(event.target.files || []))} className="sr-only" />
               <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{`${UPLOAD_LIMITS.organizationDocument.kinds} - up to ${UPLOAD_LIMITS.organizationDocument.maxMB} MB each`}</span>
             </label>
-            <button disabled={isUploading || selectedFiles.length === 0} className="inline-flex w-full items-center justify-center gap-2 rounded bg-slate-900 px-5 py-3 font-bold text-white disabled:opacity-50">
+            <button disabled={isUploading || selectedFiles.length === 0} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-5 py-3 font-bold text-white disabled:opacity-50">
               {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
               {selectedFiles.length > 1 ? `Upload ${selectedFiles.length} documents` : "Upload document"}
             </button>
@@ -234,7 +234,7 @@ export default function PendingVerificationPage() {
             <button
               onClick={handleResubmit}
               disabled={isResubmitting}
-              className="inline-flex w-full items-center justify-center gap-2 rounded bg-amber-600 hover:bg-amber-700 text-white px-5 py-3 text-sm font-bold disabled:opacity-50"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white px-5 py-3 text-sm font-bold disabled:opacity-50"
             >
               {isResubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
               Resubmit for Review

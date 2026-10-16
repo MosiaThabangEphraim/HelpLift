@@ -3,24 +3,24 @@
 import { useEffect, useState } from "react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
+import { TranslatableText, TranslateControl } from "@/components/translatable-text"
+import { formatCurrency } from "@/lib/banking"
+import { acceptsGoods, acceptsMoney, SupportTypeLabel } from "@/components/need-support-type"
+import { amountStillNeeded, FullyFundedTag, FundingProgress, isFullyFunded } from "@/components/need-funding"
+import { ViewToggle, type ListView } from "@/components/view-toggle"
 import { RefreshButton } from "@/components/refresh-button"
 import { ShareButtons } from "@/components/share-buttons"
 import {
   Building2,
-  CheckCircle2,
   MapPin,
   Mail,
   Phone,
-  HeartHandshake,
-  Calendar,
-  Sparkles,
   Loader2,
   ArrowLeft,
-  Quote,
+  ExternalLink,
+  Banknote,
+  CheckCircle2,
   Send,
-  Flame,
-  AlertTriangle,
-  PackageCheck,
   MessageSquare
 } from "lucide-react"
 import { StoryMediaGallery } from "@/components/story-media-gallery"
@@ -56,6 +56,9 @@ type Need = {
   location: string | null
   quantity: string | null
   target_amount: number | null
+  amount_raised?: number | null
+  quantity_still_needed?: string | null
+  support_type?: string | null
   due_date: string | null
   urgency: string
   status: string
@@ -91,6 +94,12 @@ export default function OrganizationPublicProfilePage() {
   const { signedIn, isCoordinator } = useCanMessage()
   const [isMessaging, setIsMessaging] = useState(false)
   const [showSignInPrompt, setShowSignInPrompt] = useState(false)
+  type Section = "needs" | "timeline" | "stories" | "about"
+  const [view, setView] = useState<ListView>("grid")
+  const [section, setSection] = useState<Section>(sharedStoryId ? "stories" : "about")
+  useEffect(() => {
+    if (window.location.hash.startsWith("#post-")) setSection("timeline")
+  }, [])
 
   const handleMessage = () => {
     if (!signedIn || !org?.message_recipient_id) {
@@ -137,23 +146,23 @@ export default function OrganizationPublicProfilePage() {
     const level = (urgency || "medium").toLowerCase()
     if (level === "high") {
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-bold bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400">
-          <Flame className="w-3 h-3 fill-red-500" />
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-bold bg-red-500/10 text-red-600 dark:text-red-400">
+          
           High
         </span>
       )
     }
     if (level === "medium") {
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-bold bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400">
-          <AlertTriangle className="w-3 h-3" />
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400">
+          
           Medium
         </span>
       )
     }
     return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-bold bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400">
-        <PackageCheck className="w-3 h-3" />
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
+        
         Standard
       </span>
     )
@@ -170,13 +179,13 @@ export default function OrganizationPublicProfilePage() {
   if (error || !org) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#FAFAFA] dark:bg-slate-950 px-4 text-center">
-        <div className="p-6 max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded space-y-4">
-          <Building2 className="w-12 h-12 text-slate-400 mx-auto" />
+        <div className="p-6 max-w-md bg-white dark:bg-slate-900 rounded space-y-4">
+          <Building2 className="w-12 h-12 text-slate-500 dark:text-slate-400 mx-auto" />
           <h2 className="text-xl font-bold">Organization Profile Unavailable</h2>
           <p className="text-sm text-slate-500 dark:text-slate-400">{error || "We could not find the organization profile you were looking for."}</p>
           <Link
             href="/needs"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded bg-blue-600 text-white text-sm font-bold hover:bg-blue-700"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-bold hover:bg-blue-700"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Browse Community Needs</span>
@@ -186,54 +195,66 @@ export default function OrganizationPublicProfilePage() {
     )
   }
 
+  const location = [org.city, org.province].filter(Boolean).join(", ")
+  const sections: { id: Section; label: string; count?: number }[] = [
+    { id: "about", label: "About" },
+    { id: "needs", label: "Needs", count: needs.length },
+    { id: "timeline", label: "Timeline" },
+    { id: "stories", label: "Impact stories", count: stories.length },
+  ]
+
   return (
-    <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 text-slate-900 dark:text-slate-100 pt-28 pb-24 px-4 md:px-8">
-      <div className="max-w-[2400px] mx-auto space-y-10">
+    <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 text-slate-900 dark:text-slate-100 pt-24 pb-20 px-4 md:px-8">
+      <div className="mx-auto max-w-[2400px] space-y-5 max-md:space-y-3">
 
         <BackButton fallbackHref="/organizations" />
 
-        {/* Organization Header Card */}
-        <header className="rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 shadow-sm space-y-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="flex items-start md:items-center gap-5">
-              {org.logo_url ? (
-                <img src={org.logo_url} alt={`${org.name} logo`} className="w-16 h-16 rounded object-cover shadow-lg shadow-blue-600/20 shrink-0 border border-slate-200 dark:border-slate-800" />
-              ) : (
-                <div className="w-16 h-16 rounded bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-600/20 shrink-0">
-                  <Building2 className="w-8 h-8" />
+        {/* Profile card: who they are and the main action, then the section
+            tabs. One plain surface - nothing boxed inside it. */}
+        <header className="overflow-hidden rounded bg-white dark:bg-slate-900 shadow-sm">
+          <div className="p-4 md:px-8 md:py-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex flex-row items-center gap-3 md:gap-5">
+                {org.logo_url ? (
+                  <img src={org.logo_url} alt={`${org.name} logo`} className="h-14 w-14 md:h-20 md:w-20 shrink-0 rounded object-cover bg-white shadow-md" />
+                ) : (
+                  <div className="flex h-14 w-14 md:h-20 md:w-20 shrink-0 items-center justify-center rounded bg-blue-600 text-white shadow-md">
+                    <Building2 className="h-10 w-10" />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <h1 className="text-xl md:text-3xl font-black tracking-tight text-slate-900 dark:text-white">{org.name}</h1>
+                    {org.verification_status === "approved" && (
+                      <span className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                        <CheckCircle2 className="h-4 w-4" />
+                        Verified
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+                    {org.type}{location ? ` · ${location}` : ""} · {needs.length} active {needs.length === 1 ? "need" : "needs"} · {stories.length} {stories.length === 1 ? "story" : "stories"}
+                  </p>
                 </div>
-              )}
-              <div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">
-                    {org.name}
-                  </h1>
-                  {org.verification_status === "approved" && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-bold bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      Verified Organization
-                    </span>
-                  )}
-                </div>
-                <p className="text-slate-500 dark:text-slate-400 text-sm font-semibold mt-1">
-                  {org.type} · Registered Entity
-                </p>
+              </div>
+
+              <div className="shrink-0">
                 {org.is_own ? (
-                  <p className="mt-3 text-xs font-bold text-slate-400">This is your organization's public profile.</p>
+                  <p className="text-xs font-bold text-slate-400">This is your organization&apos;s public profile.</p>
                 ) : isCoordinator ? (
                   <span
                     aria-disabled="true"
                     data-tip="Coordinators can't message other organizations. Ask an owner or manager."
-                    className="mt-3 inline-flex cursor-not-allowed items-center gap-1.5 rounded border border-slate-200 dark:border-slate-700 px-4 py-2 text-sm font-bold text-slate-400 opacity-70"
+                    className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-bold text-slate-500 dark:text-slate-400 opacity-70"
                   >
                     <MessageSquare className="w-4 h-4" /> Message
                   </span>
                 ) : (
-                  <div className="mt-3 flex items-center gap-3 flex-wrap">
+                  <div className="flex flex-col items-start gap-2 md:items-end">
                     <button
                       type="button"
                       onClick={handleMessage}
-                      className="inline-flex items-center gap-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm font-bold transition-colors"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 text-sm font-bold transition-colors"
                       data-tip={signedIn ? `Send a message to ${org.name}` : "Sign in to message this organization"}
                     >
                       <MessageSquare className="w-4 h-4" /> Message
@@ -249,48 +270,29 @@ export default function OrganizationPublicProfilePage() {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-3 text-xs font-semibold text-slate-500 dark:text-slate-400">
-              {(org.city || org.province) && (
-                <div className="flex items-center gap-1.5 px-3.5 py-2 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                  <MapPin className="w-4 h-4 text-slate-400" />
-                  <span>{[org.city, org.province].filter(Boolean).join(", ")}</span>
-                </div>
-              )}
-              {org.contact_email && (
-                <div className="flex items-center gap-1.5 px-3.5 py-2 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                  <Mail className="w-4 h-4 text-slate-400" />
-                  <span>{org.contact_email}</span>
-                </div>
-              )}
-              {org.phone && (
-                <div className="flex items-center gap-1.5 px-3.5 py-2 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                  <Phone className="w-4 h-4 text-slate-400" />
-                  <span>{org.phone}</span>
-                </div>
-              )}
-              {org.address && (
-                <div className="flex items-center gap-1.5 px-3.5 py-2 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                  <Building2 className="w-4 h-4 text-slate-400" />
-                  <span>{org.address}</span>
-                </div>
-              )}
-            </div>
+            {/* Sections: one at a time, so there are no long scrolls or empty columns. */}
+            <nav className="mt-5 max-md:mt-4 -mb-1 flex gap-1 overflow-x-auto scrollbar-none" role="tablist" aria-label="Organization sections">
+              {sections.map(item => (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={section === item.id}
+                  onClick={() => setSection(item.id)}
+                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                    section === item.id
+                      ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+                      : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
+                  }`}
+                >
+                  {item.label}
+                  {item.count !== undefined && item.count > 0 && (
+                    <span className={`rounded-full px-1.5 text-xs ${section === item.id ? "bg-white/20 dark:bg-slate-900/10" : "bg-slate-100 dark:bg-white/10"}`}>{item.count}</span>
+                  )}
+                </button>
+              ))}
+            </nav>
           </div>
-
-          {/* Mission Statement */}
-          {org.mission && (
-            <div className="p-6 rounded bg-slate-50 dark:bg-slate-950/60 border border-slate-100 dark:border-slate-800/80 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-black uppercase tracking-wider text-blue-600 dark:text-blue-400 flex items-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5" /> Mission & Vision
-                </span>
-                <ReadAloudButton text={org.mission} label="Listen to mission" />
-              </div>
-              <p className="text-sm md:text-base text-slate-700 dark:text-slate-300 leading-relaxed italic text-justify-smart">
-                "{org.mission}"
-              </p>
-            </div>
-          )}
         </header>
 
         <MessageComposeDialog
@@ -300,84 +302,100 @@ export default function OrganizationPublicProfilePage() {
           recipientId={org.message_recipient_id}
         />
 
-        {/* --- TIMELINE: the organization's own updates, events and news --- */}
-        <OrgTimeline organizationId={org.id} organizationName={org.name} />
-
-        {/* --- ACTIVE OPEN NEEDS SECTION --- */}
-        <section className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="flex items-center gap-3 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                Active Needs ({needs.length})
+        {section === "needs" && (
+          <section className="space-y-4" role="tabpanel">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm text-slate-500 dark:text-slate-400">Support requests published by {org.name}.</p>
+              <div className="flex items-center gap-2">
                 <RefreshButton variant="pill" onRefresh={() => loadProfile(true)} />
-              </h2>
-              <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400">
-                Support requests published by {org.name}.
-              </p>
+                <ViewToggle view={view} onChange={setView} />
+              </div>
             </div>
-          </div>
-
           {needs.length === 0 ? (
-            <div className="rounded border border-dashed border-slate-300 dark:border-slate-800 p-8 text-center bg-white dark:bg-slate-900/40 text-slate-500 dark:text-slate-400 text-sm">
+            <div className="rounded p-8 text-center bg-white dark:bg-slate-900/40 text-slate-500 dark:text-slate-400 text-sm">
               This organization has no open requests at this time.
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className={`grid grid-cols-1 gap-4 ${view === "grid" ? "md:grid-cols-2 xl:grid-cols-3" : ""}`}>
               {needs.map((need) => (
                 <div
                   key={need.id}
-                  className="rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 flex flex-col justify-between shadow-sm space-y-4"
+                  className="rounded bg-white dark:bg-slate-900 p-5 flex flex-col justify-between shadow-sm space-y-3"
                 >
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="px-3 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold">
-                        {need.category}
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="px-3 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold">
+                          {need.category}
+                        </span>
+                        <SupportTypeLabel need={need} />
                       </span>
                       {renderUrgencyBadge(need.urgency)}
                     </div>
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white">
                       {need.title}
                     </h3>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-3 leading-relaxed">
+                    <p className="text-justify-smart text-sm text-slate-600 dark:text-slate-400 line-clamp-3 leading-snug">
                       {need.description}
                     </p>
-                    <div className="flex flex-wrap gap-2 text-xs font-medium text-slate-500 dark:text-slate-400 pt-1">
-                      {need.location && <span>📍 {need.location}</span>}
+                    <div className="flex flex-wrap gap-x-2 gap-y-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                      {need.location && <span>{need.location}</span>}
                       {need.quantity && <span>· Qty: {need.quantity}</span>}
+                      {need.quantity_still_needed && (
+                        <span>· <span className="font-bold text-blue-600 dark:text-blue-400">Still needed:</span> <span className="text-slate-700 dark:text-slate-200">{need.quantity_still_needed}</span></span>
+                      )}
                       {need.due_date && <span>· Due {need.due_date}</span>}
                     </div>
+                    <FundingProgress need={need} />
                   </div>
 
-                  <Link
-                    href={`/needs?search=${encodeURIComponent(need.title)}`}
-                    className="inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 transition-colors shadow-sm"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>Support this Need</span>
-                  </Link>
+                  <div className="flex gap-2">
+                    {acceptsMoney(need) && (isFullyFunded(need) ? (
+                      <FullyFundedTag className="flex-1 py-2.5" />
+                    ) : (
+                      <Link
+                        href={`/needs?search=${encodeURIComponent(need.title)}`}
+                        className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 transition-colors"
+                      >
+                        <Banknote className="w-3.5 h-3.5" />
+                        <span>Donate Money</span>
+                      </Link>
+                    ))}
+                    {acceptsGoods(need) && (
+                      <Link
+                        href={`/needs?search=${encodeURIComponent(need.title)}`}
+                        className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 transition-colors"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Support this Need</span>
+                      </Link>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
           )}
-        </section>
+          </section>
+        )}
 
-        {/* --- IMPACT STORIES SECTION --- */}
-        <section className="space-y-6">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-              Impact Stories
-            </h2>
-            <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400">
-              Verified community outcomes achieved with HelpLift supporters.
-            </p>
+        {section === "timeline" && (
+          <div role="tabpanel" className="[&_.max-w-3xl]:max-w-none">
+            <OrgTimeline organizationId={org.id} organizationName={org.name} heading={false} />
           </div>
+        )}
 
+        {section === "stories" && (
+          <section className="space-y-4" role="tabpanel">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm text-slate-500 dark:text-slate-400">Verified community outcomes achieved with HelpLift supporters.</p>
+              <ViewToggle view={view} onChange={setView} />
+            </div>
           {stories.length === 0 ? (
-            <div className="rounded border border-dashed border-slate-300 dark:border-slate-800 p-8 text-center bg-white dark:bg-slate-900/40 text-slate-500 dark:text-slate-400 text-sm">
+            <div className="rounded p-8 text-center bg-white dark:bg-slate-900/40 text-slate-500 dark:text-slate-400 text-sm">
               No impact stories posted yet by this organization.
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className={`grid grid-cols-1 gap-4 ${view === "grid" ? "md:grid-cols-2 xl:grid-cols-3" : ""}`}>
               {stories.map((story) => {
                 const media: StoryMedia[] = story.media && story.media.length > 0
                   ? story.media
@@ -390,10 +408,10 @@ export default function OrganizationPublicProfilePage() {
                 <article
                   key={story.id}
                   id={`story-${story.id}`}
-                  className={`rounded border bg-white dark:bg-slate-900 overflow-hidden shadow-sm flex flex-col transition-colors ${
+                  className={`rounded bg-white dark:bg-slate-900 overflow-hidden shadow-sm flex flex-col transition-colors ${
                     sharedStoryId === story.id
-                      ? "border-blue-400 dark:border-blue-600 ring-2 ring-blue-200 dark:ring-blue-900"
-                      : "border-slate-200 dark:border-slate-800"
+                      ? "ring-2 ring-blue-200 dark:ring-blue-900"
+                      : ""
                   }`}
                 >
                   {media.length > 0 && (
@@ -401,14 +419,12 @@ export default function OrganizationPublicProfilePage() {
                       <StoryMediaGallery media={media} title={story.title} heightClassName="h-48" />
                     </div>
                   )}
-                  <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
+                  <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
                     <div className="space-y-2">
                       <h3 className="text-xl font-bold text-slate-900 dark:text-white">
                         {story.title}
                       </h3>
-                      <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line">
-                        {story.content}
-                      </p>
+                      <TranslatableText text={story.content} className="text-justify-smart text-sm text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line" />
                     </div>
 
                     <ShareButtons
@@ -416,7 +432,7 @@ export default function OrganizationPublicProfilePage() {
                       title={story.title}
                     />
 
-                    <div className="flex items-center justify-between text-xs text-slate-400 pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-3">
                       <span>{story.author_role || "Operations Team"}</span>
                       <span>{new Date(story.created_at).toLocaleDateString()}</span>
                     </div>
@@ -426,7 +442,159 @@ export default function OrganizationPublicProfilePage() {
               })}
             </div>
           )}
-        </section>
+          </section>
+        )}
+
+        {section === "about" && (() => {
+          // An overview in two parts: who they are (mission, key facts, where
+          // to find them), then - only when there is something - what you can
+          // support and what they've achieved.
+          const moneyStillNeeded = needs.reduce((sum, need) => sum + (amountStillNeeded(need) ?? 0), 0)
+          const since = org.created_at ? new Date(org.created_at).getFullYear() : null
+          const latestStory = stories[0]
+          const storyImage = latestStory
+            ? (latestStory.media || []).find(m => m.media_type === "image")?.url || latestStory.image_url || null
+            : null
+          const mapQuery = [org.address, org.city, org.province, "South Africa"].filter(Boolean).join(", ")
+          const facts = [
+            { value: String(needs.length), label: needs.length === 1 ? "open need" : "open needs", show: true },
+            { value: formatCurrency(moneyStillNeeded), label: "still needed", show: moneyStillNeeded > 0 },
+            { value: String(stories.length), label: stories.length === 1 ? "impact story" : "impact stories", show: true },
+            { value: since ? String(since) : "", label: "joined HelpLift", show: !!since },
+          ].filter(fact => fact.show)
+          return (
+            <div className="space-y-5" role="tabpanel">
+              <section className="grid overflow-hidden rounded bg-white dark:bg-slate-900 shadow-sm lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+                {/* Who they are */}
+                <div className="flex flex-col justify-center gap-6 p-5 md:p-8">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400">Our mission</h2>
+                      {org.mission && <ReadAloudButton text={org.mission} label="Listen" />}
+                    </div>
+                    {org.mission?.trim() ? (
+                      <TranslatableText text={org.mission.trim()} className="text-justify-smart text-base leading-relaxed text-slate-700 dark:text-slate-300" />
+                    ) : (
+                      <p className="text-base leading-relaxed text-slate-700 dark:text-slate-300">{org.name} hasn&apos;t added a mission statement yet.</p>
+                    )}
+                  </div>
+
+                  <dl className="flex flex-wrap gap-x-10 gap-y-4">
+                    {facts.map(fact => (
+                      <div key={fact.label}>
+                        <dt className="sr-only">{fact.label}</dt>
+                        <dd>
+                          <span className="block text-2xl md:text-3xl font-black tracking-tight text-slate-900 dark:text-white">{fact.value}</span>
+                          <span className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{fact.label}</span>
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+
+                {/* Where to find them */}
+                <div className="flex flex-col bg-slate-50 dark:bg-slate-950/40">
+                  {mapQuery && (
+                    <iframe
+                      title={`Map showing ${org.name}`}
+                      src={`https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&z=14&output=embed`}
+                      className="h-48 w-full"
+                      loading="lazy"
+                      referrerPolicy="no-referrer-when-downgrade"
+                    />
+                  )}
+                  <div className="space-y-3 p-5 md:p-6">
+                    <ul className="space-y-2.5 text-sm text-slate-600 dark:text-slate-300">
+                      {(org.address || location) && (
+                        <li className="flex items-start gap-2.5">
+                          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                          <span>{[org.address, location].filter(Boolean).join(", ")}</span>
+                        </li>
+                      )}
+                      {org.contact_email && (
+                        <li className="flex items-start gap-2.5">
+                          <Mail className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                          <a href={`mailto:${org.contact_email}`} className="min-w-0 break-all hover:text-blue-600 dark:hover:text-blue-400">{org.contact_email}</a>
+                        </li>
+                      )}
+                      {org.phone && (
+                        <li className="flex items-start gap-2.5">
+                          <Phone className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                          <a href={`tel:${org.phone}`} className="hover:text-blue-600 dark:hover:text-blue-400">{org.phone}</a>
+                        </li>
+                      )}
+                    </ul>
+                    {mapQuery && (
+                      <a
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(mapQuery)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-sm font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" /> Get directions
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </section>
+
+              {/* Get involved - only when there are open needs */}
+              {needs.length > 0 && (
+                <section className="space-y-3">
+                  <div className="flex items-end justify-between gap-2">
+                    <h2 className="text-lg font-bold text-slate-900 dark:text-white">How you can help</h2>
+                    <button type="button" onClick={() => setSection("needs")} className="text-sm font-bold text-blue-600 dark:text-blue-400 hover:underline">
+                      All needs ({needs.length})
+                    </button>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {needs.slice(0, 3).map(need => {
+                      const left = amountStillNeeded(need)
+                      return (
+                        <button
+                          key={need.id}
+                          type="button"
+                          onClick={() => setSection("needs")}
+                          className="flex flex-col gap-2 rounded bg-white dark:bg-slate-900 p-4 text-left shadow-sm transition-shadow hover:shadow-md"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{need.category}</span>
+                            <SupportTypeLabel need={need} />
+                          </span>
+                          <span className="font-bold leading-snug text-slate-900 dark:text-white line-clamp-2">{need.title}</span>
+                          <span className="mt-auto text-xs font-semibold text-blue-600 dark:text-blue-400">
+                            {left !== null
+                              ? (left <= 0 ? "Fully funded" : `${formatCurrency(left)} still needed`)
+                              : need.quantity_still_needed ? `Still needed: ${need.quantity_still_needed}` : need.quantity ? `Needs ${need.quantity}` : "Open to offers"}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </section>
+              )}
+
+              {/* Latest impact - only when there is a story */}
+              {latestStory && (
+                <section className="space-y-3">
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">Latest impact</h2>
+                  <button
+                    type="button"
+                    onClick={() => setSection("stories")}
+                    className={`grid w-full overflow-hidden rounded bg-white dark:bg-slate-900 text-left shadow-sm transition-shadow hover:shadow-md ${storyImage ? "md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]" : ""}`}
+                  >
+                    {storyImage && <img src={storyImage} alt="" className="h-48 w-full object-cover md:h-full" />}
+                    <span className="flex flex-col gap-2 p-5 md:p-6">
+                      <span className="text-lg font-bold leading-snug text-slate-900 dark:text-white">{latestStory.title}</span>
+                      <span className="text-sm leading-relaxed text-slate-600 dark:text-slate-300 line-clamp-3">{latestStory.content}</span>
+                      <span className="mt-1 text-sm font-bold text-blue-600 dark:text-blue-400">Read the story</span>
+                    </span>
+                  </button>
+                </section>
+              )}
+            </div>
+          )
+        })()}
 
       </div>
     </div>

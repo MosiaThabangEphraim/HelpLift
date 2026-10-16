@@ -15,7 +15,6 @@ import {
   Medal,
   Banknote,
   ShieldCheck,
-  Sparkles,
   Star,
   Target,
   Trophy,
@@ -44,7 +43,7 @@ type Leaderboard = { topGivers: LeaderboardEntry[]; topOrganizations: Leaderboar
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   medal: Medal,
-  sparkle: Sparkles,
+  sparkle: Star,
   flame: Flame,
   target: Target,
   trophy: Trophy,
@@ -172,13 +171,13 @@ function BadgeCard({
         onPointerMove={tilt}
         onPointerLeave={resetTilt}
         data-tip="View full details"
-        className={`group relative h-full w-full text-left rounded border p-4 space-y-2 transition-[transform,box-shadow,background-color,border-color,opacity] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.98] will-change-transform ${
-          badge.earned
-            ? "border-blue-200 dark:border-blue-900 bg-blue-50/60 dark:bg-blue-950/20 hover:bg-blue-100/60 dark:hover:bg-blue-950/40 hover:shadow-blue-500/10"
-            : isNextUp
-            ? "badge-glow border-indigo-300 dark:border-indigo-800 bg-white dark:bg-[#121B2E]"
-            : "border-slate-200 dark:border-[#233350] opacity-80 hover:opacity-100 hover:border-slate-300 dark:hover:border-[#2C3E63]"
-        }`}
+        className={`group relative h-full w-full text-left rounded border p-4 space-y-2 transition-[transform,box-shadow,background-color,border-color,opacity] duration-200 ease-out hover:-translate-y-0.5 active:scale-[0.98] will-change-transform ${
+ badge.earned
+ ? "border-blue-200 dark:border-blue-900 bg-blue-50/60 dark:bg-blue-950/20 hover:bg-blue-100/60 dark:hover:bg-blue-950/40 "
+ : isNextUp
+ ? "badge-glow border-indigo-300 dark:border-indigo-800 bg-white dark:bg-[#121B2E]"
+ : "border-slate-200 dark:border-[#233350] opacity-80 hover:opacity-100 hover:border-slate-300 dark:hover:border-[#2C3E63]"
+ }`}
       >
         {isNextUp && (
           <span className="absolute -top-2 right-3 rounded bg-indigo-600 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm">
@@ -304,7 +303,7 @@ function LeaderboardRow({ rank, entry, index }: { rank: number; entry: Leaderboa
       <UserAvatar src={image} name={entry.name} className="size-9 border border-slate-200 dark:border-[#233350]" />
       <p className="min-w-0 flex-1 truncate text-sm font-bold">{entry.name}</p>
       <span className="flex shrink-0 items-center gap-1 rounded bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 text-xs font-bold text-blue-700 dark:text-blue-300">
-        <Trophy className="h-3 w-3 transition-transform duration-300 group-hover:-rotate-12 group-hover:scale-125" /> <CountUp value={entry.badgeCount} duration={900} />
+        <CountUp value={entry.badgeCount} duration={900} />
       </span>
     </div>
   )
@@ -427,7 +426,7 @@ export function BadgesPanel({ endpoint, refreshKey = 0 }: { endpoint: string; re
               type="button"
               onClick={() => setView(option)}
               aria-pressed={view === option}
-              className={`rounded px-3.5 py-1.5 text-xs font-bold capitalize transition-colors ${
+              className={`rounded-lg px-3.5 py-1.5 text-xs font-bold capitalize transition-colors ${
                 view === option
                   ? "bg-blue-600 text-white"
                   : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#1A2740]"

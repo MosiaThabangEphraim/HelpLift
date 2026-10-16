@@ -38,8 +38,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Photos must be smaller than 10 MB each." }, { status: 400 })
     }
 
-    const { data: need } = await supabase.from("needs").select("id, title, organization_id, due_date").eq("id", need_id).in("status", ["open", "in_progress"]).single()
+    const { data: need } = await supabase.from("needs").select("id, title, organization_id, due_date, support_type").eq("id", need_id).in("status", ["open", "in_progress"]).single()
     if (!need) return NextResponse.json({ message: "This need is not open for support." }, { status: 400 })
+    if (need.support_type === "money") return NextResponse.json({ message: "This need is asking for money only - please donate instead." }, { status: 400 })
     if (isPastDate(need.due_date)) return NextResponse.json({ message: "This need's due date has passed, so it no longer accepts offers." }, { status: 400 })
 
     const { data: interest, error } = await supabase.from("support_interests").insert({ need_id, giver_id: giver.id, message: message || null }).select().single()

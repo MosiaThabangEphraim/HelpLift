@@ -226,7 +226,7 @@ export function OrganizationTeam({ refreshKey = 0 }: { refreshKey?: number }) {
               </ul>
 
               <div className="space-y-2">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" />Pending invitations</h4>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" />Pending invitations</h4>
                 {invitations.length === 0 ? (
                   <p className="text-sm text-slate-500 dark:text-slate-400">No pending invitations.</p>
                 ) : (

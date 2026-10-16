@@ -25,8 +25,6 @@ import {
   UserPlus,
   XCircle,
   Gift,
-  Flame,
-  AlertTriangle,
   PackageCheck,
   Pencil,
   Search,
@@ -42,10 +40,8 @@ import {
   BarChart3,
   Download,
   History,
-  Paperclip,
   Megaphone,
   Settings,
-  Bell,
   Star,
   Heart,
   Globe,
@@ -97,7 +93,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { SettingsDialog } from "@/components/settings-dialog"
-import { AnalogClock } from "@/components/analog-clock"
 import { TimeGreeting } from "@/components/time-greeting"
 import { setReturnTo } from "@/lib/window-return"
 import { ChangeEmailFlow, ChangePasswordFlow } from "@/components/account-security"
@@ -118,7 +113,7 @@ import { AdminDeveloperReports } from "@/components/admin-developer-reports"
 import { AdminInquiries, type InquiriesView } from "@/components/admin-inquiries"
 import { useDashboardColorScheme } from "@/lib/color-scheme"
 import { DashboardSearch, platformSettingsSearchItems, settingsSearchItems, themeSearchItem, type DashboardSearchItem } from "@/components/dashboard-search"
-import { MobileAttentionGrid, MobileSectionHeading, MobileSectionNav, type MobileSection } from "@/components/mobile-section-nav"
+import { MobileSectionHeading, MobileSectionNav, type MobileSection } from "@/components/mobile-section-nav"
 import { AdminFulfillmentsView, type AdminFulfillment } from "@/components/admin-fulfillments"
 import { PlatformSettingsAdmin } from "@/components/platform-settings-admin"
 import { MessageDetailDialog } from "@/components/message-detail-dialog"
@@ -131,7 +126,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { AnnouncementComposeDialog } from "@/components/announcement-compose-dialog"
-import { ThemeToggle } from "@/components/theme-toggle"
 import { CountUp } from "@/components/count-up"
 import { NotificationsWindow } from "@/components/notifications-window"
 import {
@@ -170,7 +164,7 @@ type Organization = {
   created_at: string
 }
 type Profile = { id: string; full_name: string; email: string; role: "admin" | "organization" | "giver" | string; suspended?: boolean; suspended_reason?: string | null; created_at: string; phone?: string | null; account_type?: string | null }
-type Need = { id: string; title: string; description: string; category: string; urgency?: string; status: "draft" | "open" | "in_progress" | "fulfilled" | "closed" | "rejected" | "reopen_pending"; rejection_reason?: string | null; reopen_reason?: string | null; organizations: { name: string }[] | { name: string } | null; created_at: string; location?: string | null; quantity?: string | null; target_amount?: number | string | null; due_date?: string | null; need_attachments?: { id: string; storage_path: string; file_name: string | null; url: string }[] }
+type Need = { id: string; title: string; description: string; category: string; urgency?: string; status: "draft" | "open" | "in_progress" | "fulfilled" | "closed" | "rejected" | "reopen_pending"; rejection_reason?: string | null; reopen_reason?: string | null; organizations: { name: string }[] | { name: string } | null; created_at: string; location?: string | null; quantity?: string | null; quantity_still_needed?: string | null; support_type?: string | null; target_amount?: number | string | null; amount_raised?: number | string | null; due_date?: string | null; need_attachments?: { id: string; storage_path: string; file_name: string | null; url: string }[] }
 type AdminMessage = { id: string; type?: string; title: string; message: string; sender_name?: string | null; sender_role?: string | null; read_at: string | null; created_at: string; attachment_file_name?: string | null; attachmentUrl?: string | null; attachments?: { id: string; file_name: string | null; url: string | null }[] }
 type OrganizationDocument = { id: string; organization_id: string; file_name: string; document_type: string; signed_url?: string | null }
 type OrgVerificationHistoryEntry = {
@@ -259,6 +253,14 @@ type AdminWithdrawal = {
 
 export default function AdminDashboardPage() {
   const router = useRouter()
+  // Sign out: the button shows a spinner and can't be pressed twice.
+  const [isSigningOut, setIsSigningOut] = useState(false)
+  const signOutWithSpinner = async () => {
+    if (isSigningOut) return
+    setIsSigningOut(true)
+    try { await logout() } finally { setIsSigningOut(false) }
+  }
+
   // The colour scheme chosen in Settings -> User interface (lib/color-scheme.ts).
   useDashboardColorScheme()
   const supabase = createClient()
@@ -444,7 +446,7 @@ export default function AdminDashboardPage() {
       // --- Needs (with urgency fallback retry - exactly matching org dashboard fix)
       (async () => {
         try {
-          const needColumns = "id, title, description, category, urgency, status, rejection_reason, reopen_reason, location, quantity, target_amount, due_date, organizations(name), created_at, need_attachments(id, storage_path, file_name)"
+          const needColumns = "id, title, description, category, urgency, status, rejection_reason, reopen_reason, location, quantity, amount_raised, quantity_still_needed, support_type, target_amount, due_date, organizations(name), created_at, need_attachments(id, storage_path, file_name)"
           let needsQuery = supabase
             .from("needs")
             .select(needColumns)
@@ -1096,11 +1098,10 @@ export default function AdminDashboardPage() {
     <main className="admin-readable min-h-screen bg-[#FAFAFA] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100 max-md:pb-24">
       <div className="mx-auto max-w-[2400px] px-4 md:px-10 py-6 md:py-14 space-y-6">
 
-        {/* Greeting for the time of day, with the clock and date beside it. */}
+        {/* Greeting for the time of day. */}
         <div className="flex flex-wrap items-center justify-end max-md:flex-nowrap max-md:justify-between gap-x-8 max-md:gap-x-3 gap-y-3">
           <DashboardSearch items={searchItems} placeholder="Search sections, actions and settings..." />
           <TimeGreeting name={profiles.find(p => p.email === ownEmail)?.full_name} firstNameOnly />
-          <AnalogClock />
         </div>
 
         {/* --- HEADER --- */}
@@ -1109,30 +1110,34 @@ export default function AdminDashboardPage() {
             <div className="rounded bg-gradient-to-br from-slate-800 to-slate-950 dark:from-blue-600 dark:to-indigo-600 p-3.5 text-white shadow-lg shadow-slate-900/20 dark:shadow-blue-600/20">
               <ShieldCheck className="h-6 w-6" />
             </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">HelpLift administration</p>
-              <h1 className="text-2xl md:text-3xl font-extrabold leading-tight">Moderation dashboard</h1>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Review platform verification, needs, gifts, and access.</p>
+            {/* Kept simple: what this dashboard is, in one line. */}
+            <div className="min-w-0">
+              <h1 className="truncate text-2xl md:text-3xl font-extrabold leading-tight">Moderation dashboard</h1>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">HelpLift administration</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap mobile-toolbar">
+            {/* Desktop: Announce and Live activity first, More for the logs
+                (Security, Feedback, Dev reports), then Notifications, Refresh,
+                Home, Settings and Sign out. Phones have the logs under More in
+                the bottom bar. */}
             <button
               onClick={() => setIsAnnouncing(true)}
               aria-label="Send an announcement"
               data-tip="Send an announcement to users or show a banner on the login page"
-              className="inline-flex h-9 w-9 items-center justify-center rounded border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950/70"
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 max-md:h-9 max-md:w-9 max-md:justify-center max-md:px-0 max-md:bg-blue-50 max-md:text-blue-700 max-md:dark:bg-blue-950/40 max-md:dark:text-blue-300"
             >
-              <Megaphone className="h-4 w-4" />
+              <Megaphone className="h-4 w-4" /> <span className="max-md:hidden">Announce</span>
             </button>
             <button
               data-tour="live-activity"
               data-tip="See who's online and what everyone is doing right now"
               onClick={() => changeTab("activity")}
               aria-pressed={activeTab === "activity"}
-              className={`max-md:hidden inline-flex items-center gap-2 rounded border px-4 py-2 text-sm font-semibold transition-colors ${
+              className={`max-md:hidden inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors bg-slate-100 dark:bg-[#1A2740]${
                 activeTab === "activity"
-                  ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                  : "border-slate-200 dark:border-[#233350] text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
+                  ? " bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                  : " text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#233350]"
               }`}
             >
               <span className="relative flex h-2 w-2">
@@ -1141,26 +1146,37 @@ export default function AdminDashboardPage() {
               </span>
               Live activity
             </button>
-            {([
-              { tab: "security", icon: ShieldCheck, name: "Security", tip: "Every sign-in attempt, successful or not" },
-              { tab: "feedback", icon: Star, name: "Feedback", tip: "Ratings and ideas from givers and organizations" },
-              { tab: "dev-reports", icon: Code2, name: "Dev reports", tip: "Bugs and ideas sent from the Developers page" },
-            ] as const).map(({ tab, icon: Icon, name, tip }) => (
-              <button
-                key={tab}
-                data-tour={tab}
-                onClick={() => changeTab(tab)}
-                aria-pressed={activeTab === tab}
-                data-tip={tip}
-                className={`max-md:hidden inline-flex items-center gap-2 rounded border px-4 py-2 text-sm font-semibold transition-colors ${
-                  activeTab === tab
-                    ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
-                    : "border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
-                }`}
-              >
-                <Icon className="h-4 w-4" /> {name}
-              </button>
-            ))}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  data-tour="security"
+                  data-tip="Security, Feedback and Dev reports"
+                  className={`max-md:hidden inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-colors bg-slate-100 dark:bg-[#1A2740]${
+                    ["security", "feedback", "dev-reports"].includes(activeTab)
+ ? " bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
+ : " bg-slate-100 dark:bg-[#1A2740] text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350]"
+                  }`}
+                >
+                  More <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-72 rounded-xl border-0 p-1.5 shadow-xl">
+                {([
+                  { tab: "security", icon: ShieldCheck, name: "Security", tip: "Every sign-in attempt, successful or not" },
+                  { tab: "feedback", icon: Star, name: "Feedback", tip: "Ratings and ideas from givers and organizations" },
+                  { tab: "dev-reports", icon: Code2, name: "Dev reports", tip: "Bugs and ideas sent from the Developers page" },
+                ] as const).map(({ tab, icon: Icon, name, tip }) => (
+                  <DropdownMenuItem key={tab} onSelect={() => changeTab(tab)} className="items-start gap-2.5 rounded-lg py-2">
+                    <Icon className="mt-0.5 h-4 w-4 text-slate-500" />
+                    <span>
+                      <span className="block font-semibold">{name}</span>
+                      <span className="block text-xs text-slate-500 dark:text-slate-400">{tip}</span>
+                    </span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <NotificationsWindow
               unreadCount={unreadNotifications}
               buttonTip={unreadNotifications > 0 ? `Notifications: ${unreadNotifications} need attention. Click to see them.` : "Notifications. You're all caught up."}
@@ -1178,12 +1194,11 @@ export default function AdminDashboardPage() {
             />
 
             <RefreshButton onRefresh={refreshAll} />
-            <ThemeToggle className="h-9 w-9" />
             <Link
               href="/"
               aria-label="Home"
               data-tip="Go to the HelpLift homepage"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 dark:bg-[#1A2740] text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350] transition-colors"
             >
               <Home className="w-4 h-4" />
             </Link>
@@ -1192,40 +1207,18 @@ export default function AdminDashboardPage() {
               aria-label="Settings"
               data-tip="Settings - your login email and password, and platform settings"
               onClick={() => { setSettingsMode("menu"); setSettingsMessage(""); setIsSettingsOpen(true) }}
-              className="inline-flex h-9 w-9 items-center justify-center rounded border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 dark:bg-[#1A2740] text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350]"
             >
               <Settings className="h-4 w-4" />
             </button>
 
-            <button onClick={logout} aria-label="Sign out" className="inline-flex items-center gap-2 rounded bg-slate-900 dark:bg-slate-100 px-4 py-2 max-md:h-9 max-md:w-9 max-md:justify-center max-md:px-0 text-sm font-semibold text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white">
-              <LogOut className="h-4 w-4" /> <span className="max-md:hidden">Sign out</span>
+            <button onClick={signOutWithSpinner} disabled={isSigningOut} aria-label="Sign out" className="inline-flex items-center gap-2 rounded-lg bg-slate-900 dark:bg-slate-100 px-4 py-2 max-md:h-9 max-md:w-9 max-md:justify-center max-md:px-0 text-sm font-semibold text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white">
+              {isSigningOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />} <span className="max-md:hidden">Sign out</span>
             </button>
           </div>
         </header>
 
-        {/* --- STATS ROW: what needs an admin's attention right now, nothing
-             that's just a total (those live in the Reports tab instead) --- */}
-        <MobileAttentionGrid
-          onSelect={selectSection}
-          items={[
-            { id: "users", label: "Approvals", value: pendingApprovals, icon: AlertTriangle, tone: "text-amber-600" },
-            { id: "needs", label: "Needs", value: needsAwaitingReview, icon: ClipboardList, tone: "text-emerald-600" },
-            { id: "gifts", label: "Gifts", value: pendingGifts, icon: Gift, tone: "text-purple-600" },
-            { id: "donations", label: "Donations", value: pendingDonations, icon: Banknote, tone: "text-amber-600" },
-            { id: "withdrawals", label: "Withdrawals", value: pendingWithdrawals, icon: Wallet, tone: "text-pink-600" },
-            { id: "stories", label: "Stories", value: pendingStories, icon: FileText, tone: "text-violet-600" },
-            { id: "messages", label: "Messages", value: unreadMessages, icon: Mail, tone: "text-blue-600" },
-          ]}
-        />
-        <div data-tour="admin-stats" className="max-md:hidden grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-x-6 gap-y-4">
-          <StatCard icon={AlertTriangle} label="Pending Approvals" value={pendingApprovals} accent="amber" />
-          <StatCard icon={ClipboardList} label="Needs Awaiting Review" value={needsAwaitingReview} accent="emerald" />
-          <StatCard icon={Gift} label="Pending Gifts" value={pendingGifts} accent="blue" />
-          <StatCard icon={Banknote} label="Pending Donations" value={pendingDonations} accent="amber" />
-          <StatCard icon={Wallet} label="Pending Withdrawals" value={pendingWithdrawals} accent="pink" />
-          <StatCard icon={FileText} label="Pending Stories" value={pendingStories} accent="purple" />
-          <StatCard icon={Mail} label="Unread Messages" value={unreadMessages} accent="blue" />
-        </div>
+        {/* No stat tiles: each tab shows a small count when something there is waiting. */}
 
         {/* --- TABS --- */}
         <Tabs value={activeTab} onValueChange={selectSection} className="gap-6 max-md:gap-4">
@@ -1292,7 +1285,7 @@ export default function AdminDashboardPage() {
                     <button
                       type="button"
                       aria-label={`Showing ${current.label}. Change group`}
-                      className="md:hidden flex w-full items-center gap-3 rounded-2xl bg-white dark:bg-[#121B2E] px-3 py-2.5 text-left shadow-sm"
+                      className="md:hidden flex w-full items-center gap-3 rounded-2xl bg-white dark:bg-[#121B2E] px-3 py-2.5 text-left"
                     >
                       <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${current.gradient} text-white`}>
                         <current.icon className="h-4 w-4" />
@@ -1336,7 +1329,7 @@ export default function AdminDashboardPage() {
                   type="button"
                   onClick={() => setUsersView(option.value)}
                   aria-pressed={usersView === option.value}
-                  className={`inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-sm font-semibold transition-colors ${
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
                     usersView === option.value ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-[#1A2740] text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350]"
                   }`}
                 >
@@ -1360,7 +1353,7 @@ export default function AdminDashboardPage() {
               <CardContent className="space-y-3">
                 <form onSubmit={inviteAdministrator} className="grid gap-3 md:grid-cols-[1fr_auto]">
                   <input required type="email" placeholder="Admin email" value={adminInviteEmail} onChange={event => setAdminInviteEmail(event.target.value)} className="field" />
-                  <button data-tip="Send an email invitation to become an administrator" disabled={isCreatingAdmin} className="inline-flex items-center justify-center gap-2 rounded bg-slate-900 px-4 py-3 text-sm font-bold text-white disabled:opacity-50">
+                  <button data-tip="Send an email invitation to become an administrator" disabled={isCreatingAdmin} className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-3 text-sm font-bold text-white disabled:opacity-50">
                     {isCreatingAdmin ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}Send invitation
                   </button>
                 </form>
@@ -1430,7 +1423,7 @@ export default function AdminDashboardPage() {
             <button aria-label="Close"
               type="button"
               onClick={() => setEditingOrganization(null)}
-              className="rounded p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
+              className="rounded-lg p-1 text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
             >
               <X className="w-4 h-4" />
             </button>
@@ -1528,7 +1521,7 @@ export default function AdminDashboardPage() {
             <DialogTitle>
               {settingsMode === "email" ? "Change Login Email" : settingsMode === "password" ? "Change Password" : "Platform Settings"}
             </DialogTitle>
-            <button aria-label="Close" type="button" onClick={() => setSettingsMode("menu")} className="rounded p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1A2740]">
+            <button aria-label="Close" type="button" onClick={() => setSettingsMode("menu")} className="rounded-lg p-1 text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1A2740]">
               <X className="w-4 h-4" />
             </button>
           </DialogHeader>
@@ -1567,7 +1560,7 @@ export default function AdminDashboardPage() {
             <button aria-label="Close"
               type="button"
               onClick={() => setEditingProfile(null)}
-              className="rounded p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
+              className="rounded-lg p-1 text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
             >
               <X className="w-4 h-4" />
             </button>
@@ -1695,6 +1688,9 @@ export default function AdminDashboardPage() {
           location: selectedNeedDetail.location,
           quantity: selectedNeedDetail.quantity,
           target_amount: selectedNeedDetail.target_amount,
+          amount_raised: selectedNeedDetail.amount_raised,
+          quantity_still_needed: selectedNeedDetail.quantity_still_needed,
+          support_type: selectedNeedDetail.support_type,
           due_date: selectedNeedDetail.due_date,
           created_at: selectedNeedDetail.created_at,
           attachments: selectedNeedDetail.need_attachments,
@@ -1781,12 +1777,12 @@ function UserDetailDialog({
 
           <div className="grid grid-cols-1 gap-3 text-sm">
             <div className="flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <Mail className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
               <span className="break-all">{profile.email}</span>
             </div>
             {profile.phone && (
               <div className="flex items-center gap-1.5">
-                <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <Phone className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
                 <span>{profile.phone}</span>
               </div>
             )}
@@ -1882,7 +1878,7 @@ function OrganizationsView({ organizations, documents, onUpdate, onEdit, onMessa
               </p>
               <p className="md:hidden truncate text-sm text-slate-500 dark:text-slate-400">{org.type} · {[org.city, org.province].filter(Boolean).join(", ") || org.contact_email}</p>
               {(org.city || org.province || org.phone) && (
-                <p className="max-md:hidden text-[11px] text-slate-400 mt-0.5">
+                <p className="max-md:hidden text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                   {[org.city, org.province].filter(Boolean).join(", ")}
                   {org.phone ? ` · Tel: ${org.phone}` : ""}
                 </p>
@@ -1891,7 +1887,7 @@ function OrganizationsView({ organizations, documents, onUpdate, onEdit, onMessa
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setViewingDocsOrg(org) }}
-                  className="max-md:hidden mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:underline bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 rounded"
+                  className="max-md:hidden mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:underline bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 rounded-lg"
                 >
                   <FileText className="w-3.5 h-3.5" /> View Documents ({orgDocuments.length})
                 </button>
@@ -1977,7 +1973,7 @@ function OrganizationsView({ organizations, documents, onUpdate, onEdit, onMessa
                   <FileText className="w-4 h-4 text-blue-600 shrink-0" />
                   <div className="min-w-0">
                     <p className="text-sm font-semibold truncate">{document.file_name}</p>
-                    <p className="text-[11px] text-slate-400 capitalize">{document.document_type.replace(/_/g, " ")}</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 capitalize">{document.document_type.replace(/_/g, " ")}</p>
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
@@ -2016,6 +2012,13 @@ function OrganizationDetailDialog({
   const [showRequestInfo, setShowRequestInfo] = useState(false)
   const [infoNotes, setInfoNotes] = useState("")
   const [showHistory, setShowHistory] = useState(false)
+  // Which decision is being saved - its button shows a spinner and all three wait.
+  const [busyDecision, setBusyDecision] = useState<Organization["verification_status"] | null>(null)
+  const decide = async (status: Organization["verification_status"], notes?: string) => {
+    if (busyDecision || !organization) return
+    setBusyDecision(status)
+    try { await onUpdate(organization.id, status, notes) } finally { setBusyDecision(null) }
+  }
 
   useEffect(() => {
     setShowRequestInfo(false)
@@ -2075,18 +2078,18 @@ function OrganizationDetailDialog({
               </div>
             )}
             <div className="col-span-2 flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <Mail className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
               <span className="break-all">{organization.contact_email}</span>
             </div>
             {organization.phone && (
               <div className="flex items-center gap-1.5">
-                <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <Phone className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
                 <span>{organization.phone}</span>
               </div>
             )}
             {(organization.address || organization.city || organization.province) && (
               <div className="col-span-2 flex items-start gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                <MapPin className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0 mt-0.5" />
                 <span>{[organization.address, organization.city, organization.province].filter(Boolean).join(", ")}</span>
               </div>
             )}
@@ -2115,14 +2118,14 @@ function OrganizationDetailDialog({
           )}
 
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Documents ({orgDocuments.length})</p>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Documents ({orgDocuments.length})</p>
             {orgDocuments.length === 0 ? (
               <p className="text-xs text-slate-400">No documents uploaded.</p>
             ) : (
               <div className="flex flex-wrap gap-2">
                 {orgDocuments.map(document => document.signed_url ? (
-                  <a key={document.id} href={document.signed_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:underline bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1.5 rounded">
-                    <FileText className="w-3.5 h-3.5" /> {document.file_name} <span className="font-normal text-slate-400 capitalize">({document.document_type.replace(/_/g, " ")})</span>
+                  <a key={document.id} href={document.signed_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:underline bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1.5 rounded-lg">
+                    <FileText className="w-3.5 h-3.5" /> {document.file_name} <span className="font-normal text-slate-500 dark:text-slate-400 capitalize">({document.document_type.replace(/_/g, " ")})</span>
                   </a>
                 ) : (
                   <span key={document.id} className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1.5 rounded">
@@ -2137,7 +2140,7 @@ function OrganizationDetailDialog({
             <button
               type="button"
               onClick={() => setShowHistory(v => !v)}
-              className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+              className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
             >
               <History className="w-3.5 h-3.5" /> Verification history ({orgHistory.length}) {showHistory ? "▲" : "▼"}
             </button>
@@ -2193,7 +2196,8 @@ function OrganizationDetailDialog({
               )}
               <DialogFooter className="pt-2 gap-2 flex-wrap">
                 {showRequestInfo ? (
-                  <button type="button" onClick={() => infoNotes.trim() && onUpdate(organization.id, "more_info_requested", infoNotes.trim())} className="btn-pill btn-pill--amber-solid h-9">
+                  <button type="button" disabled={!!busyDecision} onClick={() => infoNotes.trim() && decide("more_info_requested", infoNotes.trim())} className="inline-flex items-center gap-1.5 btn-pill btn-pill--amber-solid h-9 disabled:opacity-60">
+                    {busyDecision === "more_info_requested" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                     Send request
                   </button>
                 ) : (
@@ -2202,12 +2206,14 @@ function OrganizationDetailDialog({
                   </button>
                 )}
                 {!isRejected && (
-                  <button type="button" onClick={() => onUpdate(organization.id, "rejected")} data-tip={isApproved ? "Remove this organization's verification - its needs come off the platform until it's approved again" : undefined} className="btn-pill btn-pill--red h-9">
+                  <button type="button" disabled={!!busyDecision} onClick={() => decide("rejected")} data-tip={isApproved ? "Remove this organization's verification - its needs come off the platform until it's approved again" : undefined} className="inline-flex items-center gap-1.5 btn-pill btn-pill--red h-9 disabled:opacity-60">
+                    {busyDecision === "rejected" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                     {isApproved ? "Revoke verification" : "Reject"}
                   </button>
                 )}
                 {!isApproved && (
-                  <button type="button" onClick={() => onUpdate(organization.id, "approved")} className="btn-pill btn-pill--green h-9">
+                  <button type="button" disabled={!!busyDecision} onClick={() => decide("approved")} className="inline-flex items-center gap-1.5 btn-pill btn-pill--green h-9 disabled:opacity-60">
+                    {busyDecision === "approved" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                     {isRejected ? "Reconsider & approve" : "Approve"}
                   </button>
                 )}
@@ -2287,7 +2293,7 @@ function NeedsView({ needs, onUpdate, onDelete, onSelect }: { needs: Need[]; onU
           tabIndex={0}
           onClick={() => onSelect(need)}
           onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(need) } }}
-          className={`row cursor-pointer ${need.status === "draft" ? "border-amber-200 bg-amber-50/40 dark:border-amber-900 dark:bg-amber-950/10" : need.status === "rejected" ? "border-red-200 bg-red-50/40 dark:bg-red-950/10" : isReopenRequest ? "border-purple-200 bg-purple-50/40 dark:border-purple-900 dark:bg-purple-950/10" : ""}`}
+          className="row cursor-pointer"
         >
           <div>
             <div className="flex items-center gap-2">
@@ -2462,8 +2468,8 @@ function GiftsView({ gifts, onUpdate, onSelect, onDeleted }: { gifts: AdminGift[
                 {gift.offering_type}
               </span>
             </div>
-            <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 max-md:hidden">{gift.description}</p>
-            <p className="text-xs text-slate-400 max-md:truncate">Pledged by: {gift.givers?.name || "Giver"}<span className="max-md:hidden"> ({gift.givers?.email || "No email"})</span></p>
+            <p className="text-justify-smart text-xs text-slate-600 dark:text-slate-300 line-clamp-2 max-md:hidden">{gift.description}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-md:truncate">Pledged by: {gift.givers?.name || "Giver"}<span className="max-md:hidden"> ({gift.givers?.email || "No email"})</span></p>
             {gift.status === "claimed" && gift.organizations?.name && (
               <p className="text-xs font-semibold text-blue-600 dark:text-blue-400">Claimed by: {gift.organizations.name}</p>
             )}
@@ -2997,7 +3003,7 @@ function MessagesView({ messages, onOpen, onDeleted, refreshKey = 0 }: { refresh
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300 truncate">{item.message}</p>
           {item.attachmentUrl && (
             <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-blue-600">
-              <Paperclip className="w-3 h-3" /> Attachment
+              Attachment
             </span>
           )}
         </div>
@@ -3381,6 +3387,19 @@ function ReportsView({ organizations, needs, donations, profiles, gifts, withdra
       .slice(0, 8)
   }, [filteredNeeds])
 
+  // Where needs are posted: the need's own location (case and spacing ignored), top 8.
+  const needsByLocation = useMemo(() => {
+    const counts = new Map<string, { location: string; count: number }>()
+    for (const n of filteredNeeds) {
+      const label = (n.location || "").trim().replace(/\s+/g, " ")
+      const key = label.toLowerCase() || "not specified"
+      const entry = counts.get(key) || { location: label || "Not specified", count: 0 }
+      entry.count += 1
+      counts.set(key, entry)
+    }
+    return Array.from(counts.values()).sort((a, b) => b.count - a.count).slice(0, 8)
+  }, [filteredNeeds])
+
   const giftsTrendData = useMemo(() => {
     const { granularity, keys } = timeline
     const counts = countByBucket(filteredGifts, g => g.created_at, granularity)
@@ -3476,7 +3495,7 @@ function ReportsView({ organizations, needs, donations, profiles, gifts, withdra
               Reset to all time
             </button>
           )}
-          <p className="text-xs text-slate-400 pb-2.5">Showing metrics for {rangeLabel}.</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 pb-2.5">Showing metrics for {rangeLabel}.</p>
         </div>
       </Panel>
 
@@ -3538,7 +3557,7 @@ function ReportsView({ organizations, needs, donations, profiles, gifts, withdra
           )}
         </Panel>
 
-        <Panel title="Needs by category">
+        <Panel title="Most-needed categories (needs posted)">
           {needsByCategory.length === 0 ? (
             <Empty text="No needs in this range yet." />
           ) : (
@@ -3548,6 +3567,24 @@ function ReportsView({ organizations, needs, donations, profiles, gifts, withdra
                   <CartesianGrid horizontal={false} strokeDasharray="3 3" />
                   <XAxis type="number" tickLine={false} axisLine={false} fontSize={11} allowDecimals={false} />
                   <YAxis type="category" dataKey="category" tickLine={false} axisLine={false} fontSize={11} width={110} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="count" fill="var(--color-count)" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ChartContainer>
+            </ChartFrame>
+          )}
+        </Panel>
+
+        <Panel title="Needs by location">
+          {needsByLocation.length === 0 ? (
+            <Empty text="No needs in this range yet." />
+          ) : (
+            <ChartFrame filename="needs-by-location">
+              <ChartContainer config={needsCategoryChartConfig} className="h-[280px] w-full">
+                <BarChart data={needsByLocation} layout="vertical" margin={{ left: 12, right: 12, top: 8, bottom: 0 }}>
+                  <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+                  <XAxis type="number" tickLine={false} axisLine={false} fontSize={11} allowDecimals={false} />
+                  <YAxis type="category" dataKey="location" tickLine={false} axisLine={false} fontSize={11} width={110} />
                   <ChartTooltip content={<ChartTooltipContent />} />
                   <Bar dataKey="count" fill="var(--color-count)" radius={[0, 4, 4, 0]} />
                 </BarChart>
@@ -3770,7 +3807,7 @@ function ExportButton({ label, onClick }: { label: string; onClick: () => void }
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 rounded border border-slate-200 dark:border-[#233350] px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+      className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350] bg-slate-100 dark:bg-[#1A2740]"
     >
       <Download className="w-3.5 h-3.5" /> Export {label}
     </button>
@@ -3806,8 +3843,8 @@ function StoriesView({ stories, onReview, onDeleted }: { onDeleted: () => void |
       title="Impact stories"
       toolbar={
         <div className="flex items-center gap-2 text-xs font-bold">
-          <button onClick={() => setFilter("pending")} className={`rounded px-3 py-1.5 ${filter === "pending" ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-[#1A2740]"}`}>Awaiting review</button>
-          <button onClick={() => setFilter("all")} className={`rounded px-3 py-1.5 ${filter === "all" ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-[#1A2740]"}`}>All stories</button>
+          <button onClick={() => setFilter("pending")} className={`rounded-lg px-3 py-1.5 ${filter === "pending" ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-[#1A2740]"}`}>Awaiting review</button>
+          <button onClick={() => setFilter("all")} className={`rounded-lg px-3 py-1.5 ${filter === "all" ? "bg-blue-600 text-white" : "bg-slate-100 dark:bg-[#1A2740]"}`}>All stories</button>
         </div>
       }
     >
@@ -3853,7 +3890,7 @@ function StoriesView({ stories, onReview, onDeleted }: { onDeleted: () => void |
                 <AdminDeleteButton kind="story" id={story.id} onDeleted={onDeleted} />
               </div>
             </div>
-            <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed">{story.content}</p>
+            <p className="text-justify-smart text-sm text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed">{story.content}</p>
             {story.status === "rejected" && story.rejection_reason && (
               <p className="text-xs italic text-red-700 dark:text-red-400">Reason given: {story.rejection_reason}</p>
             )}
@@ -3863,9 +3900,9 @@ function StoriesView({ stories, onReview, onDeleted }: { onDeleted: () => void |
                 {story.media.map(m => m.media_type === "image" ? (
                   <a key={m.id} href={m.url} target="_blank" rel="noreferrer"><img src={m.url} alt="" className="h-20 w-20 rounded object-cover" /></a>
                 ) : (
-                  <a key={m.id} href={m.url} target="_blank" rel="noreferrer" className="inline-flex h-20 items-center rounded bg-purple-50 px-3 text-xs font-bold text-purple-700">🎥 Video</a>
+                  <a key={m.id} href={m.url} target="_blank" rel="noreferrer" className="inline-flex h-20 items-center rounded-lg bg-purple-50 px-3 text-xs font-bold text-purple-700">Video</a>
                 ))}
-                {story.video_url && <a href={story.video_url} target="_blank" rel="noreferrer" className="inline-flex h-20 items-center rounded bg-purple-50 px-3 text-xs font-bold text-purple-700">🎥 Video link</a>}
+                {story.video_url && <a href={story.video_url} target="_blank" rel="noreferrer" className="inline-flex h-20 items-center rounded-lg bg-purple-50 px-3 text-xs font-bold text-purple-700">Video link</a>}
               </div>
             )}
           </article>
@@ -3901,7 +3938,7 @@ function ChartFrame({ filename, children }: { filename: string; children: React.
         <button
           type="button"
           onClick={() => downloadChartAsImage(ref.current, filename)}
-          className="inline-flex items-center gap-1 rounded border border-slate-200 dark:border-[#233350] px-2.5 py-1 text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-[#233350] bg-slate-100 dark:bg-[#1A2740]"
         >
           <Download className="w-3 h-3" /> Download
         </button>

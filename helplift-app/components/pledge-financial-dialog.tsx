@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { stageFormFiles } from "@/lib/stage-uploads"
 import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
-import { Banknote, CheckCircle2, CreditCard, Loader2, Sparkles, UploadCloud } from "lucide-react"
+import { Banknote, CheckCircle2, CreditCard, Loader2, UploadCloud } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -278,7 +278,7 @@ export function PledgeFinancialDialog({ open, onOpenChange, onDone, initialAmoun
             <DialogFooter className="pt-2 gap-2">
               <Button type="button" variant="outline" onClick={close}>Cancel</Button>
               <Button type="button" onClick={createPledge} disabled={isSubmitting || (method === "eft" && !bank)} className="bg-purple-600 hover:bg-purple-700 text-white">
-                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                 <span>{isSubmitting ? "Preparing..." : method === "eft" ? "Get banking details" : method === "payfast" ? "Continue to PayFast" : "Continue to PayPal"}</span>
               </Button>
             </DialogFooter>

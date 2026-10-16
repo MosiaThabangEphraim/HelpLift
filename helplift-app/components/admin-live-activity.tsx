@@ -169,7 +169,7 @@ export function AdminLiveActivity({ refreshKey = 0 }: { refreshKey?: number }) {
           <div>
             {person ? (
               <>
-                <button type="button" onClick={() => { setEvents(null); setPerson(null) }} className="mb-1 inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:underline">
+                <button type="button" onClick={() => { setEvents(null); setPerson(null) }} className="mb-1 -ml-3 inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-white/5 dark:hover:text-white transition-colors">
                   <ArrowLeft className="h-3.5 w-3.5" /> All activity
                 </button>
                 <CardTitle>{person.name}&apos;s activity</CardTitle>
@@ -250,7 +250,7 @@ export function AdminLiveActivity({ refreshKey = 0 }: { refreshKey?: number }) {
                 <button
                   type="button"
                   onClick={() => { setIsFiltering(true); setFrom(""); setTo("") }}
-                  className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                  className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"
                 >
                   <X className="h-3 w-3" /> Any time
                 </button>

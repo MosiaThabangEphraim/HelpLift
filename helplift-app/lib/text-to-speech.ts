@@ -1,5 +1,6 @@
 "use client"
 
+import { guessLanguage, languageLabel, speechLocale } from "@/lib/languages"
 import { useCallback, useEffect, useRef, useState } from "react"
 
 // The Web Speech API's SpeechSynthesis half - the mirror image of
@@ -46,6 +47,34 @@ function scoreVoice(voice: SpeechSynthesisVoice): number {
   if (!voice.localService) score += 5
   if (ROBOTIC_HINTS.some((hint) => name.includes(hint))) score -= 20
   return score
+}
+
+// Voices whose language matches (e.g. "zu-ZA" voices for "zu").
+function voicesFor(voices: SpeechSynthesisVoice[], lang: string) {
+  const primary = lang.split("-")[0].toLowerCase()
+  return voices.filter(v => (v.lang || "").toLowerCase().split(/[-_]/)[0] === primary)
+}
+
+/**
+ * The language to read `text` in: the one asked for, else a South African
+ * language spotted in the text, else null (the device's own language). See
+ * lib/languages.ts guessLanguage.
+ */
+export function readingLanguage(text: string, explicit?: string): string | null {
+  if (explicit) return explicit
+  const guessed = guessLanguage(text)
+  return guessed ? speechLocale(guessed) || null : null
+}
+
+/** Whether this device has a voice for `lang` - so nothing is read in the wrong accent. */
+export async function hasVoiceFor(lang: string): Promise<boolean> {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return false
+  return voicesFor(await getVoicesAsync(), lang).length > 0
+}
+
+/** "No isiZulu voice on this device..." for a speech locale like "zu-ZA". */
+export function noVoiceMessage(lang: string) {
+  return `This device has no ${languageLabel(lang.split("-")[0])} voice, so it isn't read aloud - an English voice would make it sound like gibberish.`
 }
 
 function pickBestVoice(voices: SpeechSynthesisVoice[], lang: string): SpeechSynthesisVoice | undefined {
@@ -98,7 +127,7 @@ const START_TIMEOUT_MS = 2500
 // when cancelled. If other speech on the page (a "Listen" button) cuts it off,
 // `onInterrupted` runs instead. Returns a function that stops it - which only
 // ever stops this reply's own speech, never someone else's.
-export function speakInSentences(text: string, onDone?: () => void, onInterrupted?: () => void): () => void {
+export function speakInSentences(text: string, onDone?: () => void, onInterrupted?: () => void, language?: string): () => void {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) {
     onDone?.()
     return () => {}
@@ -127,10 +156,12 @@ export function speakInSentences(text: string, onDone?: () => void, onInterrupte
 
   getVoicesAsync().then((voices) => {
     if (cancelled) return
-    const lang = typeof navigator !== "undefined" ? navigator.language || "en-US" : "en-US"
-    let voice = pickBestVoice(voices, lang)
+    const lang = language || (typeof navigator !== "undefined" ? navigator.language || "en-US" : "en-US")
+    const pool = language ? voicesFor(voices, language) : voices
+    if (language && pool.length === 0) { finish(); return }
+    let voice = pickBestVoice(pool, lang)
     // Fallback: the best voice that runs on the device itself (no network).
-    const localVoice = pickBestVoice(voices.filter(v => v.localService), lang)
+    const localVoice = pickBestVoice(pool.filter(v => v.localService), lang)
     let usedFallback = !voice || voice === localVoice
 
     const speakChunk = (index: number) => {
@@ -270,11 +301,23 @@ export function useTextToSpeech() {
     window.speechSynthesis.cancel()
 
     const utterance = new SpeechSynthesisUtterance(trimmed)
-    utterance.lang = typeof navigator !== "undefined" ? navigator.language || "en-US" : "en-US"
-
     const voices = await getVoicesAsync()
-    const bestVoice = pickBestVoice(voices, utterance.lang)
-    if (bestVoice) utterance.voice = bestVoice
+    // Text in another language (e.g. a need translated to isiZulu) is only
+    // read with a voice for that language - never an English one.
+    const textLang = readingLanguage(trimmed)
+    if (textLang) {
+      const matching = voicesFor(voices, textLang)
+      if (matching.length === 0) {
+        setError(noVoiceMessage(textLang))
+        return
+      }
+      utterance.lang = textLang
+      utterance.voice = [...matching].sort((a, b) => scoreVoice(b) - scoreVoice(a))[0]
+    } else {
+      utterance.lang = typeof navigator !== "undefined" ? navigator.language || "en-US" : "en-US"
+      const bestVoice = pickBestVoice(voices, utterance.lang)
+      if (bestVoice) utterance.voice = bestVoice
+    }
 
     utterance.onstart = () => setSpeaking(true)
     utterance.onend = () => { ownsSpeechRef.current = false; setSpeaking(false) }

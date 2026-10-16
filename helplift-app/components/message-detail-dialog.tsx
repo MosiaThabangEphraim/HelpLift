@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { MessageComposeDialog } from "@/components/message-compose-dialog"
+import { TranslatableText, TranslateControl } from "@/components/translatable-text"
 import { ReadAloudButton } from "@/components/read-aloud-button"
 import { MessageStatus } from "@/components/message-status"
 
@@ -157,7 +158,7 @@ export function MessageDetailDialog({
                               : "bg-white dark:bg-[#1A2740] text-slate-800 dark:text-slate-100 rounded-bl-md border border-slate-200/70 dark:border-transparent"
                           } ${item.id === message.id ? "ring-2 ring-blue-300 dark:ring-blue-500/60" : ""}`}
                         >
-                          <p className="whitespace-pre-line leading-relaxed text-justify-smart">{item.message}</p>
+                          <TranslatableText text={item.message} className="whitespace-pre-line leading-relaxed text-justify-smart" />
                           <AttachmentLinks attachments={item.attachments} className={`mt-1.5 ${item.mine ? "text-white" : "text-blue-600 dark:text-blue-400"}`} />
                         </div>
                         <p className="flex items-center gap-1 px-1 text-[10px] text-slate-400">
@@ -192,7 +193,7 @@ export function MessageDetailDialog({
                     </blockquote>
                   )}
 
-                  <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-line text-justify-smart">{message.message}</p>
+                  <TranslatableText text={message.message} className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-line text-justify-smart" />
                   <ReadAloudButton text={message.message} label="Listen to this message" iconOnly />
                   {message.attachments && message.attachments.length > 0 ? (
                     <AttachmentLinks attachments={message.attachments} className="text-blue-600" />

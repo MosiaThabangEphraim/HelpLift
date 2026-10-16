@@ -8,7 +8,7 @@ import {
   bucketByMonth, byStatusOrder, countBy, firstOf, inRange, resolveRange, sumBy, topN,
   type AnalyticsRange, type MonthPoint,
 } from "@/lib/analytics"
-import { ChartCard, DateRangeFilter, MonthlyArea, MonthlyLine, RangeFilter, RankedBars, StatTile, StatusPie, VizRoot } from "@/components/analytics/chart-parts"
+import { ChartCard, DateRangeFilter, MonthlyArea, MonthlyLine, RangeFilter, RankedBars, StatusPie, VizRoot } from "@/components/analytics/chart-parts"
 
 type Named = { title?: string; category?: string; organizations?: { name: string }[] | { name: string } | null }
 
@@ -190,15 +190,6 @@ export function GiverAnalytics({ donations, interests, fulfillments, gifts }: Pr
           Your giving analytics will appear here once you donate, offer help or pledge a gift.
         </p>
       )}
-
-      <div className="grid grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-3 xl:grid-cols-6">
-        <StatTile label="Total donated" value={view.funds} prefix="R" decimals={2} note={view.awaitingCount ? `${view.awaitingCount} awaiting verification` : "Confirmed donations"} />
-        <StatTile label="Donations made" value={view.successfulCount} note="Confirmed by an administrator" />
-        <StatTile label="Needs supported" value={view.supportedNeeds} note="Donated to or offered help with" />
-        <StatTile label="Organizations helped" value={view.helpedOrgs} />
-        <StatTile label="Deliveries completed" value={view.completed} note="Support you delivered" />
-        <StatTile label="Gifts pledged" value={view.pledgeCount} note={`${view.approvedPledges} approved`} />
-      </div>
 
       <div className="grid gap-x-10 gap-y-8 lg:grid-cols-2">
         <ChartCard

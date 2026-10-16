@@ -76,8 +76,9 @@ export function FeedbackButton({ className = "" }: { className?: string }) {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Rate HelpLift and send feedback"
+        data-feedback-trigger
         data-tip="Rate HelpLift and tell us how we can improve. It goes straight to our admins."
-        className={`inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${className}`}
+        className={`inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 dark:bg-[#1A2740] text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350] transition-colors ${className}`}
       >
         <Star className="w-4 h-4" />
       </button>
@@ -116,7 +117,7 @@ export function FeedbackButton({ className = "" }: { className?: string }) {
                       onFocus={() => setHovered(value)}
                       onBlur={() => setHovered(0)}
                       onClick={() => setRating(value)}
-                      className="rounded-md p-1 transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                      className="rounded-lg p-1 transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                     >
                       <Star className={`h-8 w-8 ${value <= shown ? "fill-amber-400 text-amber-400" : "text-slate-300 dark:text-slate-600"}`} />
                     </button>

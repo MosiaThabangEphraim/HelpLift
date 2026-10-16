@@ -4,7 +4,6 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react"
 import { fileUrl } from "@/lib/file-links"
 import { useTabTransition } from "@/lib/use-tab-transition"
 import { isPastDate, todayInSA } from "@/lib/expiry"
-import { CountUp } from "@/components/count-up"
 import { stageFormFiles } from "@/lib/stage-uploads"
 import { describeUploadLimit, UPLOAD_LIMITS } from "@/lib/upload-limits"
 import { useRouter } from "next/navigation"
@@ -12,6 +11,7 @@ import Link from "next/link"
 import { showFeedback } from "@/lib/inline-feedback"
 import {
   Building2,
+  ChevronDown,
   CheckCircle2,
   FileText,
   Loader2,
@@ -19,20 +19,16 @@ import {
   Plus,
   UploadCloud,
   XCircle,
-  Sparkles,
   Gift,
   ExternalLink,
-  Flame,
   AlertTriangle,
   PackageCheck,
   ShieldCheck,
   Image as ImageIcon,
-  Quote,
   Pencil,
   Search,
   MessageSquare,
   Eye,
-  Bell,
   ClipboardList,
   Users,
   Clock,
@@ -41,7 +37,6 @@ import {
   Banknote,
   Wallet,
   Mail,
-  Paperclip,
   BarChart3,
   Settings,
   Trash2,
@@ -53,12 +48,15 @@ import {
   RefreshCw,
   Home,
   Newspaper,
+  BookOpen,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { getSessionUser } from "@/lib/session-user"
 import { firstOf } from "@/lib/utils"
 import { useNeedCategories } from "@/lib/use-need-categories"
 import { NeedWriter } from "@/components/need-writer"
+import { NeedSupportFields, needSupportType, supportFieldsProblem, SupportTypeLabel } from "@/components/need-support-type"
+import { FundingProgress, QuantityStillNeeded } from "@/components/need-funding"
 import { DashboardTour } from "@/components/dashboard-tour"
 import { recordSignOut } from "@/components/activity-tracker"
 import { RefreshButton } from "@/components/refresh-button"
@@ -73,6 +71,7 @@ import { formatCurrency } from "@/lib/banking"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -102,7 +101,7 @@ import { MobileFilterSelect } from "@/components/mobile-filter-select"
 import { OrgTimeline } from "@/components/org-timeline"
 import { useDashboardColorScheme } from "@/lib/color-scheme"
 import { DashboardSearch, settingsSearchItems, themeSearchItem, type DashboardSearchItem } from "@/components/dashboard-search"
-import { MobileAttentionGrid, MobileSectionHeading, MobileSectionNav, type MobileAction, type MobileSection } from "@/components/mobile-section-nav"
+import { MobileSectionHeading, MobileSectionNav, type MobileAction, type MobileSection } from "@/components/mobile-section-nav"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -118,11 +117,9 @@ import { MicButton } from "@/components/mic-button"
 import { GrammarCheckButton } from "@/components/grammar-check-button"
 import { appendSpeech } from "@/lib/speech-to-text"
 import { activateOnKey } from "@/lib/keyboard"
-import { ThemeToggle } from "@/components/theme-toggle"
 import { FeedbackButton } from "@/components/feedback-button"
 import { SupportPlatformDialog } from "@/components/support-platform-dialog"
 import { SettingsDialog } from "@/components/settings-dialog"
-import { AnalogClock } from "@/components/analog-clock"
 import { TimeGreeting } from "@/components/time-greeting"
 import { setReturnTo } from "@/lib/window-return"
 import { PasskeyPrompt } from "@/components/passkey-prompt"
@@ -161,6 +158,9 @@ type Need = {
   location: string | null
   quantity: string | null
   target_amount: number | null
+  amount_raised?: number | null
+  quantity_still_needed?: string | null
+  support_type?: string | null
   due_date: string | null
   urgency?: "low" | "medium" | "high" | string
   status: string
@@ -244,6 +244,14 @@ type PlatformDonation = {
 
 export default function OrganizationDashboardPage() {
   const router = useRouter()
+  // Sign out: the button shows a spinner and can't be pressed twice.
+  const [isSigningOut, setIsSigningOut] = useState(false)
+  const signOutWithSpinner = async () => {
+    if (isSigningOut) return
+    setIsSigningOut(true)
+    try { await logout() } finally { setIsSigningOut(false) }
+  }
+
   // The colour scheme chosen in Settings -> User interface (lib/color-scheme.ts).
   useDashboardColorScheme()
   const supabase = createClient()
@@ -305,12 +313,14 @@ export default function OrganizationDashboardPage() {
   const setMessage = (text: string) => showFeedback(text, "success")
   const setError = (text: string) => showFeedback(text, "error")
 
-  // Need Form with Urgency
+  // Need Form with Urgency (shown in the "Post a need" window)
+  const [showCreateNeed, setShowCreateNeed] = useState(false)
   const [form, setForm] = useState({
     title: "",
     description: "",
     category: "",
     location: "",
+    support_type: "",
     quantity: "",
     target_amount: "",
     due_date: "",
@@ -341,9 +351,13 @@ export default function OrganizationDashboardPage() {
   // Edit / Delete Need
   const [editingNeed, setEditingNeed] = useState<Need | null>(null)
   const [editNeedForm, setEditNeedForm] = useState({
-    title: "", description: "", category: "", location: "", quantity: "", target_amount: "", due_date: "", urgency: "medium",
+    title: "", description: "", category: "", location: "", support_type: "goods", quantity: "", target_amount: "", due_date: "", urgency: "medium",
   })
   const [isSavingNeedEdit, setIsSavingNeedEdit] = useState(false)
+  // "Update still needed": what's left of a need, so givers see how much / how many is still needed.
+  const [stillNeededNeed, setStillNeededNeed] = useState<Need | null>(null)
+  const [stillNeededForm, setStillNeededForm] = useState({ quantity_still_needed: "", target_amount: "" })
+  const [isSavingStillNeeded, setIsSavingStillNeeded] = useState(false)
   const [deletingNeedId, setDeletingNeedId] = useState<string | null>(null)
 
   // Fulfillment Verification Modal
@@ -493,14 +507,14 @@ export default function OrganizationDashboardPage() {
       (async () => {
         let needsQuery = supabase
           .from("needs")
-          .select("id, title, description, category, location, quantity, target_amount, due_date, urgency, status, rejection_reason, reopen_reason, created_at")
+          .select("id, title, description, category, location, quantity, target_amount, amount_raised, quantity_still_needed, support_type, due_date, urgency, status, rejection_reason, reopen_reason, created_at")
           .eq("organization_id", org.id)
           .order("created_at", { ascending: false })
         let { data: organizationNeeds, error: needsError } = await needsQuery
         if (needsError && needsError.message?.toLowerCase().includes("urgency")) {
           const fallback: any = await supabase
             .from("needs")
-            .select("id, title, description, category, location, quantity, target_amount, due_date, status, rejection_reason, reopen_reason, created_at")
+            .select("id, title, description, category, location, quantity, target_amount, amount_raised, quantity_still_needed, support_type, due_date, status, rejection_reason, reopen_reason, created_at")
             .eq("organization_id", org.id)
             .order("created_at", { ascending: false })
           organizationNeeds = (fallback.data || []).map((item: any) => ({ ...item, urgency: "medium" }))
@@ -685,6 +699,8 @@ export default function OrganizationDashboardPage() {
   const handleCreateNeed = async (event: FormEvent) => {
     event.preventDefault()
     if (!organization) return
+    const supportProblem = supportFieldsProblem(form)
+    if (supportProblem) { setError(supportProblem); return }
     setIsSaving(true)
     setError("")
     setMessage("")
@@ -694,8 +710,9 @@ export default function OrganizationDashboardPage() {
     formData.set("description", form.description)
     formData.set("category", form.category)
     formData.set("location", form.location)
-    formData.set("quantity", form.quantity)
-    formData.set("target_amount", form.target_amount)
+    formData.set("support_type", form.support_type)
+    formData.set("quantity", form.support_type === "money" ? "" : form.quantity)
+    formData.set("target_amount", form.support_type === "goods" ? "" : form.target_amount)
     formData.set("due_date", form.due_date)
     formData.set("urgency", form.urgency)
     newNeedAttachments.forEach(file => formData.append("attachments", file))
@@ -714,11 +731,14 @@ export default function OrganizationDashboardPage() {
       setError((await response.json()).message || "Need creation failed.")
     } else {
       setMessage("Need saved as a draft with specified urgency level.")
+      setShowCreateNeed(false)
+      changeTab("needs")
       setForm({
         title: "",
         description: "",
         category: "",
         location: "",
+        support_type: "",
         quantity: "",
         target_amount: "",
         due_date: "",
@@ -772,6 +792,7 @@ export default function OrganizationDashboardPage() {
       description: need.description,
       category: need.category,
       location: need.location || "",
+      support_type: needSupportType(need),
       quantity: need.quantity || "",
       target_amount: need.target_amount != null ? String(need.target_amount) : "",
       due_date: need.due_date || "",
@@ -779,9 +800,42 @@ export default function OrganizationDashboardPage() {
     })
   }
 
+  const openStillNeeded = (need: Need) => {
+    setStillNeededNeed(need)
+    setStillNeededForm({
+      quantity_still_needed: need.quantity_still_needed || "",
+      target_amount: need.target_amount != null ? String(need.target_amount) : "",
+    })
+  }
+
+  const saveStillNeeded = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!stillNeededNeed) return
+    setIsSavingStillNeeded(true)
+    setError("")
+    const body: Record<string, unknown> = {}
+    if (stillNeededNeed.quantity) body.quantity_still_needed = stillNeededForm.quantity_still_needed.trim()
+    if (stillNeededNeed.target_amount != null) body.target_amount = stillNeededForm.target_amount ? Number(stillNeededForm.target_amount) : null
+    const response = await fetch(`/api/organization/needs/${stillNeededNeed.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+    if (!response.ok) {
+      setError((await response.json()).message || "Update failed.")
+    } else {
+      setStillNeededNeed(null)
+      showFeedback("Updated - givers now see what's still needed.")
+      await loadData()
+    }
+    setIsSavingStillNeeded(false)
+  }
+
   const saveNeedEdit = async (event: FormEvent) => {
     event.preventDefault()
     if (!editingNeed) return
+    const supportProblem = supportFieldsProblem(editNeedForm)
+    if (supportProblem) { setError(supportProblem); return }
     setIsSavingNeedEdit(true)
     setError("")
     const response = await fetch(`/api/organization/needs/${editingNeed.id}`, {
@@ -790,7 +844,8 @@ export default function OrganizationDashboardPage() {
       body: JSON.stringify({
         ...editNeedForm,
         due_date: editNeedForm.due_date || null,
-        target_amount: editNeedForm.target_amount ? Number(editNeedForm.target_amount) : null,
+        quantity: editNeedForm.support_type === "money" ? "" : editNeedForm.quantity,
+        target_amount: editNeedForm.support_type !== "goods" && editNeedForm.target_amount ? Number(editNeedForm.target_amount) : null,
       }),
     })
     if (!response.ok) {
@@ -935,6 +990,7 @@ export default function OrganizationDashboardPage() {
   }
 
   // Create Impact Story
+  const [showCreateStory, setShowCreateStory] = useState(false)
   const handleCreateStory = async (e: FormEvent) => {
     e.preventDefault()
     if (!storyTitle || !storyContent) return
@@ -957,6 +1013,7 @@ export default function OrganizationDashboardPage() {
       if (!res.ok) throw new Error(data.message || "Failed to publish story.")
 
       setMessage("Impact Story submitted. It will appear on your public profile once an administrator approves it.")
+      setShowCreateStory(false)
       setStoryTitle("")
       setStoryContent("")
       setStoryRole("")
@@ -1271,21 +1328,21 @@ export default function OrganizationDashboardPage() {
   const mobileMoreSections: MobileSection[] = [
     ...(canSeeMoney ? [
       { id: "donations", label: "Donations", icon: Banknote, count: pendingDonations, gradient: "from-amber-500 to-orange-500", hint: "Money received" },
-      { id: "wallet", label: "Wallet", icon: Wallet, gradient: "from-pink-500 to-rose-600", hint: "Balance and withdrawals" },
+      { id: "wallet", label: "Wallet", icon: Wallet, count: pendingWithdrawals, gradient: "from-pink-500 to-rose-600", hint: "Balance and withdrawals" },
     ] : []),
     { id: "timeline", label: "Timeline", icon: Newspaper, gradient: "from-blue-500 to-indigo-600", hint: "Your public updates, events and news" },
-    { id: "stories", label: "Impact Stories", icon: Sparkles, gradient: "from-violet-500 to-purple-600", hint: "Share what your organization achieved" },
+    { id: "stories", label: "Impact Stories", icon: BookOpen, gradient: "from-violet-500 to-purple-600", hint: "Share what your organization achieved" },
     { id: "gifts", label: "Gift Library", icon: Gift, gradient: "from-purple-500 to-fuchsia-600", hint: "Offerings from givers you can claim" },
     { id: "analytics", label: "Analytics", icon: BarChart3, gradient: "from-indigo-500 to-blue-600", hint: "Needs, donations and engagement" },
     { id: "documents", label: "Documents", icon: FileText, gradient: "from-slate-500 to-slate-700", hint: "Verification documents" },
     ...(memberRole === "owner" ? [{ id: "team", label: "Team", icon: Users, gradient: "from-emerald-500 to-green-600", hint: "Invite and manage teammates" }] : []),
   ]
   const mobileActions: MobileAction[] = [
+    ...(roleAtLeast(memberRole, "manager") ? [{ id: "post-need", label: "Post a need", icon: Plus, gradient: "from-emerald-500 to-teal-600", onClick: () => setShowCreateNeed(true), hint: "Create a new need" }] : []),
     { id: "badges", label: "Badges", icon: Star, gradient: "from-amber-400 to-yellow-500", onClick: () => setShowBadges(true), hint: "Your badges and the leaderboard" },
     ...(organization?.id ? [{ id: "profile", label: "Public Profile", icon: ExternalLink, gradient: "from-blue-500 to-cyan-600", onClick: () => window.open(`/organizations/${organization.id}`, "_blank"), hint: "Open your public profile" }] : []),
     { id: "qr", label: "QR Code", icon: QrCode, gradient: "from-slate-600 to-slate-800", onClick: () => setShowQrCode(true), hint: "Share or print a QR code to your profile" },
     { id: "organizations", label: "Organizations", icon: Building2, gradient: "from-sky-500 to-blue-600", onClick: () => router.push("/organizations"), hint: "Browse verified organizations" },
-    { id: "message-admin", label: "Message Admin", icon: MessageSquare, gradient: "from-indigo-500 to-violet-600", onClick: () => setIsMessagingAdmin(true), hint: "Message the HelpLift team" },
     ...(canSeeMoney ? [{ id: "support", label: "Support HelpLift", icon: Heart, gradient: "from-pink-500 to-rose-600", onClick: () => setShowSupportPlatform(true), hint: "Donate to HelpLift itself" }] : []),
   ]
 
@@ -1300,6 +1357,7 @@ export default function OrganizationDashboardPage() {
       hint: section.hint,
       onSelect: () => changeTab(section.id),
     })),
+    { id: "action-message-admin", label: "Message Admin", group: "Actions", icon: MessageSquare, hint: "Messages", keywords: "message admin contact helplift team support help", onSelect: () => { changeTab("messages"); setIsMessagingAdmin(true) } },
     ...mobileActions.map(action => ({
       id: `action-${action.id}`,
       label: action.label,
@@ -1309,8 +1367,8 @@ export default function OrganizationDashboardPage() {
       onSelect: action.onClick,
     })),
     { id: "action-settings", label: "Open Settings", group: "Actions", icon: Settings, keywords: "settings preferences options", onSelect: openOrgSettings },
-    { id: "action-post-need", label: "Post a need", group: "Actions", icon: Plus, keywords: "create new need request post", onSelect: () => changeTab("needs") },
-    { id: "action-post-timeline", label: "Post on your timeline", group: "Actions", icon: Sparkles, keywords: "timeline update event news milestone post share", onSelect: () => changeTab("timeline") },
+    { id: "action-post-need", label: "Post a need", group: "Actions", icon: Plus, keywords: "create new need request post", onSelect: () => setShowCreateNeed(true) },
+    { id: "action-post-timeline", label: "Post on your timeline", group: "Actions", icon: Newspaper, keywords: "timeline update event news milestone post share", onSelect: () => changeTab("timeline") },
     { id: "action-refresh", label: "Refresh the dashboard", group: "Actions", icon: RefreshCw, keywords: "reload refresh update", onSelect: () => { refreshAll() } },
     themeSearchItem,
     { id: "action-home", label: "Go to the homepage", group: "Actions", icon: Home, keywords: "home homepage website", onSelect: () => router.push("/") },
@@ -1329,20 +1387,20 @@ export default function OrganizationDashboardPage() {
     if (level === "high") {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded border border-red-300 dark:border-red-800 bg-red-50/60 dark:bg-red-950/20 text-xs font-semibold text-red-700 dark:text-red-400">
-          <Flame className="w-3 h-3 fill-red-600" /> High
+          High
         </span>
       )
     }
     if (level === "medium") {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded border border-amber-300 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/20 text-xs font-semibold text-amber-700 dark:text-amber-400">
-          <AlertTriangle className="w-3 h-3" /> Medium
+          Medium
         </span>
       )
     }
     return (
       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded border border-slate-200 dark:border-[#233350] text-xs font-semibold text-slate-700 dark:text-slate-300">
-        <PackageCheck className="w-3 h-3" /> Standard
+        Standard
       </span>
     )
   }
@@ -1353,11 +1411,10 @@ export default function OrganizationDashboardPage() {
     <main className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100 max-md:pb-24">
       <div className="mx-auto max-w-[2400px] px-4 md:px-10 py-6 md:py-14 space-y-6">
 
-        {/* Greeting for the time of day, with the clock and date beside it. */}
+        {/* Greeting for the time of day. */}
         <div className="flex flex-wrap items-center justify-end max-md:flex-nowrap max-md:justify-between gap-x-8 max-md:gap-x-3 gap-y-3">
           <DashboardSearch items={searchItems} placeholder="Search sections, actions and settings..." />
           <TimeGreeting name={organization?.name} />
-          <AnalogClock />
         </div>
 
         {/* --- HEADER --- */}
@@ -1370,11 +1427,14 @@ export default function OrganizationDashboardPage() {
                 <Building2 className="h-6 w-6" />
               </div>
             )}
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Organization dashboard</p>
-              <h1 className="text-2xl md:text-3xl font-extrabold leading-tight">{organization?.name}</h1>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-sm text-slate-500 dark:text-slate-400 max-md:truncate max-md:max-w-[45vw]">{organization?.contact_email}</span>
+            {/* Kept simple: name, what kind of account it is, and verification
+                status. The email address lives in Settings. */}
+            <div className="min-w-0">
+              <h1 className="truncate text-2xl md:text-3xl font-extrabold leading-tight">{organization?.name}</h1>
+              <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                <span className="text-sm text-slate-500 dark:text-slate-400">
+                  {organization?.type ? `${organization.type} · ` : ""}Organization
+                </span>
                 <span
                   className={`inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-[11px] font-bold ${
                     organization?.verification_status === "approved"
@@ -1392,68 +1452,75 @@ export default function OrganizationDashboardPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap mobile-toolbar">
-            {organization?.id && (
-              <Link
-                href={`/organizations/${organization.id}`}
-                target="_blank"
-                className="max-md:hidden inline-flex items-center gap-1.5 rounded-sm border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
-              >
-                <span>Public Profile</span>
-                <ExternalLink className="h-3.5 w-3.5 text-slate-400" />
-              </Link>
-            )}
-
-            <button
-              onClick={() => setActiveTab("documents")}
-              data-tip="View and upload your organization's verification documents"
-              className="max-md:hidden inline-flex items-center gap-1.5 rounded-sm border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
-            >
-              <FileText className="h-3.5 w-3.5" /> Documents
-            </button>
-
-            <button
-              onClick={() => setShowQrCode(true)}
-              aria-label="Get your QR code"
-              data-tip="Get a QR code linking to your public profile, to share or print"
-              className="max-md:hidden inline-flex h-9 w-9 items-center justify-center rounded-sm border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740] transition-colors"
-            >
-              <QrCode className="h-4 w-4" />
-            </button>
-
-            <button
-              data-tour="badges"
-              onClick={() => setShowBadges(true)}
-              data-tip="Your organization's badges and progress toward the next one"
-              className="max-md:hidden inline-flex items-center gap-1.5 rounded-sm border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 px-4 py-2 text-sm font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950/70"
-            >
-              <Star className="h-3.5 w-3.5" fill="currentColor" /> Badges
-            </button>
-
-            <Link
-              href="/organizations"
-              className="max-md:hidden inline-flex items-center gap-1.5 rounded-sm border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
-            >
-              Organizations
-            </Link>
-
+            {/* Desktop: the main job first (Post a need; Documents while the
+                organization still needs verifying), More for the extras, then
+                Notifications, Refresh, Home, Settings and Sign out. Phones:
+                Feedback joins the icons, and the extras are under More in the
+                bottom bar. */}
             {roleAtLeast(memberRole, "manager") && (
               <button
-                onClick={() => setShowSupportPlatform(true)}
-                data-tip="Donate directly to HelpLift - not to any organization"
-                className="max-md:hidden inline-flex items-center gap-1.5 rounded-sm border border-pink-200 dark:border-pink-900 bg-pink-50 dark:bg-pink-950/40 px-4 py-2 text-sm font-semibold text-pink-700 dark:text-pink-300 hover:bg-pink-100 dark:hover:bg-pink-950/70"
+                onClick={() => setShowCreateNeed(true)}
+                className="max-md:hidden inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700"
               >
-                <Heart className="h-3.5 w-3.5" /> Support The Platform
+                <Plus className="h-4 w-4" /> Post a need
               </button>
             )}
 
-            <button
-              onClick={() => setIsMessagingAdmin(true)}
-              className="max-md:hidden inline-flex items-center gap-1.5 rounded-sm border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
-            >
-              <MessageSquare className="h-3.5 w-3.5" /> Message Admin
-            </button>
+            {organization?.verification_status !== "approved" && (
+              <button
+                onClick={() => setActiveTab("documents")}
+                data-tip="Upload your verification documents so an administrator can approve your organization"
+                className="max-md:hidden inline-flex items-center gap-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 px-4 py-2 text-sm font-semibold text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-950/70"
+              >
+                <FileText className="h-3.5 w-3.5" /> Documents
+              </button>
+            )}
 
-            <FeedbackButton />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  data-tour="badges"
+                  data-tip="Public Profile, Documents, QR code, Badges, Organizations and feedback"
+                  className="max-md:hidden inline-flex items-center gap-1.5 rounded-lg bg-slate-100 dark:bg-[#1A2740] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350]"
+                >
+                  More <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64 rounded-xl border-0 p-1.5 shadow-xl">
+                {organization?.id && (
+                  <DropdownMenuItem onSelect={() => window.open(`/organizations/${organization.id}`, "_blank")} className="gap-2.5 rounded-lg py-2">
+                    <ExternalLink className="h-4 w-4 text-blue-600" /> Public Profile
+                  </DropdownMenuItem>
+                )}
+                {organization?.verification_status === "approved" && (
+                  <DropdownMenuItem onSelect={() => setActiveTab("documents")} className="gap-2.5 rounded-lg py-2">
+                    <FileText className="h-4 w-4 text-slate-500" /> Documents
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onSelect={() => setShowQrCode(true)} className="gap-2.5 rounded-lg py-2">
+                  <QrCode className="h-4 w-4 text-slate-500" /> QR code
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setShowBadges(true)} className="gap-2.5 rounded-lg py-2">
+                  <Star className="h-4 w-4 text-amber-500" /> Badges
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => router.push("/organizations")} className="gap-2.5 rounded-lg py-2">
+                  <Building2 className="h-4 w-4 text-blue-600" /> Organizations
+                </DropdownMenuItem>
+                {roleAtLeast(memberRole, "manager") && (
+                  <DropdownMenuItem onSelect={() => setShowSupportPlatform(true)} className="gap-2.5 rounded-lg py-2">
+                    <Heart className="h-4 w-4 text-pink-600" /> Support The Platform
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => document.querySelector<HTMLButtonElement>("[data-feedback-trigger]")?.click()} className="gap-2.5 rounded-lg py-2">
+                  <Star className="h-4 w-4 text-slate-500" /> Give feedback
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <FeedbackButton className="md:hidden" />
             <NotificationsWindow
               dataTour="notifications"
               buttonClassName="rounded-sm"
@@ -1471,30 +1538,30 @@ export default function OrganizationDashboardPage() {
             />
 
             <RefreshButton onRefresh={refreshAll} />
-            <ThemeToggle className="h-9 w-9" />
             <Link
               href="/"
               aria-label="Home"
               data-tip="Go to the HelpLift homepage"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 dark:bg-[#1A2740] text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350] transition-colors"
             >
               <Home className="w-4 h-4" />
             </Link>
             <button
               data-tour="settings"
               aria-label="Settings"
+              data-tip="Settings - organization details, security, notifications, accessibility and more"
               onClick={() => setIsSettingsOpen(true)}
-              className="max-md:h-9 max-md:w-9 max-md:justify-center max-md:px-0 inline-flex items-center gap-1.5 rounded-sm border border-slate-200 dark:border-[#233350] bg-white dark:bg-[#121B2E] px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 dark:bg-[#1A2740] text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350]"
             >
-              <Settings className="h-3.5 w-3.5" /> <span className="max-md:hidden">Settings</span>
+              <Settings className="h-4 w-4" />
             </button>
 
             <button
-              onClick={logout}
+              onClick={signOutWithSpinner} disabled={isSigningOut}
               aria-label="Sign out"
-              className="max-md:h-9 max-md:w-9 max-md:justify-center max-md:px-0 inline-flex items-center gap-2 rounded-sm bg-slate-900 dark:bg-slate-100 px-4 py-2 text-sm font-semibold text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white"
+              className="max-md:h-9 max-md:w-9 max-md:justify-center max-md:px-0 inline-flex items-center gap-2 rounded-lg bg-slate-900 dark:bg-slate-100 px-4 py-2 text-sm font-semibold text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white"
             >
-              <LogOut className="h-4 w-4" /> <span className="max-md:hidden">Sign out</span>
+              {isSigningOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />} <span className="max-md:hidden">Sign out</span>
             </button>
           </div>
         </header>
@@ -1519,7 +1586,7 @@ export default function OrganizationDashboardPage() {
             <button
               onClick={handleResubmitForReview}
               disabled={isResubmitting}
-              className="inline-flex items-center gap-2 rounded-sm bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 text-xs font-bold disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 text-xs font-bold disabled:opacity-50"
             >
               {isResubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
               Resubmit for Review
@@ -1536,25 +1603,7 @@ export default function OrganizationDashboardPage() {
           </div>
         )}
 
-        {/* --- STATS ROW: what needs your attention right now, nothing
-             that's just a total (that's what the Analytics tab is for) --- */}
-        <MobileAttentionGrid
-          onSelect={changeTab}
-          items={[
-            { id: "needs", label: "Open needs", value: stats.openNeeds, icon: ClipboardList, tone: "text-emerald-600" },
-            { id: "interests", label: "Pending interests", value: stats.pendingInterests, icon: Users, tone: "text-amber-600" },
-            { id: "fulfillments", label: "Active deliveries", value: stats.activeFulfillments, icon: PackageCheck, tone: "text-purple-600" },
-            ...(canSeeMoney ? [{ id: "wallet", label: "Pending withdrawals", value: pendingWithdrawals, icon: Wallet, tone: "text-pink-600" }] : []),
-            { id: "messages", label: "Unread messages", value: unreadMessages, icon: Mail, tone: "text-blue-600" },
-          ]}
-        />
-        <div className={`max-md:hidden grid grid-cols-2 ${canSeeMoney ? "md:grid-cols-5" : "md:grid-cols-4"} gap-x-6 gap-y-4`}>
-          <StatCard icon={ClipboardList} label="Open Needs" value={stats.openNeeds} accent="emerald" />
-          <StatCard icon={Users} label="Pending Interests" value={stats.pendingInterests} accent="amber" />
-          <StatCard icon={PackageCheck} label="Active Fulfillments" value={stats.activeFulfillments} accent="purple" />
-          {roleAtLeast(memberRole, "manager") && <StatCard icon={Wallet} label="Pending Withdrawals" value={pendingWithdrawals} accent="pink" />}
-          <StatCard icon={Mail} label="Unread Messages" value={unreadMessages} accent="blue" />
-        </div>
+        {/* No stat tiles: a tab shows a small count when something there is pending or new. */}
 
         {/* --- TABS --- */}
         <Tabs value={activeTab} onValueChange={changeTab} className="gap-6 max-md:gap-4">
@@ -1566,10 +1615,10 @@ export default function OrganizationDashboardPage() {
             <TabsTrigger value="interests" data-tour="tab-interests" className="shrink-0 gap-1.5 px-2.5"><Users className="w-4 h-4" />Interests<CountBadge value={stats.pendingInterests} /></TabsTrigger>
             {/* Money is for managers and owners only. */}
             {roleAtLeast(memberRole, "manager") && <TabsTrigger value="donations" data-tour="tab-donations" className="shrink-0 gap-1.5 px-2.5"><Banknote className="w-4 h-4" />Donations<CountBadge value={pendingDonations} /></TabsTrigger>}
-            {roleAtLeast(memberRole, "manager") && <TabsTrigger value="wallet" data-tour="tab-wallet" className="shrink-0 gap-1.5 px-2.5"><Wallet className="w-4 h-4" />Wallet</TabsTrigger>}
+            {roleAtLeast(memberRole, "manager") && <TabsTrigger value="wallet" data-tour="tab-wallet" className="shrink-0 gap-1.5 px-2.5"><Wallet className="w-4 h-4" />Wallet<CountBadge value={pendingWithdrawals} /></TabsTrigger>}
             <TabsTrigger value="messages" data-tour="tab-messages" className="shrink-0 gap-1.5 px-2.5"><Mail className="w-4 h-4" />Messages<CountBadge value={unreadMessages} /></TabsTrigger>
             <TabsTrigger value="timeline" data-tour="tab-timeline" data-tip="Your public timeline: updates, events and news" className="shrink-0 gap-1.5 px-2.5"><Newspaper className="w-4 h-4" />Timeline</TabsTrigger>
-            <TabsTrigger value="stories" data-tour="tab-stories" className="shrink-0 gap-1.5 px-2.5"><Sparkles className="w-4 h-4" />Impact Stories</TabsTrigger>
+            <TabsTrigger value="stories" data-tour="tab-stories" className="shrink-0 gap-1.5 px-2.5"><BookOpen className="w-4 h-4" />Impact Stories</TabsTrigger>
             <TabsTrigger value="gifts" data-tour="tab-gifts" className="shrink-0 gap-1.5 px-2.5"><Gift className="w-4 h-4" />Gift Library</TabsTrigger>
             <TabsTrigger value="analytics" data-tour="tab-analytics" className="shrink-0 gap-1.5 px-2.5"><BarChart3 className="w-4 h-4" />Analytics</TabsTrigger>
             {memberRole === "owner" && <TabsTrigger value="team" data-tour="tab-team" className="shrink-0 gap-1.5 px-2.5"><Users className="w-4 h-4" />Team</TabsTrigger>}
@@ -1584,154 +1633,25 @@ export default function OrganizationDashboardPage() {
           <fieldset disabled={memberRole === "coordinator" && ["needs", "interests", "documents"].includes(activeTab)} className="min-w-0 disabled:opacity-90">
 
           {/* --- NEEDS TAB --- */}
-          <TabsContent value="needs" className={`grid gap-0 lg:grid-cols-[1.1fr_0.9fr] ${tabMotion}`}>
+          <TabsContent value="needs" className={tabMotion}>
             <Card className="border-0 rounded shadow-none">
               <CardHeader>
-                <CardTitle>Create a need</CardTitle>
-                <CardDescription>Needs are saved as drafts and can be published after admin approval.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleCreateNeed} className="space-y-3">
-                  <NeedWriter onDraft={draft => setForm(f => ({ ...f, ...draft }))} />
-                  <input
-                    required
-                    placeholder="Need title (e.g. 50 Winter Jackets for Shelter)"
-                    value={form.title}
-                    onChange={e => setForm({ ...form, title: e.target.value })}
-                    className="field"
-                  />
-                  <div className="flex justify-end mb-1">
-                    <GrammarCheckButton
-                      text={form.description}
-                      onTextChange={text => setForm(f => ({ ...f, description: text }))}
-                    />
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="space-y-1.5">
+                    <CardTitle>Your needs</CardTitle>
+                    <CardDescription>Only needs created by this organization appear here.</CardDescription>
                   </div>
-                  <div className="relative">
-                    <textarea
-                      required
-                      placeholder="Describe what is needed and who will benefit..."
-                      value={form.description}
-                      onChange={e => setForm({ ...form, description: e.target.value })}
-                      className="field min-h-24 pr-11"
-                    />
-                    <MicButton className="top-2 right-2" onText={text => setForm(f => ({ ...f, description: appendSpeech(f.description, text) }))} />
-                  </div>
-
-                  {similarNeeds.length > 0 && (
-                    <div role="status" className="rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-2">
-                      <p className="flex items-center gap-2 text-sm font-bold text-amber-800 dark:text-amber-300">
-                        <AlertTriangle className="w-4 h-4 shrink-0" /> This looks similar to an existing need
-                      </p>
-                      <p className="text-xs text-amber-800/80 dark:text-amber-200/80">
-                        To help beneficiaries, please make sure your need is unique. You can still submit it if it is genuinely different.
-                      </p>
-                      <ul className="space-y-1.5">
-                        {similarNeeds.map(item => (
-                          <li key={item.id} className="rounded-sm bg-white/70 dark:bg-[#121B2E] px-3 py-2 text-xs">
-                            <span className="font-bold text-slate-900 dark:text-slate-100">{item.title}</span>
-                            <span className="block text-slate-500 dark:text-slate-400">
-                              {item.own ? "Your organization" : item.organization_name || "Another organization"} · {item.status.replace("_", " ")}
-                              {item.location ? ` · ${item.location}` : ""} · {item.score}% match
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                  {roleAtLeast(memberRole, "manager") && (
+                    <button
+                      type="button"
+                      data-tour="need-writer"
+                      onClick={() => setShowCreateNeed(true)}
+                      className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700"
+                    >
+                      <Plus className="h-4 w-4" /> Post a need
+                    </button>
                   )}
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <select
-                      required
-                      value={form.category}
-                      onChange={e => setForm({ ...form, category: e.target.value })}
-                      className="field text-slate-500 dark:text-slate-400"
-                    >
-                      <option value="" disabled>Select a category</option>
-                      {needCategories.map(category => (
-                        <option key={category} value={category}>{category}</option>
-                      ))}
-                    </select>
-                    <select
-                      value={form.urgency}
-                      onChange={e => setForm({ ...form, urgency: e.target.value })}
-                      className="field text-slate-500 dark:text-slate-400"
-                    >
-                      <option value="medium">Medium Urgency</option>
-                      <option value="high">High / Critical Urgency</option>
-                      <option value="low">Standard / Low</option>
-                    </select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <input
-                      placeholder="Location (e.g. Pretoria West)"
-                      value={form.location}
-                      onChange={e => setForm({ ...form, location: e.target.value })}
-                      className="field"
-                    />
-                    <input
-                      placeholder="Quantity (e.g. 50 boxes)"
-                      value={form.quantity}
-                      onChange={e => setForm({ ...form, quantity: e.target.value })}
-                      className="field"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 text-[10px] font-mono uppercase tracking-wider text-slate-400">
-                    <label className="pl-1">Target amount (optional)</label>
-                    <label className="pl-1">Due date (optional)</label>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder="Target Amount (Rands)"
-                      value={form.target_amount}
-                      onChange={e => setForm({ ...form, target_amount: e.target.value })}
-                      className="field"
-                    />
-                    <input
-                      type="date"
-                      data-tip="The date by which this need should ideally be fulfilled - it comes off the Needs board after this date"
-                      min={todayInSA()}
-                      value={form.due_date}
-                      onChange={e => setForm({ ...form, due_date: e.target.value })}
-                      className="field text-slate-400 dark:text-slate-500"
-                    />
-                  </div>
-
-                  <label className="flex items-center gap-3 p-3 rounded border border-dashed border-slate-300 dark:border-[#2C3E63] cursor-pointer hover:border-blue-500 transition-colors text-xs font-normal text-slate-500 dark:text-slate-400">
-                    <ImageIcon className="w-4 h-4 text-slate-400 shrink-0" />
-                    <span className="truncate">
-                      {newNeedAttachments.length > 0
-                        ? `${newNeedAttachments.length} file${newNeedAttachments.length === 1 ? "" : "s"} attached`
-                        : "Attach photos or documents (optional)"}
-                    </span>
-                    <input
-                      type="file"
-                      accept="image/*,.pdf,.doc,.docx"
-                      multiple
-                      onChange={e => setNewNeedAttachments(Array.from(e.target.files || []))}
-                      className="sr-only"
-                    />
-                      <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{describeUploadLimit(UPLOAD_LIMITS.needAttachments)}</span>
-                  </label>
-
-                  <button
-                    disabled={isSaving}
-                    className="inline-flex w-full h-10 items-center justify-center gap-2 rounded bg-slate-900 dark:bg-blue-600 px-5 font-medium text-white hover:bg-slate-800 dark:hover:bg-blue-700 disabled:opacity-60"
-                  >
-                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                    Save draft
-                  </button>
-                </form>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 rounded shadow-none">
-              <CardHeader>
-                <CardTitle>Your needs</CardTitle>
-                <CardDescription>Only needs created by this organization appear here.</CardDescription>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 {needs.length > 0 && (
@@ -1777,10 +1697,10 @@ export default function OrganizationDashboardPage() {
                           type="button"
                           onClick={() => setNeedsStatusFilter(value)}
                           data-tip={`Show only ${label.toLowerCase()} needs`}
-                          className={`shrink-0 whitespace-nowrap rounded-sm px-3 py-1 text-xs font-semibold transition-colors ${
+                          className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1 text-xs font-semibold transition-colors bg-slate-100 dark:bg-[#1A2740]${
                             needsStatusFilter === value
                               ? "bg-blue-600 text-white"
-                              : "border border-slate-200 dark:border-[#233350] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                              : " text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#233350]"
                           }`}
                         >
                           {label}
@@ -1808,13 +1728,23 @@ export default function OrganizationDashboardPage() {
                         onClick={() => setSelectedNeed(need)}
                         onKeyDown={activateOnKey}
                         data-tip="View the full details of this need"
-                        className="cursor-pointer rounded border border-slate-200 dark:border-[#233350] bg-slate-50 dark:bg-[#111a2e] p-5 space-y-3 hover:border-blue-300 dark:hover:border-blue-800 transition-colors"
+                        className="cursor-pointer rounded border border-slate-200 dark:border-[#233350] bg-slate-50 dark:bg-[#111a2e] px-5 py-4 space-y-2 hover:border-blue-300 dark:hover:border-blue-800 transition-colors"
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div>
-                            <h3 className="font-semibold text-base">{need.title}</h3>
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <h3 className="font-semibold text-base">{need.title}</h3>
+                              <SupportTypeLabel need={need} />
+                            </div>
                             <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                               {need.category} {need.location ? `· ${need.location}` : ""}
+                              {!isFinished && need.quantity_still_needed ? (
+                                <>
+                                  {" · "}
+                                  <span className="font-bold text-blue-600 dark:text-blue-400">Still needed:</span>{" "}
+                                  <span className="font-semibold text-slate-700 dark:text-slate-200">{need.quantity_still_needed}</span>
+                                </>
+                              ) : null}
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
@@ -1826,9 +1756,12 @@ export default function OrganizationDashboardPage() {
                         </div>
 
                         {!isFinished && (
-                          <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300 line-clamp-2">
+                          <p className="text-justify-smart text-sm leading-snug text-slate-600 dark:text-slate-300 line-clamp-2">
                             {need.description}
                           </p>
+                        )}
+                        {!isFinished && need.target_amount != null && (
+                          <FundingProgress need={need} className="max-w-md" />
                         )}
 
                         {!isFinished && attachments.length > 0 && (
@@ -1838,7 +1771,7 @@ export default function OrganizationDashboardPage() {
                                 {/\.(png|jpe?g|gif|webp)$/i.test(att.file_name || att.url) ? (
                                   <img src={att.url} alt={att.file_name || "Attachment"} className="h-14 w-14 rounded object-cover" />
                                 ) : (
-                                  <span className="flex items-center justify-center h-14 w-14 rounded text-[10px] font-bold text-blue-600 text-center px-1">📄 {att.file_name?.slice(0, 10) || "File"}</span>
+                                  <span className="flex items-center justify-center h-14 w-14 rounded text-[10px] font-bold text-blue-600 text-center px-1">{att.file_name?.slice(0, 10) || "File"}</span>
                                 )}
                               </a>
                             ))}
@@ -1848,7 +1781,7 @@ export default function OrganizationDashboardPage() {
                         <div className="pt-2 flex items-center gap-2 flex-wrap" onClick={e => e.stopPropagation()}>
                           {need.status === "draft" && (
                             <span className="inline-flex items-center gap-1 rounded-sm border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
-                              <ShieldCheck className="w-3 h-3" />
+                              
                               Draft - awaiting administrator approval before public listing
                             </span>
                           )}
@@ -1868,6 +1801,16 @@ export default function OrganizationDashboardPage() {
                               >
                                 <QrCode className="w-3 h-3" /> QR code
                               </button>
+                              {(need.quantity || need.target_amount != null) && (
+                                <button
+                                  type="button"
+                                  onClick={() => openStillNeeded(need)}
+                                  data-tip="Tell givers how much or how many is still needed"
+                                  className="inline-flex items-center gap-1.5 btn-pill btn-pill--neutral"
+                                >
+                                  Update still needed
+                                </button>
+                              )}
                               <button
                                 onClick={() => runAction(`${need.id}:close`, () => updateNeedStatus(need, "closed"))}
                                 disabled={busyAction?.startsWith(`${need.id}:`)}
@@ -1904,7 +1847,7 @@ export default function OrganizationDashboardPage() {
                           )}
                           {need.status === "reopen_pending" && (
                             <span className="inline-flex items-center gap-1 rounded-sm border border-purple-200 bg-purple-50 dark:bg-purple-950/20 px-3 py-1.5 text-xs font-bold text-purple-700 dark:text-purple-400">
-                              <RefreshCw className="w-3 h-3" />
+                              
                               Reopen requested{need.reopen_reason ? `: ${need.reopen_reason}` : " - awaiting administrator approval"}
                             </span>
                           )}
@@ -1920,7 +1863,7 @@ export default function OrganizationDashboardPage() {
                             <button
                               onClick={() => deleteNeed(need.id)}
                               disabled={deletingNeedId === need.id}
-                              className="inline-flex items-center gap-1 rounded border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 px-3 py-1.5 text-xs font-medium hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-50"
+                              className="inline-flex items-center gap-1 rounded-lg text-red-600 dark:text-red-400 px-3 py-1.5 text-xs font-medium hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-50 bg-slate-100 dark:bg-[#1A2740]"
                             >
                               {deletingNeedId === need.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />} Delete
                             </button>
@@ -1968,7 +1911,7 @@ export default function OrganizationDashboardPage() {
                         </p>
                         {item.proof_storage_path && (
                           <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 mt-1">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> Proof verified on file
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Fulfilled
                           </span>
                         )}
                       </div>
@@ -2042,18 +1985,21 @@ export default function OrganizationDashboardPage() {
                           <span>{giver?.name || "Giver"} · {giver?.email}</span>
                         </p>
                         {item.message && <p className="mt-1 text-sm text-slate-600 dark:text-slate-300 italic">"{item.message}"</p>}
+                        {/* Photos as links, not previews - the tile stays compact. */}
                         {item.photos && item.photos.length > 0 && (
-                          <div className="flex gap-1.5 mt-2">
-                            {item.photos.map(photo => (
+                          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                            {item.photos.map((photo, index) => (
                               <a
                                 key={photo.id}
                                 href={photo.url || undefined}
                                 target="_blank"
                                 rel="noreferrer"
+                                onClick={e => e.stopPropagation()}
                                 data-tip="Open this photo full-size in a new tab"
-                                className="block w-12 h-12 rounded overflow-hidden shrink-0"
+                                className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
                               >
-                                {photo.url && <img src={photo.url} alt={photo.file_name || "Attached photo"} className="w-full h-full object-cover" />}
+                                <ImageIcon className="h-3.5 w-3.5" />
+                                {item.photos!.length > 1 ? `Photo ${index + 1}` : "View photo"}
                               </a>
                             ))}
                           </div>
@@ -2270,7 +2216,18 @@ export default function OrganizationDashboardPage() {
                 <CardDescription>Direct messages from HelpLift admins and givers.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <MessageViewToggle value={messageView} onChange={setMessageView} />
+                {/* Message Admin lives here, with the rest of your conversations. */}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <MessageViewToggle value={messageView} onChange={setMessageView} />
+                  <button
+                    type="button"
+                    onClick={() => setIsMessagingAdmin(true)}
+                    data-tip="Send a message to the HelpLift team"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-blue-700"
+                  >
+                    <MessageSquare className="h-3.5 w-3.5" /> Message Admin
+                  </button>
+                </div>
                 {messageView === "inbox" && (messages.length === 0 ? (
                   <EmptyState text="No messages yet." />
                 ) : (
@@ -2286,13 +2243,13 @@ export default function OrganizationDashboardPage() {
                     >
                       <div className="flex items-center justify-between gap-3">
                         <p className="font-bold text-sm">{item.sender_name || "Unknown sender"}</p>
-                        <span className="text-[11px] text-slate-400 shrink-0">{new Date(item.created_at).toLocaleString()}</span>
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 shrink-0">{new Date(item.created_at).toLocaleString()}</span>
                       </div>
                       <p className="text-xs text-slate-500 dark:text-slate-400">{item.title}</p>
                       <p className="mt-1 text-sm text-slate-600 dark:text-slate-300 truncate">{item.message}</p>
                       {item.attachmentUrl && (
                         <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-blue-600">
-                          <Paperclip className="w-3 h-3" /> Attachment
+                          Attachment
                         </span>
                       )}
                     </div>
@@ -2312,115 +2269,22 @@ export default function OrganizationDashboardPage() {
               {organization?.id && <OrgTimeline organizationId={organization.id} organizationName={organization.name || "Your organization"} refreshKey={refreshKey} heading={false} />}
             </div>
           </TabsContent>
-          <TabsContent value="stories" className={`grid gap-6 lg:grid-cols-[0.9fr_1.1fr] ${tabMotion}`}>
+          <TabsContent value="stories" className={tabMotion}>
             <Card className="border-0 rounded shadow-none">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-amber-500" />
-                  Post an Impact Story
-                </CardTitle>
-                <CardDescription>Showcase the real difference community support made to inspire further giving.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleCreateStory} className="space-y-4">
-                  <input
-                    required
-                    placeholder="Story Headline (e.g. 50 Learners Equipped with Winter Boots)"
-                    value={storyTitle}
-                    onChange={e => setStoryTitle(e.target.value)}
-                    className="field"
-                  />
-                  <div className="flex justify-end mb-1">
-                    <GrammarCheckButton text={storyContent} onTextChange={setStoryContent} />
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="space-y-1.5">
+                    <CardTitle>Your Impact Stories ({stories.length})</CardTitle>
+                    <CardDescription>Visible publicly on your organization profile and HelpLift showcase.</CardDescription>
                   </div>
-                  <div className="relative">
-                    <textarea
-                      required
-                      placeholder="Share the story of what was received, how it helped beneficiaries, and thank supporters..."
-                      value={storyContent}
-                      onChange={e => setStoryContent(e.target.value)}
-                      className="field min-h-28 pr-11"
-                    />
-                    <MicButton className="top-2 right-2" onText={text => setStoryContent(c => appendSpeech(c, text))} />
-                  </div>
-                  <input
-                    placeholder="Author Title (e.g. Sarah M., Centre Director)"
-                    value={storyRole}
-                    onChange={e => setStoryRole(e.target.value)}
-                    className="field"
-                  />
-
-                  <label className="flex items-center gap-3 p-3 rounded border border-dashed border-slate-300 dark:border-[#2C3E63] cursor-pointer hover:border-blue-500 transition-colors text-xs font-semibold text-slate-600 dark:text-slate-300">
-                    <ImageIcon className="w-4 h-4 text-blue-600 shrink-0" />
-                    <span className="truncate">
-                      {storyImages.length === 0
-                        ? "Attach story photos (optional, multiple allowed)"
-                        : `${storyImages.length} photo${storyImages.length === 1 ? "" : "s"} selected`}
-                    </span>
-                    <input type="file" accept="image/*" multiple onChange={e => setStoryImages(Array.from(e.target.files || []))} className="sr-only" />
-                    <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{describeUploadLimit(UPLOAD_LIMITS.storyImages)}</span>
-                  </label>
-                  {storyImages.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {storyImages.map((file, index) => (
-                        <span key={`${file.name}-${index}`} className="inline-flex items-center gap-1.5 rounded-sm bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                          {file.name}
-                          <button aria-label="Remove" type="button" onClick={() => setStoryImages(files => files.filter((_, i) => i !== index))} className="text-slate-400 hover:text-red-500">
-                            <X className="w-3 h-3" />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="flex gap-2">
-                    <input
-                      type="url"
-                      placeholder="Video link (optional - YouTube or Vimeo URL)"
-                      value={storyVideoUrlInput}
-                      onChange={e => setStoryVideoUrlInput(e.target.value)}
-                      className="field"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!storyVideoUrlInput.trim()) return
-                        setStoryVideoUrls(urls => [...urls, storyVideoUrlInput.trim()])
-                        setStoryVideoUrlInput("")
-                      }}
-                      className="shrink-0 rounded-sm px-4 text-xs font-bold hover:bg-slate-50 dark:hover:bg-[#1A2740]"
-                    >
-                      Add
-                    </button>
-                  </div>
-                  {storyVideoUrls.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {storyVideoUrls.map((url, index) => (
-                        <span key={`${url}-${index}`} className="inline-flex items-center gap-1.5 rounded-sm bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300 max-w-xs">
-                          <span className="truncate">{url}</span>
-                          <button aria-label="Remove" type="button" onClick={() => setStoryVideoUrls(urls => urls.filter((_, i) => i !== index))} className="text-slate-400 hover:text-red-500 shrink-0">
-                            <X className="w-3 h-3" />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
                   <button
-                    disabled={isPostingStory}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-sm bg-slate-900 px-5 py-3 font-bold text-white hover:bg-slate-800 disabled:opacity-60"
+                    type="button"
+                    onClick={() => setShowCreateStory(true)}
+                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700"
                   >
-                    {isPostingStory ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                    Publish Impact Story
+                    <Plus className="h-4 w-4" /> Post a story
                   </button>
-                </form>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 rounded shadow-none">
-              <CardHeader>
-                <CardTitle>Your Impact Stories ({stories.length})</CardTitle>
-                <CardDescription>Visible publicly on your organization profile and HelpLift showcase.</CardDescription>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4 max-h-[420px] overflow-y-auto pr-1">
@@ -2437,16 +2301,16 @@ export default function OrganizationDashboardPage() {
                           {story.status === "pending" && <span className="text-[10px] font-bold px-2 py-0.5 rounded-sm bg-amber-100 text-amber-700">Awaiting admin approval</span>}
                           {story.status === "rejected" && <span className="text-[10px] font-bold px-2 py-0.5 rounded-sm bg-red-100 text-red-700">Rejected</span>}
                           {story.status === "approved" && <span className="text-[10px] font-bold px-2 py-0.5 rounded-sm bg-emerald-100 text-emerald-700">Published</span>}
-                          {videoCount > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-sm bg-purple-50 text-purple-700">🎥 {videoCount} video{videoCount === 1 ? "" : "s"}</span>}
-                          {photoCount > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-sm bg-blue-50 text-blue-700">🖼 {photoCount} photo{photoCount === 1 ? "" : "s"}</span>}
+                          {videoCount > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-sm bg-purple-50 text-purple-700">{videoCount} video{videoCount === 1 ? "" : "s"}</span>}
+                          {photoCount > 0 && <span className="text-[10px] font-bold px-2 py-0.5 rounded-sm bg-blue-50 text-blue-700">{photoCount} photo{photoCount === 1 ? "" : "s"}</span>}
                         </div>
-                        <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-3 leading-relaxed whitespace-pre-line">{story.content}</p>
+                        <p className="text-justify-smart text-xs text-slate-600 dark:text-slate-300 line-clamp-3 leading-relaxed whitespace-pre-line">{story.content}</p>
                         {story.status === "rejected" && (
                           <p className="text-xs italic text-red-700 dark:text-red-400">
                             An administrator rejected this story{story.rejection_reason ? `: ${story.rejection_reason}` : "."} Edit it and it will be reviewed again.
                           </p>
                         )}
-                        <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-100 dark:border-[#233350]">
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-[#233350]">
                           <span>{story.author_role || "Staff"}</span>
                           <span>{new Date(story.created_at).toLocaleDateString()}</span>
                         </div>
@@ -2460,7 +2324,7 @@ export default function OrganizationDashboardPage() {
                           <button
                             onClick={() => deleteStory(story.id)}
                             disabled={deletingStoryId === story.id}
-                            className="inline-flex items-center gap-1 rounded border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 px-3 py-1.5 text-xs font-medium hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-50"
+                            className="inline-flex items-center gap-1 rounded-lg text-red-600 dark:text-red-400 px-3 py-1.5 text-xs font-medium hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-50 bg-slate-100 dark:bg-[#1A2740]"
                           >
                             {deletingStoryId === story.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />} Delete
                           </button>
@@ -2533,7 +2397,7 @@ export default function OrganizationDashboardPage() {
                             {gift.location && <span className="text-[11px] text-slate-400">{gift.location}</span>}
                           </div>
                           <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100 line-clamp-1">{gift.title}</h4>
-                          <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">{gift.description}</p>
+                          <p className="text-justify-smart text-xs text-slate-600 dark:text-slate-300 line-clamp-2">{gift.description}</p>
                         </div>
                         {gift.my_claim_pending ? (
                           <span className="text-xs font-bold text-amber-600">Your claim is awaiting a decision →</span>
@@ -2695,7 +2559,7 @@ export default function OrganizationDashboardPage() {
                     <input type="file" multiple accept=".pdf,.png,.jpg,.jpeg" onChange={event => setSelectedFiles(Array.from(event.target.files || []))} className="sr-only" />
                     <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{`${UPLOAD_LIMITS.organizationDocument.kinds} - up to ${UPLOAD_LIMITS.organizationDocument.maxMB} MB each`}</span>
                   </label>
-                  <button disabled={isUploading || selectedFiles.length === 0} className="inline-flex w-full items-center justify-center gap-2 rounded-sm bg-slate-900 px-5 py-3 font-bold text-white disabled:opacity-50">
+                  <button disabled={isUploading || selectedFiles.length === 0} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-5 py-3 font-bold text-white disabled:opacity-50">
                     {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
                     {selectedFiles.length > 1 ? `Upload ${selectedFiles.length} documents` : "Upload document"}
                   </button>
@@ -2772,8 +2636,8 @@ export default function OrganizationDashboardPage() {
                   </p>
 
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Description</p>
-                    <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300 whitespace-pre-line">{need.description}</p>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Description</p>
+                    <p className="text-justify-smart text-sm leading-relaxed text-slate-600 dark:text-slate-300 whitespace-pre-line">{need.description}</p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 text-sm">
@@ -2796,17 +2660,19 @@ export default function OrganizationDashboardPage() {
                       </div>
                     )}
                   </div>
+                  <QuantityStillNeeded value={need.quantity_still_needed} className="text-sm" />
+                  <FundingProgress need={need} />
 
                   {attachments.length > 0 && (
                     <div>
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Attachments</p>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Attachments</p>
                       <div className="flex flex-wrap gap-2">
                         {attachments.map(att => (
                           <a key={att.id} href={att.url} target="_blank" rel="noreferrer" className="block">
                             {/\.(png|jpe?g|gif|webp)$/i.test(att.file_name || att.url) ? (
                               <img src={att.url} alt={att.file_name || "Attachment"} className="h-16 w-16 rounded object-cover" />
                             ) : (
-                              <span className="flex items-center justify-center h-16 w-16 rounded text-[10px] font-bold text-blue-600 text-center px-1">📄 {att.file_name?.slice(0, 10) || "File"}</span>
+                              <span className="flex items-center justify-center h-16 w-16 rounded text-[10px] font-bold text-blue-600 text-center px-1">{att.file_name?.slice(0, 10) || "File"}</span>
                             )}
                           </a>
                         ))}
@@ -2860,7 +2726,7 @@ export default function OrganizationDashboardPage() {
                       <Button
                         type="button"
                         variant="outline"
-                        className="text-blue-700 border-blue-200 hover:bg-blue-50 dark:border-blue-900 dark:hover:bg-blue-950/30"
+                        className="text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/30"
                         onClick={() => { const n = need; setSelectedNeed(null); setReopenReason(""); setReopenFiles([]); setReopenDueDate(""); setReopenNeed(n) }}
                       >
                         <RefreshCw className="w-4 h-4" /> Reopen
@@ -2944,7 +2810,7 @@ export default function OrganizationDashboardPage() {
                           onClick={() => setReopenFiles(files => files.filter((_, i) => i !== index))}
                           aria-label={`Remove ${file.name}`}
                           data-tip="Remove this file"
-                          className="text-slate-400 hover:text-red-600 shrink-0 font-bold px-1"
+                          className="text-slate-500 dark:text-slate-400 hover:text-red-600 shrink-0 font-bold px-1"
                         >
                           ✕
                         </button>
@@ -3020,7 +2886,7 @@ export default function OrganizationDashboardPage() {
                   Upload notes, photos, and documents (e.g. delivery receipt, photo with beneficiaries) to verify completion.
                 </p>
               </div>
-              <button aria-label="Close" onClick={() => setVerifyingFulfillment(null)} className="text-slate-400 hover:text-slate-600">
+              <button aria-label="Close" onClick={() => setVerifyingFulfillment(null)} className="text-slate-500 dark:text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -3057,14 +2923,14 @@ export default function OrganizationDashboardPage() {
                 <button
                   type="button"
                   onClick={() => setVerifyingFulfillment(null)}
-                  className="px-4 py-2 rounded-sm text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                  className="px-4 py-2 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1A2740]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingProof}
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-sm bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold disabled:opacity-50"
                 >
                   {isSubmittingProof ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                   <span>Verify & Mark Completed</span>
@@ -3076,6 +2942,295 @@ export default function OrganizationDashboardPage() {
       )}
 
       {/* --- EDIT NEED DIALOG --- */}
+      {/* Post an impact story - opened from "Post a story" in the Impact Stories tab. */}
+      <Dialog open={showCreateStory} onOpenChange={setShowCreateStory}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Post an impact story</DialogTitle>
+            <DialogDescription>Showcase the real difference community support made. Stories go live once an administrator approves them.</DialogDescription>
+          </DialogHeader>
+                    <form onSubmit={handleCreateStory} className="space-y-4">
+                      <input
+                        required
+                        placeholder="Story Headline (e.g. 50 Learners Equipped with Winter Boots)"
+                        value={storyTitle}
+                        onChange={e => setStoryTitle(e.target.value)}
+                        className="field"
+                      />
+                      <div className="flex justify-end mb-1">
+                        <GrammarCheckButton text={storyContent} onTextChange={setStoryContent} />
+                      </div>
+                      <div className="relative">
+                        <textarea
+                          required
+                          placeholder="Share the story of what was received, how it helped beneficiaries, and thank supporters..."
+                          value={storyContent}
+                          onChange={e => setStoryContent(e.target.value)}
+                          className="field min-h-28 pr-11"
+                        />
+                        <MicButton className="top-2 right-2" onText={text => setStoryContent(c => appendSpeech(c, text))} />
+                      </div>
+                      <input
+                        placeholder="Author Title (e.g. Sarah M., Centre Director)"
+                        value={storyRole}
+                        onChange={e => setStoryRole(e.target.value)}
+                        className="field"
+                      />
+
+                      <label className="flex items-center gap-3 p-3 rounded border border-dashed border-slate-300 dark:border-[#2C3E63] cursor-pointer hover:border-blue-500 transition-colors text-xs font-semibold text-slate-600 dark:text-slate-300">
+                        <ImageIcon className="w-4 h-4 text-blue-600 shrink-0" />
+                        <span className="truncate">
+                          {storyImages.length === 0
+                            ? "Attach story photos (optional, multiple allowed)"
+                            : `${storyImages.length} photo${storyImages.length === 1 ? "" : "s"} selected`}
+                        </span>
+                        <input type="file" accept="image/*" multiple onChange={e => setStoryImages(Array.from(e.target.files || []))} className="sr-only" />
+                        <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{describeUploadLimit(UPLOAD_LIMITS.storyImages)}</span>
+                      </label>
+                      {storyImages.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {storyImages.map((file, index) => (
+                            <span key={`${file.name}-${index}`} className="inline-flex items-center gap-1.5 rounded-sm bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                              {file.name}
+                              <button aria-label="Remove" type="button" onClick={() => setStoryImages(files => files.filter((_, i) => i !== index))} className="text-slate-500 dark:text-slate-400 hover:text-red-500">
+                                <X className="w-3 h-3" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="flex gap-2">
+                        <input
+                          type="url"
+                          placeholder="Video link (optional - YouTube or Vimeo URL)"
+                          value={storyVideoUrlInput}
+                          onChange={e => setStoryVideoUrlInput(e.target.value)}
+                          className="field"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!storyVideoUrlInput.trim()) return
+                            setStoryVideoUrls(urls => [...urls, storyVideoUrlInput.trim()])
+                            setStoryVideoUrlInput("")
+                          }}
+                          className="shrink-0 rounded-lg px-4 text-xs font-bold hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                        >
+                          Add
+                        </button>
+                      </div>
+                      {storyVideoUrls.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {storyVideoUrls.map((url, index) => (
+                            <span key={`${url}-${index}`} className="inline-flex items-center gap-1.5 rounded-sm bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300 max-w-xs">
+                              <span className="truncate">{url}</span>
+                              <button aria-label="Remove" type="button" onClick={() => setStoryVideoUrls(urls => urls.filter((_, i) => i !== index))} className="text-slate-500 dark:text-slate-400 hover:text-red-500 shrink-0">
+                                <X className="w-3 h-3" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      <button
+                        disabled={isPostingStory}
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-5 py-3 font-bold text-white hover:bg-slate-800 disabled:opacity-60"
+                      >
+                        {isPostingStory ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        Publish Impact Story
+                      </button>
+                    </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create a need - opened from "Post a need" (header, Needs tab, search, phone menu). */}
+      <Dialog open={showCreateNeed} onOpenChange={setShowCreateNeed}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Post a need</DialogTitle>
+            <DialogDescription>Needs are saved as drafts and published after an administrator approves them.</DialogDescription>
+          </DialogHeader>
+                    <form onSubmit={handleCreateNeed} className="space-y-3">
+                      <NeedWriter onDraft={draft => setForm(f => ({ ...f, ...draft, support_type: f.support_type || (draft.target_amount ? (draft.quantity ? "both" : "money") : "goods") }))} />
+                      <input
+                        required
+                        placeholder="Need title (e.g. 50 Winter Jackets for Shelter)"
+                        value={form.title}
+                        onChange={e => setForm({ ...form, title: e.target.value })}
+                        className="field"
+                      />
+                      <div className="flex justify-end mb-1">
+                        <GrammarCheckButton
+                          text={form.description}
+                          onTextChange={text => setForm(f => ({ ...f, description: text }))}
+                        />
+                      </div>
+                      <div className="relative">
+                        <textarea
+                          required
+                          placeholder="Describe what is needed and who will benefit..."
+                          value={form.description}
+                          onChange={e => setForm({ ...form, description: e.target.value })}
+                          className="field min-h-24 pr-11"
+                        />
+                        <MicButton className="top-2 right-2" onText={text => setForm(f => ({ ...f, description: appendSpeech(f.description, text) }))} />
+                      </div>
+
+                      {similarNeeds.length > 0 && (
+                        <div role="status" className="rounded border border-amber-300 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-2">
+                          <p className="flex items-center gap-2 text-sm font-bold text-amber-800 dark:text-amber-300">
+                            <AlertTriangle className="w-4 h-4 shrink-0" /> This looks similar to an existing need
+                          </p>
+                          <p className="text-xs text-amber-800/80 dark:text-amber-200/80">
+                            To help beneficiaries, please make sure your need is unique. You can still submit it if it is genuinely different.
+                          </p>
+                          <ul className="space-y-1.5">
+                            {similarNeeds.map(item => (
+                              <li key={item.id} className="rounded-sm bg-white/70 dark:bg-[#121B2E] px-3 py-2 text-xs">
+                                <span className="font-bold text-slate-900 dark:text-slate-100">{item.title}</span>
+                                <span className="block text-slate-500 dark:text-slate-400">
+                                  {item.own ? "Your organization" : item.organization_name || "Another organization"} · {item.status.replace("_", " ")}
+                                  {item.location ? ` · ${item.location}` : ""} · {item.score}% match
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <select
+                          required
+                          value={form.category}
+                          onChange={e => setForm({ ...form, category: e.target.value })}
+                          className="field text-slate-500 dark:text-slate-400"
+                        >
+                          <option value="" disabled>Select a category</option>
+                          {needCategories.map(category => (
+                            <option key={category} value={category}>{category}</option>
+                          ))}
+                        </select>
+                        <select
+                          value={form.urgency}
+                          onChange={e => setForm({ ...form, urgency: e.target.value })}
+                          className="field text-slate-500 dark:text-slate-400"
+                        >
+                          <option value="medium">Medium Urgency</option>
+                          <option value="high">High / Critical Urgency</option>
+                          <option value="low">Standard / Low</option>
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <label className="space-y-1">
+                          <span className="pl-1 text-[10px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400">Location (optional)</span>
+                          <input
+                            placeholder="e.g. Pretoria West"
+                            value={form.location}
+                            onChange={e => setForm({ ...form, location: e.target.value })}
+                            className="field"
+                          />
+                        </label>
+                        <label className="space-y-1">
+                          <span className="pl-1 text-[10px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400">Due date (optional)</span>
+                          <input
+                            type="date"
+                            data-tip="The date by which this need should ideally be fulfilled - it comes off the Needs board after this date"
+                            min={todayInSA()}
+                            value={form.due_date}
+                            onChange={e => setForm({ ...form, due_date: e.target.value })}
+                            className="field text-slate-500 dark:text-slate-500"
+                          />
+                        </label>
+                      </div>
+
+                      <NeedSupportFields value={form} onChange={setForm} />
+
+                      <label className="flex items-center gap-3 p-3 rounded border border-dashed border-slate-300 dark:border-[#2C3E63] cursor-pointer hover:border-blue-500 transition-colors text-xs font-normal text-slate-500 dark:text-slate-400">
+                        <ImageIcon className="w-4 h-4 text-slate-500 dark:text-slate-400 shrink-0" />
+                        <span className="truncate">
+                          {newNeedAttachments.length > 0
+                            ? `${newNeedAttachments.length} file${newNeedAttachments.length === 1 ? "" : "s"} attached`
+                            : "Attach photos or documents (optional)"}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*,.pdf,.doc,.docx"
+                          multiple
+                          onChange={e => setNewNeedAttachments(Array.from(e.target.files || []))}
+                          className="sr-only"
+                        />
+                          <span className="block text-[11px] font-normal text-slate-500 dark:text-slate-400">{describeUploadLimit(UPLOAD_LIMITS.needAttachments)}</span>
+                      </label>
+
+                      <button
+                        disabled={isSaving}
+                        className="inline-flex w-full h-10 items-center justify-center gap-2 rounded-lg bg-slate-900 dark:bg-blue-600 px-5 font-medium text-white hover:bg-slate-800 dark:hover:bg-blue-700 disabled:opacity-60"
+                      >
+                        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                        Save draft
+                      </button>
+                    </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!stillNeededNeed} onOpenChange={open => !open && setStillNeededNeed(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Update what&apos;s still needed</DialogTitle>
+            <DialogDescription>
+              {stillNeededNeed?.title}. Givers see this on the need, so they know how much or how many is still needed.
+            </DialogDescription>
+          </DialogHeader>
+          {stillNeededNeed && (
+            <form onSubmit={saveStillNeeded} className="space-y-4">
+              {stillNeededNeed.quantity && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400" htmlFor="still-needed-quantity">
+                    Goods still needed
+                  </label>
+                  <input
+                    id="still-needed-quantity"
+                    placeholder={`e.g. 40 of ${stillNeededNeed.quantity}`}
+                    value={stillNeededForm.quantity_still_needed}
+                    onChange={e => setStillNeededForm({ ...stillNeededForm, quantity_still_needed: e.target.value })}
+                    className="field"
+                  />
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Originally: {stillNeededNeed.quantity}. Leave empty to show only the original quantity.</p>
+                </div>
+              )}
+              {stillNeededNeed.target_amount != null && (
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400" htmlFor="still-needed-target">
+                    Money target (R)
+                  </label>
+                  <FundingProgress need={stillNeededNeed} />
+                  <input
+                    id="still-needed-target"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={stillNeededForm.target_amount}
+                    onChange={e => setStillNeededForm({ ...stillNeededForm, target_amount: e.target.value })}
+                    className="field"
+                  />
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Confirmed donations count automatically. Lower the target if you received money elsewhere; once it&apos;s reached, the need stops accepting donations.
+                  </p>
+                </div>
+              )}
+              <DialogFooter className="gap-2">
+                <Button type="button" variant="outline" onClick={() => setStillNeededNeed(null)}>Cancel</Button>
+                <Button type="submit" disabled={isSavingStillNeeded}>
+                  {isSavingStillNeeded && <Loader2 className="h-4 w-4 animate-spin" />} Save
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!editingNeed} onOpenChange={open => !open && setEditingNeed(null)}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -3121,42 +3276,29 @@ export default function OrganizationDashboardPage() {
                   <option value="low">Standard / Low</option>
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  placeholder="Location"
-                  value={editNeedForm.location}
-                  onChange={e => setEditNeedForm({ ...editNeedForm, location: e.target.value })}
-                  className="field"
-                />
-                <input
-                  placeholder="Quantity"
-                  value={editNeedForm.quantity}
-                  onChange={e => setEditNeedForm({ ...editNeedForm, quantity: e.target.value })}
-                  className="field"
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="space-y-1">
+                  <span className="pl-1 text-[10px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400">Location (optional)</span>
+                  <input
+                    placeholder="e.g. Pretoria West"
+                    value={editNeedForm.location}
+                    onChange={e => setEditNeedForm({ ...editNeedForm, location: e.target.value })}
+                    className="field"
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="pl-1 text-[10px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400">Due date (optional)</span>
+                  <input
+                    type="date"
+                    data-tip="The date by which this need should ideally be fulfilled - it comes off the Needs board after this date"
+                    min={todayInSA()}
+                    value={editNeedForm.due_date}
+                    onChange={e => setEditNeedForm({ ...editNeedForm, due_date: e.target.value })}
+                    className="field text-slate-600 dark:text-slate-300"
+                  />
+                </label>
               </div>
-              <div className="grid grid-cols-2 gap-3 text-[10px] font-mono uppercase tracking-wider text-slate-400">
-                <label className="pl-1">Target amount (optional)</label>
-                <label className="pl-1">Due date (optional)</label>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="Target Amount (Rands)"
-                  value={editNeedForm.target_amount}
-                  onChange={e => setEditNeedForm({ ...editNeedForm, target_amount: e.target.value })}
-                  className="field"
-                />
-                <input
-                  type="date"
-                  data-tip="The date by which this need should ideally be fulfilled - it comes off the Needs board after this date"
-                  min={todayInSA()}
-                  value={editNeedForm.due_date}
-                  onChange={e => setEditNeedForm({ ...editNeedForm, due_date: e.target.value })}
-                  className="field text-slate-600 dark:text-slate-300"
-                />
-              </div>
+              <NeedSupportFields value={editNeedForm} onChange={setEditNeedForm} />
               <DialogFooter className="pt-2 gap-2">
                 <Button type="button" variant="outline" onClick={() => setEditingNeed(null)}>Cancel</Button>
                 <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white" disabled={isSavingNeedEdit}>
@@ -3219,14 +3361,14 @@ export default function OrganizationDashboardPage() {
                           <img src={item.url} alt="" className="h-16 w-16 rounded-sm object-cover" />
                         ) : (
                           <a href={item.url} target="_blank" rel="noreferrer" className="flex h-16 w-16 items-center justify-center rounded-sm text-xl">
-                            🎥
+                            <span className="text-xs font-bold">Video</span>
                           </a>
                         )}
                         <button
                           type="button"
                           onClick={() => deleteStoryMedia(item.id)}
                           disabled={deletingStoryMediaId === item.id}
-                          className="absolute -top-1.5 -right-1.5 rounded-sm bg-red-600 text-white p-1 shadow disabled:opacity-50"
+                          className="absolute -top-1.5 -right-1.5 rounded-lg bg-red-600 text-white p-1 disabled:opacity-50"
                         >
                           {deletingStoryMediaId === item.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
                         </button>
@@ -3262,7 +3404,7 @@ export default function OrganizationDashboardPage() {
                       setEditStoryNewVideoUrls(urls => [...urls, editStoryVideoUrlInput.trim()])
                       setEditStoryVideoUrlInput("")
                     }}
-                    className="shrink-0 rounded-sm px-4 text-xs font-bold hover:bg-slate-50 dark:hover:bg-[#1A2740]"
+                    className="shrink-0 rounded-lg px-4 text-xs font-bold hover:bg-slate-50 dark:hover:bg-[#1A2740]"
                   >
                     Add
                   </button>
@@ -3272,7 +3414,7 @@ export default function OrganizationDashboardPage() {
                     {editStoryNewVideoUrls.map((url, index) => (
                       <span key={`${url}-${index}`} className="inline-flex items-center gap-1.5 rounded-sm bg-slate-100 dark:bg-[#1A2740] px-3 py-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300 max-w-xs">
                         <span className="truncate">{url}</span>
-                        <button aria-label="Remove" type="button" onClick={() => setEditStoryNewVideoUrls(urls => urls.filter((_, i) => i !== index))} className="text-slate-400 hover:text-red-500 shrink-0">
+                        <button aria-label="Remove" type="button" onClick={() => setEditStoryNewVideoUrls(urls => urls.filter((_, i) => i !== index))} className="text-slate-500 dark:text-slate-400 hover:text-red-500 shrink-0">
                           <X className="w-3 h-3" />
                         </button>
                       </span>
@@ -3325,7 +3467,7 @@ export default function OrganizationDashboardPage() {
             <button aria-label="Close"
               type="button"
               onClick={closeOrgDialog}
-              className="rounded-sm p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
+              className="rounded-lg p-1 text-slate-500 dark:text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-[#1A2740]"
             >
               <X className="w-4 h-4" />
             </button>
@@ -3442,7 +3584,7 @@ export default function OrganizationDashboardPage() {
                 </div>
                 <div className="space-y-1 sm:col-span-2 pt-2 border-t border-slate-100 dark:border-[#233350]">
                   <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Banking details</p>
-                  <p className="text-xs text-slate-400 dark:text-slate-500 mb-2">Where donations collected on your behalf are forwarded to you.</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-500 mb-2">Where donations collected on your behalf are forwarded to you.</p>
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="edit-org-bank-name">Bank name</Label>
@@ -3583,12 +3725,12 @@ export default function OrganizationDashboardPage() {
                   <p className="text-sm font-semibold">{new Date(selectedInterest.created_at).toLocaleString()}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Message</p>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Message</p>
                   <p className="text-sm text-slate-600 dark:text-slate-300">{selectedInterest.message ? `"${selectedInterest.message}"` : "No message was included."}</p>
                 </div>
                 {selectedInterest.photos && selectedInterest.photos.length > 0 && (
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
                       Attachments ({selectedInterest.photos.length})
                     </p>
                     <div className="grid grid-cols-3 gap-2">
@@ -3667,7 +3809,7 @@ export default function OrganizationDashboardPage() {
                 {display.description && <p className="text-sm text-slate-600 dark:text-slate-300">{display.description}</p>}
                 <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
                   {!display.isGift && display.tag && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded">{display.tag}</span>}
-                  {display.location && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded">📍 {display.location}</span>}
+                  {display.location && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded">{display.location}</span>}
                   {display.quantity && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded">Qty: {display.quantity}</span>}
                   {display.dueDate && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded">Due {display.dueDate}</span>}
                   {display.conditions && <span className="bg-slate-100 dark:bg-[#1A2740] px-2.5 py-1 rounded">Terms: {display.conditions}</span>}
@@ -3708,7 +3850,7 @@ export default function OrganizationDashboardPage() {
                 )}
                 {(proofGallery.length > 0 || selectedFulfillment.proof_storage_path) && (
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Delivery proof</p>
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Delivery proof</p>
                     {isLoadingProof ? (
                       <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
                     ) : proofGallery.length > 0 ? (
@@ -3716,7 +3858,7 @@ export default function OrganizationDashboardPage() {
                         {proofGallery.map((item) => (
                           <a key={item.id} href={item.signedUrl || undefined} target="_blank" rel="noreferrer" className="block">
                             {item.signedUrl && /\.pdf($|\?)/i.test(item.signedUrl) ? (
-                              <span className="flex items-center justify-center h-24 rounded-sm text-xs font-bold text-blue-600 hover:underline">📄 {item.fileName || "View file"}</span>
+                              <span className="flex items-center justify-center h-24 rounded-sm text-xs font-bold text-blue-600 hover:underline">{item.fileName || "View file"}</span>
                             ) : item.signedUrl ? (
                               <img src={item.signedUrl} alt={item.fileName || "Delivery proof"} className="rounded-sm h-24 w-full object-cover" />
                             ) : null}
@@ -3842,30 +3984,6 @@ export default function OrganizationDashboardPage() {
         </AlertDialogContent>
       </AlertDialog>
     </main>
-  )
-}
-
-function StatCard({ icon: Icon, label, value, accent }: { icon: React.ComponentType<{ className?: string }>; label: string; value: number; accent: "blue" | "emerald" | "amber" | "purple" | "pink" }) {
-  const accentClasses = {
-    blue: "text-blue-600 dark:text-blue-400",
-    emerald: "text-emerald-600 dark:text-emerald-400",
-    amber: "text-amber-600 dark:text-amber-400",
-    purple: "text-purple-600 dark:text-purple-400",
-    pink: "text-pink-600 dark:text-pink-400",
-  }[accent]
-
-  // Same flat design as the admin dashboard's tiles: no box or fill, just a rule above and below.
-  return (
-    <div data-stat-card className="flex items-center gap-3 max-md:gap-2 border-y border-slate-200 dark:border-[#233350] py-3 max-md:py-2">
-      {/* Animated icon (pop in, then a gentle float; wiggles on hover) - see .stat-icon in globals.css. */}
-      <span className="stat-icon inline-flex shrink-0"><Icon className={`h-5 w-5 max-md:h-4 max-md:w-4 shrink-0 ${accentClasses}`} /></span>
-      <div>
-        <p className="text-2xl max-md:text-xl font-extrabold leading-none">
-          <CountUp value={value} />
-        </p>
-        <p className="text-xs max-md:text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1 max-md:leading-tight">{label}</p>
-      </div>
-    </div>
   )
 }
 

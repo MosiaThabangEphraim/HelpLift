@@ -137,19 +137,9 @@ export function OrganizationWallet({ memberRole, refreshKey = 0 }: { memberRole:
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="rounded border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/30 p-4">
-          <p className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 flex items-center gap-1.5"><Wallet className="w-3.5 h-3.5" /> Available balance</p>
-          <p className="mt-1 text-2xl font-black text-slate-900 dark:text-slate-100">{formatCurrency(summary.availableBalance)}</p>
-        </div>
-        <div className="rounded border border-slate-200 dark:border-[#233350] p-4">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Received to date</p>
-          <p className="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100">{formatCurrency(summary.totalReceived)}</p>
-        </div>
-        <div className="rounded border border-slate-200 dark:border-[#233350] p-4">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Paid out to date</p>
-          <p className="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100">{formatCurrency(summary.totalPaidOut)}</p>
-        </div>
+      <div className="rounded border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/30 p-4 sm:max-w-sm">
+        <p className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 flex items-center gap-1.5"><Wallet className="w-3.5 h-3.5" /> Available balance</p>
+        <p className="mt-1 text-2xl font-black text-slate-900 dark:text-slate-100">{formatCurrency(summary.availableBalance)}</p>
       </div>
 
       {!organization_approved && (
@@ -207,7 +197,7 @@ export function OrganizationWallet({ memberRole, refreshKey = 0 }: { memberRole:
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-bold text-base">{formatCurrency(Number(w.amount))}</span>
                   <span className={`inline-flex items-center gap-1.5 rounded px-3 py-1 text-xs font-bold ${STATUS_CLASSES[w.status]}`}>
-                    <Icon className="w-3.5 h-3.5" /> {STATUS_LABEL[w.status]}
+                    {STATUS_LABEL[w.status]}
                   </span>
                 </div>
                 <p className="text-xs text-slate-400">Requested {new Date(w.created_at).toLocaleDateString()}</p>
@@ -229,7 +219,7 @@ export function OrganizationWallet({ memberRole, refreshKey = 0 }: { memberRole:
                     size="sm"
                     disabled={cancellingId === w.id}
                     onClick={() => cancelWithdrawal(w.id)}
-                    className="text-red-600 border-red-200 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/30"
+                    className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
                   >
                     {cancellingId === w.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                     Cancel request

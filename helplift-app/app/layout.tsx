@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { ThemeProvider } from "@/components/theme-provider"
+import { SignedOutLightTheme } from "@/components/signed-out-light-theme"
 import PublicShell from "@/components/public-shell"
 import { Toaster } from "@/components/ui/sonner"
 import { SiteTooltips } from "@/components/site-tooltips"
@@ -64,11 +65,14 @@ export default function RootLayout({
       <body className={`${geist.variable} ${geistMono.variable} font-sans antialiased`} suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem={true}
+          defaultTheme="light"
+          enableSystem={false}
           disableTransitionOnChange
           themes={["light", "dark", "high-contrast", "grayscale"]}
         >
+          {/* Visitors who aren't signed in always get light mode; a member's
+              own choice (Settings -> User interface) comes back when they sign in. */}
+          <SignedOutLightTheme />
           {/* First tab-stop on every page: lets someone navigating by keyboard
               jump straight past the repeated header/nav, instead of tabbing
               through it fresh on every single page. Invisible until it

@@ -194,7 +194,7 @@ export function GuestSupportPlatformDialog({ open, onOpenChange, onDone }: Guest
               </p>
               <p className="text-xs text-pink-700 dark:text-pink-400">
                 You don't need an account to support us. Just leave your name and email below for your receipt,
-                and you're set. Thank you for believing in what we're doing. 💙
+                and you're set. Thank you for believing in what we're doing.
               </p>
             </div>
 
