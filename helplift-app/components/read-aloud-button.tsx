@@ -24,10 +24,13 @@ export function ReadAloudButton({
   label = "Listen",
   className = "",
   iconOnly = false,
+  language,
 }: {
   text: string
   label?: string
   className?: string
+  /** Explicit speech locale when the text's language is already known. */
+  language?: string
   /** Just the speaker icon, no text and a much smaller hit area - for tight spots (e.g. one per message in a long conversation) where the full pill takes up too much room. The label still drives its aria-label/tooltip. */
   iconOnly?: boolean
 }) {
@@ -39,7 +42,7 @@ export function ReadAloudButton({
   const toggle = () => {
     if (speaking) return stop()
     logClientAction("Used Read aloud", label)
-    speak(text)
+    speak(text, language)
   }
 
   if (!supported || !text.trim()) return null
@@ -60,6 +63,7 @@ export function ReadAloudButton({
         >
           {speaking ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
         </button>
+        {error && <span role="status" className="ml-1 max-w-48 text-[11px] text-red-500">{error}</span>}
       </span>
     )
   }
@@ -80,7 +84,7 @@ export function ReadAloudButton({
         {speaking ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
         <span>{speaking ? "Stop" : label}</span>
       </button>
-      {error && <span className="text-[11px] text-red-500">{error}</span>}
+      {error && <span role="status" className="text-[11px] text-red-500">{error}</span>}
     </span>
   )
 }

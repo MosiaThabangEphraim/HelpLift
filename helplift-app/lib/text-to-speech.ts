@@ -98,14 +98,17 @@ function getVoicesAsync(): Promise<SpeechSynthesisVoice[]> {
       return
     }
     const handler = () => {
+      const voices = window.speechSynthesis.getVoices()
+      if (voices.length === 0) return
       window.speechSynthesis.removeEventListener("voiceschanged", handler)
-      resolve(window.speechSynthesis.getVoices())
+      window.clearTimeout(timeout)
+      resolve(voices)
     }
-    window.speechSynthesis.addEventListener("voiceschanged", handler)
-    setTimeout(() => {
+    const timeout = window.setTimeout(() => {
       window.speechSynthesis.removeEventListener("voiceschanged", handler)
       resolve(window.speechSynthesis.getVoices())
-    }, 300)
+    }, 2000)
+    window.speechSynthesis.addEventListener("voiceschanged", handler)
   })
 }
 
@@ -273,6 +276,7 @@ export function useTextToSpeech() {
   const [speaking, setSpeaking] = useState(false)
   const [error, setError] = useState("")
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
+  const requestIdRef = useRef(0)
   // True only while THIS button's own speech is playing. There's one speech
   // engine for the whole page, so a button must never cancel speech it didn't
   // start - e.g. Lifty's reply when a homepage story (and its Listen button)
@@ -280,13 +284,16 @@ export function useTextToSpeech() {
   const ownsSpeechRef = useRef(false)
 
   const stop = useCallback(() => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return
-    if (ownsSpeechRef.current) window.speechSynthesis.cancel()
+    requestIdRef.current++
+    if (typeof window !== "undefined" && "speechSynthesis" in window && ownsSpeechRef.current) {
+      window.speechSynthesis.cancel()
+    }
     ownsSpeechRef.current = false
     setSpeaking(false)
   }, [])
 
-  const speak = useCallback(async (text: string) => {
+  const speak = useCallback(async (text: string, language?: string) => {
+    const requestId = ++requestIdRef.current
     setError("")
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
       setError("Reading aloud isn't supported in this browser.")
@@ -299,16 +306,21 @@ export function useTextToSpeech() {
     // simpler than a queue, and matches the button always showing exactly
     // one "Listen"/"Stop" toggle for its own piece of text.
     window.speechSynthesis.cancel()
+    ownsSpeechRef.current = true
+    setSpeaking(true)
 
     const utterance = new SpeechSynthesisUtterance(trimmed)
     const voices = await getVoicesAsync()
+    if (requestId !== requestIdRef.current) return
     // Text in another language (e.g. a need translated to isiZulu) is only
     // read with a voice for that language - never an English one.
-    const textLang = readingLanguage(trimmed)
+    const textLang = readingLanguage(trimmed, language)
     if (textLang) {
       const matching = voicesFor(voices, textLang)
       if (matching.length === 0) {
         setError(noVoiceMessage(textLang))
+        ownsSpeechRef.current = false
+        setSpeaking(false)
         return
       }
       utterance.lang = textLang
@@ -319,9 +331,16 @@ export function useTextToSpeech() {
       if (bestVoice) utterance.voice = bestVoice
     }
 
-    utterance.onstart = () => setSpeaking(true)
-    utterance.onend = () => { ownsSpeechRef.current = false; setSpeaking(false) }
+    utterance.onstart = () => {
+      if (requestId === requestIdRef.current) setSpeaking(true)
+    }
+    utterance.onend = () => {
+      if (requestId !== requestIdRef.current) return
+      ownsSpeechRef.current = false
+      setSpeaking(false)
+    }
     utterance.onerror = (event) => {
+      if (requestId !== requestIdRef.current) return
       ownsSpeechRef.current = false
       // "interrupted"/"canceled" fire when stop() or a newer speak() call
       // cuts this utterance off deliberately - not a real error.
@@ -338,6 +357,7 @@ export function useTextToSpeech() {
   // Stop speaking if the component unmounts (dialog closed, navigated away)
   // mid-utterance - but only this button's own speech.
   useEffect(() => () => {
+    requestIdRef.current++
     if (ownsSpeechRef.current && typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel()
   }, [])
 

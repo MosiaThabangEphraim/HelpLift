@@ -536,7 +536,12 @@ export function HelpLiftAssistant() {
                   {msg.role === "assistant" && !msg.isError ? withSiteLinks(msg.text) : msg.text}
                   {msg.role === "assistant" && !msg.isError && canSpeak && (
                     <div className="mt-1.5 -mb-1 flex justify-end">
-                      <ReadAloudButton text={toSpeakable(msg.text)} label="Listen to this reply" iconOnly />
+                      <ReadAloudButton
+                        text={toSpeakable(msg.text)}
+                        label="Listen to this reply"
+                        language={replyLanguage === "auto" ? undefined : speechLocale(replyLanguage)}
+                        iconOnly
+                      />
                     </div>
                   )}
                 </div>

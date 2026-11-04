@@ -38,6 +38,7 @@ export function useSpeechToText(
   const [listening, setListening] = useState(false)
   const [error, setError] = useState("")
   const recognitionRef = useRef<any>(null)
+  const cancelRecognitionRef = useRef<(() => void) | null>(null)
   const onFinalTextRef = useRef(onFinalText)
   onFinalTextRef.current = onFinalText
   const onEndRef = useRef(options.onEnd)
@@ -51,7 +52,13 @@ export function useSpeechToText(
   const continuous = options.continuous ?? true
 
   const stop = useCallback(() => {
-    recognitionRef.current?.stop()
+    const recognition = recognitionRef.current
+    if (!recognition) return
+    cancelRecognitionRef.current?.()
+    cancelRecognitionRef.current = null
+    recognitionRef.current = null
+    setListening(false)
+    try { recognition.abort() } catch {}
   }, [])
 
   const start = useCallback(() => {
@@ -63,6 +70,7 @@ export function useSpeechToText(
     }
     const recognition = new Ctor()
     let heardSpeech = false
+    let cancelled = false
     const deviceLang = typeof navigator !== "undefined" ? navigator.language || "en-US" : "en-US"
     const wanted = langRef.current
     const usingWanted = !!wanted && !unsupportedLocales.has(wanted)
@@ -71,6 +79,7 @@ export function useSpeechToText(
     recognition.continuous = continuous
     recognition.interimResults = false
     recognition.onresult = (event: any) => {
+      if (cancelled) return
       let text = ""
       for (let i = event.resultIndex; i < event.results.length; i++) {
         if (event.results[i].isFinal) text += event.results[i][0].transcript
@@ -81,6 +90,7 @@ export function useSpeechToText(
       }
     }
     recognition.onerror = (event: any) => {
+      if (cancelled) return
       if (event.error === "no-speech" || event.error === "aborted") return
       // The browser can't listen in the chosen language: switch to the
       // device's language and start again, instead of failing.
@@ -98,23 +108,35 @@ export function useSpeechToText(
       setListening(false)
     }
     recognition.onend = () => {
-      setListening(false)
+      if (recognitionRef.current === recognition) {
+        recognitionRef.current = null
+        cancelRecognitionRef.current = null
+        setListening(false)
+      }
+      if (cancelled) return
       if (fallBack) { retryRef.current(); return }
       onEndRef.current?.(heardSpeech)
     }
     recognitionRef.current = recognition
+    cancelRecognitionRef.current = () => { cancelled = true }
     try {
       recognition.start()
       setListening(true)
     } catch {
-      // start() throws if a recognition session is already running (e.g. a fast double-click); ignore.
+      if (recognitionRef.current === recognition) {
+        recognitionRef.current = null
+        cancelRecognitionRef.current = null
+      }
     }
   }, [continuous])
 
   retryRef.current = start
 
   // Stop listening if the component unmounts (dialog closed, navigated away) mid-session.
-  useEffect(() => () => { recognitionRef.current?.stop() }, [])
+  useEffect(() => () => {
+    cancelRecognitionRef.current?.()
+    try { recognitionRef.current?.abort() } catch {}
+  }, [])
 
   return { listening, error, notice, start, stop }
 }

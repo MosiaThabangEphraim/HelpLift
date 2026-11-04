@@ -535,6 +535,7 @@ async function callGemini(model: string, apiKey: string, systemPrompt: string, c
   const response = await geminiFetch(model, apiKey, {
     systemInstruction: { parts: [{ text: systemPrompt }] },
     contents,
+    generationConfig: { maxOutputTokens: 512 },
     // Tools stay declared even on the last round (the history already holds
     // function calls); "NONE" just forces a written answer from what it has.
     tools: [{ functionDeclarations: ASSISTANT_TOOL_DECLARATIONS }],
