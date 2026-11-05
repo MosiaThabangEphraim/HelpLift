@@ -287,6 +287,7 @@ const chapters: Chapter[] = [
     blocks: [
       { p: "Lifty is HelpLift's AI assistant. Select the chat button in the corner of any page to open it. Ask how anything on HelpLift works, or ask about open needs, organizations, gift offerings and impact stories." },
       { list: [
+        "Use the language button at the top of the chat to choose the language Lifty replies in. English is selected by default. This also sets the voice input and spoken replies where your browser supports that language.",
         "Type a question, or select the microphone to speak it.",
         "Select the speaker button on a reply to hear it read aloud.",
         "Select the headphones to start a hands-free voice chat. Lifty listens, answers out loud, then listens again.",

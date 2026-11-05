@@ -11,6 +11,7 @@ import { isAssistantEnabled, onAssistantPreferenceChange, setAssistantEnabled } 
 import { isSpeechToTextSupported, useSpeechToText } from "@/lib/speech-to-text"
 import { hasVoiceFor, isTextToSpeechSupported, noVoiceMessage, primeSpeechSynthesis, readingLanguage, speakInSentences } from "@/lib/text-to-speech"
 import { ReadAloudButton } from "@/components/read-aloud-button"
+import { MicrophoneLevelIndicator } from "@/components/microphone-level-indicator"
 import { isWakeWordEnabled, onWakeWordPreferenceChange, useWakeWord } from "@/lib/wake-word"
 import { logClientAction } from "@/components/activity-tracker"
 import { TRANSLATE_LANGUAGES, languageLabel, speechLocale } from "@/lib/languages"
@@ -19,7 +20,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
@@ -150,21 +150,20 @@ export function HelpLiftAssistant() {
   // all) before the voice chat ends.
   const silentTurnsRef = useRef(0)
   const MAX_SILENT_TURNS = 3
-  // The language Lifty replies in, chosen in its window: "auto" matches the
-  // user's own language. Remembered on this device.
-  const [replyLanguage, setReplyLanguage] = useState("auto")
+  // The language Lifty replies in, chosen in its window. Remembered on this device.
+  const [replyLanguage, setReplyLanguage] = useState("en")
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem("helplift:lifty-language")
-      if (saved && (saved === "auto" || TRANSLATE_LANGUAGES.some(option => option.code === saved))) setReplyLanguage(saved)
+      if (saved && TRANSLATE_LANGUAGES.some(option => option.code === saved)) setReplyLanguage(saved)
     } catch {}
   }, [])
   const changeReplyLanguage = (code: string) => {
     setReplyLanguage(code)
     try { window.localStorage.setItem("helplift:lifty-language", code) } catch {}
-    logClientAction("Changed Lifty's language", code === "auto" ? "Same as the user writes" : languageLabel(code))
+    logClientAction("Changed Lifty's language", languageLabel(code))
   }
-  const replySpeechLang = replyLanguage === "auto" ? undefined : speechLocale(replyLanguage)
+  const replySpeechLang = speechLocale(replyLanguage)
 
   const speech = useSpeechToText(text => sendMessageRef.current(text), {
     continuous: false, // one spoken message, sent when the person pauses
@@ -221,7 +220,7 @@ export function HelpLiftAssistant() {
         setIsSpeaking(false)
         if (conversationRef.current) endConversation("Voice chat ended because something else on the page started reading aloud. Tap the headphones to talk again.")
       },
-      readingLanguage(text, replySpeechLang) || undefined
+      replySpeechLang
     )
   }
 
@@ -464,7 +463,7 @@ export function HelpLiftAssistant() {
               <div>
                 <h4 className="font-bold text-sm leading-tight">Lifty</h4>
                 <p className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
-                  {replyLanguage === "auto" ? "Online & Ready" : `Replying in ${languageLabel(replyLanguage)}`}
+                  {`Replying in ${languageLabel(replyLanguage)}`}
                 </p>
               </div>
             </div>
@@ -482,11 +481,6 @@ export function HelpLiftAssistant() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="z-[300] max-h-72 w-52 overflow-y-auto rounded border-0 p-1 shadow-xl">
                   <DropdownMenuLabel className="text-[11px] uppercase tracking-wider text-slate-500">Lifty replies in</DropdownMenuLabel>
-                  <DropdownMenuItem onSelect={() => changeReplyLanguage("auto")} className="justify-between gap-2">
-                    <span>Same as you write</span>
-                    {replyLanguage === "auto" && <Check className="h-4 w-4 text-blue-600" />}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
                   {TRANSLATE_LANGUAGES.map(option => (
                     <DropdownMenuItem key={option.code} onSelect={() => changeReplyLanguage(option.code)} className="justify-between gap-2">
                       <span>{option.label}</span>
@@ -554,7 +548,7 @@ export function HelpLiftAssistant() {
                       <ReadAloudButton
                         text={toSpeakable(msg.text)}
                         label="Listen to this reply"
-                        language={replyLanguage === "auto" ? undefined : speechLocale(replyLanguage)}
+                        language={replySpeechLang}
                         iconOnly
                       />
                     </div>
@@ -584,10 +578,7 @@ export function HelpLiftAssistant() {
               <div className="flex items-center gap-2 min-w-0 text-xs font-semibold text-blue-700 dark:text-blue-300">
                 {speech.listening ? (
                   <>
-                    <span className="relative flex h-2.5 w-2.5 shrink-0">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
-                    </span>
+                    <MicrophoneLevelIndicator active />
                     Listening... speak now
                   </>
                 ) : isTyping ? (
@@ -633,6 +624,7 @@ export function HelpLiftAssistant() {
               aria-label="Message Lifty"
               className="flex-1 min-w-0 px-4 py-3 bg-slate-100 dark:bg-slate-800 border-0 rounded focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm text-slate-800 dark:text-slate-200"
             />
+            {speech.listening && !conversation && <MicrophoneLevelIndicator active />}
             {canListen && !conversation && (
               <button
                 type="button"

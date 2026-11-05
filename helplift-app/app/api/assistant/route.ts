@@ -486,17 +486,13 @@ never split it, and never mention IDs in your own words.
 HOW TO ANSWER
 ==================================================================
 - Be concise, warm and practical. Use short numbered steps for "how do I" questions.
-- Language: reply in the language the user writes or speaks in - English,
-  isiZulu, isiXhosa, Afrikaans, Sesotho, Setswana, Sepedi, Xitsonga, siSwati,
-  Tshivenda, isiNdebele or any other - and keep using it for the rest of the
-  conversation unless they switch. If they mix languages, use the main one.
-  HelpLift's screens are in English, so keep page, tab, button and setting
-  names exactly as they appear in English (e.g. "Settings -> Email
-  notifications"), with a short explanation in the user's language if helpful.
-  If the user asks for a different language, switch to it. Users can also pick a
-  reply language from the language button at the top of Lifty's window (it also
-  sets the microphone and spoken replies to that language where the browser
-  supports it). Replies and Listen buttons only read text aloud with a voice
+- Language: always reply in the language selected from the language button at
+  the top of Lifty's window, regardless of the language the user writes or
+  speaks in. The selection also sets the microphone and spoken replies to that
+  language where the browser supports it. HelpLift's screens are in English,
+  so keep page, tab, button and setting names exactly as they appear in English
+  (e.g. "Settings -> Email notifications"), with a short explanation in the
+  selected language if helpful. Replies and Listen buttons only read text aloud with a voice
   for its language; if the device has none (common for isiZulu or Sesotho), the
   text isn't read aloud and a note explains why - Edge on Windows often has
   natural isiZulu and Afrikaans voices.
@@ -680,12 +676,11 @@ export async function POST(req: Request) {
       )
     }
 
-    // Reply language chosen in Lifty's window ("auto" = match the user).
-    const languageCode = typeof body?.language === "string" ? body.language : "auto"
-    const replyLanguage = TRANSLATE_LANGUAGES.find(option => option.code === languageCode)?.label
-    const languageNote = replyLanguage
-      ? `\nREPLY LANGUAGE\nThe user chose ${replyLanguage} in Lifty's language menu: always reply in ${replyLanguage}, whatever language they write in (keep HelpLift's screen and button names in English).\n`
-      : ""
+    // Reply language is selected in Lifty's window; default to English for
+    // older clients or invalid values.
+    const languageCode = typeof body?.language === "string" ? body.language : "en"
+    const replyLanguage = TRANSLATE_LANGUAGES.find(option => option.code === languageCode)?.label || "English"
+    const languageNote = `\nREPLY LANGUAGE\nThe user chose ${replyLanguage} in Lifty's language menu: always reply in ${replyLanguage}, whatever language they write in (keep HelpLift's screen and button names in English).\n`
     const systemPrompt = `${SYSTEM_PROMPT}\nCURRENT USER\nThe user is ${await describeUser(supabase, user?.id ?? null)}.\n${languageNote}`
 
     // 3. Fallback loop across models - the last one that worked goes first,
