@@ -81,7 +81,6 @@ import { MessageDetailDialog } from "@/components/message-detail-dialog"
 import { FeedbackButton } from "@/components/feedback-button"
 import { SupportPlatformDialog } from "@/components/support-platform-dialog"
 import { SettingsDialog } from "@/components/settings-dialog"
-import { TimeGreeting } from "@/components/time-greeting"
 import { setReturnTo } from "@/lib/window-return"
 import { PasskeyPrompt } from "@/components/passkey-prompt"
 import { useNotificationAlerts } from "@/hooks/use-notification-alerts"
@@ -905,16 +904,13 @@ export default function GiverDashboardPage() {
     <main className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100 max-md:pb-24">
       <div className="mx-auto max-w-[2400px] px-4 md:px-10 py-6 md:py-14 space-y-6">
 
-        {/* Greeting for the time of day. */}
-        <div className="flex flex-wrap items-center justify-end max-md:flex-nowrap max-md:justify-between gap-x-8 max-md:gap-x-3 gap-y-3">
+        <div className="flex justify-end">
           <DashboardSearch items={searchItems} placeholder="Search sections, actions and settings..." />
-          <TimeGreeting name={giver?.name} firstNameOnly />
         </div>
 
         {/* --- HEADER --- */}
         <header className="flex flex-wrap items-center justify-between gap-5 max-md:gap-4">
-          {/* Kept simple: picture, name and account type. The greeting above
-              says hello, and the email address lives in Settings. */}
+          {/* Kept simple: picture, name and account type. The email address lives in Settings. */}
           <div className="flex items-center gap-4">
             <UserAvatar src={giver?.avatar_url} name={giver?.name} className="size-12 text-lg shadow-lg shadow-blue-600/20" />
             <div className="min-w-0">

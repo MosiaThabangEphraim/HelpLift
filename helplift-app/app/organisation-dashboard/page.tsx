@@ -37,7 +37,6 @@ import {
   Banknote,
   Wallet,
   Mail,
-  BarChart3,
   Settings,
   Trash2,
   Heart,
@@ -92,7 +91,6 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { OrganizationTeam } from "@/components/organization-team"
-import { OrganizationAnalytics } from "@/components/analytics/organization-analytics"
 import { OrganizationWallet } from "@/components/organization-wallet"
 import { UserAvatar } from "@/components/user-avatar"
 import { MessageViewToggle, SentMessages } from "@/components/sent-messages"
@@ -120,7 +118,6 @@ import { activateOnKey } from "@/lib/keyboard"
 import { FeedbackButton } from "@/components/feedback-button"
 import { SupportPlatformDialog } from "@/components/support-platform-dialog"
 import { SettingsDialog } from "@/components/settings-dialog"
-import { TimeGreeting } from "@/components/time-greeting"
 import { setReturnTo } from "@/lib/window-return"
 import { PasskeyPrompt } from "@/components/passkey-prompt"
 import { useNotificationAlerts } from "@/hooks/use-notification-alerts"
@@ -292,7 +289,7 @@ export default function OrganizationDashboardPage() {
   const [activeTab, setActiveTab] = useState("needs")
   // Smooth tab transitions (lib/use-tab-transition.ts), in tab-bar order.
   const { changeTab, tabMotion } = useTabTransition(
-    ["needs", "fulfillments", "interests", "donations", "wallet", "messages", "timeline", "stories", "gifts", "analytics", "team", "documents"],
+    ["needs", "fulfillments", "interests", "donations", "wallet", "messages", "timeline", "stories", "gifts", "team", "documents"],
     activeTab,
     setActiveTab
   )
@@ -1333,7 +1330,6 @@ export default function OrganizationDashboardPage() {
     { id: "timeline", label: "Timeline", icon: Newspaper, gradient: "from-blue-500 to-indigo-600", hint: "Your public updates, events and news" },
     { id: "stories", label: "Impact Stories", icon: BookOpen, gradient: "from-violet-500 to-purple-600", hint: "Share what your organization achieved" },
     { id: "gifts", label: "Gift Library", icon: Gift, gradient: "from-purple-500 to-fuchsia-600", hint: "Offerings from givers you can claim" },
-    { id: "analytics", label: "Analytics", icon: BarChart3, gradient: "from-indigo-500 to-blue-600", hint: "Needs, donations and engagement" },
     { id: "documents", label: "Documents", icon: FileText, gradient: "from-slate-500 to-slate-700", hint: "Verification documents" },
     ...(memberRole === "owner" ? [{ id: "team", label: "Team", icon: Users, gradient: "from-emerald-500 to-green-600", hint: "Invite and manage teammates" }] : []),
   ]
@@ -1411,10 +1407,8 @@ export default function OrganizationDashboardPage() {
     <main className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100 max-md:pb-24">
       <div className="mx-auto max-w-[2400px] px-4 md:px-10 py-6 md:py-14 space-y-6">
 
-        {/* Greeting for the time of day. */}
-        <div className="flex flex-wrap items-center justify-end max-md:flex-nowrap max-md:justify-between gap-x-8 max-md:gap-x-3 gap-y-3">
+        <div className="flex justify-end">
           <DashboardSearch items={searchItems} placeholder="Search sections, actions and settings..." />
-          <TimeGreeting name={organization?.name} />
         </div>
 
         {/* --- HEADER --- */}
@@ -1620,7 +1614,6 @@ export default function OrganizationDashboardPage() {
             <TabsTrigger value="timeline" data-tour="tab-timeline" data-tip="Your public timeline: updates, events and news" className="shrink-0 gap-1.5 px-2.5"><Newspaper className="w-4 h-4" />Timeline</TabsTrigger>
             <TabsTrigger value="stories" data-tour="tab-stories" className="shrink-0 gap-1.5 px-2.5"><BookOpen className="w-4 h-4" />Impact Stories</TabsTrigger>
             <TabsTrigger value="gifts" data-tour="tab-gifts" className="shrink-0 gap-1.5 px-2.5"><Gift className="w-4 h-4" />Gift Library</TabsTrigger>
-            <TabsTrigger value="analytics" data-tour="tab-analytics" className="shrink-0 gap-1.5 px-2.5"><BarChart3 className="w-4 h-4" />Analytics</TabsTrigger>
             {memberRole === "owner" && <TabsTrigger value="team" data-tour="tab-team" className="shrink-0 gap-1.5 px-2.5"><Users className="w-4 h-4" />Team</TabsTrigger>}
             {/* Documents lives as a header button now (next to Settings) - pulling it out of this row is what lets everything else fit on one line without scrolling. */}
             <TabsTrigger value="documents" className="hidden" />
@@ -2262,7 +2255,7 @@ export default function OrganizationDashboardPage() {
 
           {/* --- IMPACT STORIES TAB --- */}
           <TabsContent value="timeline" className={tabMotion}>
-            <div className="mx-auto max-w-3xl space-y-4">
+            <div className="space-y-4">
               <p className="text-sm text-slate-500 dark:text-slate-400 max-md:hidden">
                 Post updates, events, milestones and news. Posts appear straight away on your public profile and in the Organizations directory - no admin approval needed.
               </p>
@@ -2576,9 +2569,6 @@ export default function OrganizationDashboardPage() {
           )}
           </fieldset>
 
-          <TabsContent value="analytics" className={tabMotion}>
-            <OrganizationAnalytics needs={needs} donations={donations} interests={interests} fulfillments={fulfillments} />
-          </TabsContent>
         </Tabs>
 
         {/* --- BADGES --- */}

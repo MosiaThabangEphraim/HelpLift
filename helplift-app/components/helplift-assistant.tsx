@@ -359,16 +359,31 @@ export function HelpLiftAssistant() {
     try {
       // Error bubbles are only for the user to see - never part of the conversation sent to the model.
       const history = updatedMessages.filter(m => !m.isError).slice(-MAX_HISTORY).map(({ role, text }) => ({ role, text }))
-      const res = await fetch("/api/assistant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history, language: replyLanguage }),
-        // Never leave the typing dots spinning forever.
-        signal: AbortSignal.timeout(60_000),
-      }).catch((fetchError: any) => {
-        if (fetchError?.name === "TimeoutError") throw new Error("Lifty is taking too long to answer. Please try again.")
-        throw fetchError
-      })
+      const requestBody = JSON.stringify({ messages: history, language: replyLanguage })
+      const requestSignal = AbortSignal.timeout(60_000)
+      let res: Response | undefined
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          res = await fetch("/api/assistant", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: requestBody,
+            signal: requestSignal,
+          })
+        } catch (fetchError: any) {
+          if (fetchError?.name === "TimeoutError") {
+            throw new Error("Lifty is taking too long to answer. Please try again.")
+          }
+          if (attempt === 1) throw fetchError
+          await new Promise(resolve => window.setTimeout(resolve, 300))
+          continue
+        }
+
+        if (res.status < 500 || attempt === 1) break
+        await res.body?.cancel()
+        await new Promise(resolve => window.setTimeout(resolve, 300))
+      }
+      if (!res) throw new Error(FRIENDLY_ERROR)
 
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.reply) throw new Error(data.message || FRIENDLY_ERROR)

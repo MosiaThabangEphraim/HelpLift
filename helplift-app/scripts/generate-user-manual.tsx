@@ -138,7 +138,6 @@ const chapters: Chapter[] = [
       { h: "The top of the dashboard" },
       { list: [
         "Search (on a computer): find any section, action or setting on the dashboard. See Search below.",
-        "Greeting and clock: a greeting for the time of day, with the time and date. The clock can be hidden in Settings, under User interface.",
         "Main actions and places come first, such as Pledge a Gift, Public Profile, Documents, Badges and Organizations, then Support The Platform and Message Admin. On the giver dashboard these are kept simple: Pledge a Gift and Badges, with Organizations, Support The Platform and Message Admin under More.",
         "Then the round icon buttons: Feedback, Notifications (the bell), Refresh (loads the latest information without losing your filters), Theme (light, dark, high contrast or grayscale) and Home.",
         "Settings, and Sign out at the far right.",
@@ -149,7 +148,7 @@ const chapters: Chapter[] = [
       { h: "Search" },
       { p: "On a computer, the search box at the top left of every dashboard finds anything on it: sections such as Wallet or Timeline, actions such as Pledge a Gift or Message Admin, and settings such as Change password or Font size. It also finds things inside other screens, such as banking details in the Wallet, or each Platform settings field for administrators, and takes you straight to them. Type, or select the microphone and say what you are looking for, then choose a result. Press Ctrl and K, or the / key, to jump to the search box from anywhere on the page." },
       { h: "Tabs" },
-      { p: "Each dashboard is divided into tabs, such as Needs, Messages and Analytics. Select a tab to open it." },
+      { p: "Each dashboard is divided into sections and tabs. The sections available depend on your account type. Select one to open it." },
       { p: "On a phone, the tabs move to a bar at the bottom of the screen with the four sections you use most. Select More to see every other section, as well as quick actions such as Badges, Message Admin and Pledge a Gift. The name of the section you are in is shown above its content. Filters that would not fit on a small screen, such as categories and statuses, become a single dropdown." },
       { h: "Notifications" },
       { p: "The Notifications window lists new messages, offers, donations, approvals and announcements. Unread items are highlighted. Switch between All and Unread, select a notification to open it, or select Mark all as read. Notifications are also emailed to you unless you turn email notifications off in Settings." },
@@ -239,8 +238,6 @@ const chapters: Chapter[] = [
       { p: "In the Gift Library tab, browse offerings from givers and select Claim Offering for those that would help you. You can have one pending claim per offering. An administrator approves one claim per offering." },
       { h: "Profile, documents and sharing" },
       { p: "The buttons at the top of your dashboard open your Public Profile, your verification documents and a QR code for your profile that you can share or print. Verified organizations can download a compliance certificate as proof of verification for funders and partners." },
-      { h: "Analytics" },
-      { p: "The Analytics tab shows your needs, donations and engagement. Charts can be exported as CSV files or images." },
     ],
   },
   {

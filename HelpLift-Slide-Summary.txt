@@ -1,0 +1,86 @@
+HELPLIFT - SLIDE-READY SUMMARY
+
+SLIDE 1: WHAT IS HELPLIFT?
+
+HelpLift connects verified community organizations with people who want to help.
+
+- Organizations post community needs and updates.
+- Individuals and businesses can donate money, pledge goods or services, or contact organizations.
+- Administrators review and moderate activity to support transparency and trust.
+- Tagline: "Giving made transparent. Impact made real."
+
+
+SLIDE 2: TECHNOLOGIES USED
+
+- Frontend: Next.js 16, React 19, TypeScript
+- UI and styling: Tailwind CSS, shadcn/ui, Radix UI
+- Backend: Next.js API routes for application logic, validation, payments, email and integrations
+- Database and platform services: Supabase with PostgreSQL, authentication, file storage and Row Level Security (RLS)
+- AI: Google Gemini for the Lifty assistant, AI need writer, photo-to-pledge assistance and on-demand translation
+- Payments: PayFast, PayPal and EFT with proof-of-payment upload
+- Email: Brevo for transactional messages and notifications
+- Hosting: Vercel
+- Other tools: Leaflet/OpenStreetMap for maps, Recharts for analytics, and PWA support
+
+
+SLIDE 3: FEATURES FOR GIVERS
+
+- Browse verified organizations and open community needs.
+- Find needs by category, location, preferences or proximity.
+- Offer to help with needs and track interests and deliveries.
+- Donate through EFT, PayFast or PayPal, and access receipts.
+- Pledge goods, services or funds through the Gift Library.
+- Track donations, pledges, messages and fulfillment activity.
+- View organization profiles, impact stories and public timelines.
+
+
+SLIDE 4: FEATURES FOR ORGANIZATIONS
+
+- Create and manage needs, including goods, money or combined support requests.
+- Track funding progress and update what is still needed.
+- Review giver interests and manage deliveries and fulfillment evidence.
+- Receive donations and manage the organization wallet and withdrawal requests.
+- Manage team members with owner, manager and coordinator roles.
+- Upload verification documents and publish organization stories.
+- Share updates, events and milestones on a public timeline.
+- Use analytics to view organizational activity and impact.
+
+
+SLIDE 5: ADMINISTRATOR FEATURES
+
+- Review organizations and verify uploaded documents.
+- Moderate needs, Gift Library offerings, claims and impact stories.
+- Manage users, organization accounts, roles and platform settings.
+- Review withdrawal requests and oversee fulfillment records.
+- Send announcements through in-app notifications, email and site banners.
+- Monitor live platform activity, login attempts and site-visit reports.
+- View analytics and export selected reports.
+- Review user inquiries, feedback, developer reports and anonymous tip-offs.
+
+
+SLIDE 6: AI, ACCESSIBILITY AND SECURITY
+
+AI AND LANGUAGE
+- Lifty, a site-wide assistant that can answer HelpLift questions and look up relevant live platform information.
+- Voice input, read-aloud replies and optional "Hey Lifty" hands-free chat where supported by the browser and device.
+- AI-assisted need creation and photo-based gift-pledge drafting.
+- On-demand translation for selected platform content.
+
+ACCESSIBILITY AND USABILITY
+- Speech-to-text, text-to-speech and grammar checking.
+- Adjustable text size, reduced motion and optional click sounds.
+- Light, dark, high-contrast and grayscale themes.
+- Mobile-friendly dashboards and installable PWA with offline awareness.
+
+SECURITY AND TRUST
+- Database Row Level Security helps restrict access to data by role.
+- Authentication includes email/password, optional two-factor codes, passkeys and supported social sign-in.
+- Rate limits and account lockout help protect sensitive flows.
+- Organization verification and administrative moderation support platform accountability.
+
+
+SLIDE 7: CONCLUSION
+
+HelpLift brings community needs, practical giving and transparent follow-through into one platform. By combining donations, in-kind support, organization tools, administrative oversight and accessibility features, it helps people discover ways to contribute and helps organizations manage support from request through delivery.
+
+Note: Security and accessibility features describe implemented safeguards and options; they should not be presented as a certification or guarantee.

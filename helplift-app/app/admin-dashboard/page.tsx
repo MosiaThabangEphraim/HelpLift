@@ -93,7 +93,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { SettingsDialog } from "@/components/settings-dialog"
-import { TimeGreeting } from "@/components/time-greeting"
 import { setReturnTo } from "@/lib/window-return"
 import { ChangeEmailFlow, ChangePasswordFlow } from "@/components/account-security"
 import { MicButton } from "@/components/mic-button"
@@ -1098,10 +1097,8 @@ export default function AdminDashboardPage() {
     <main className="admin-readable min-h-screen bg-[#FAFAFA] dark:bg-[#0B1220] text-slate-900 dark:text-slate-100 max-md:pb-24">
       <div className="mx-auto max-w-[2400px] px-4 md:px-10 py-6 md:py-14 space-y-6">
 
-        {/* Greeting for the time of day. */}
-        <div className="flex flex-wrap items-center justify-end max-md:flex-nowrap max-md:justify-between gap-x-8 max-md:gap-x-3 gap-y-3">
+        <div className="flex justify-end">
           <DashboardSearch items={searchItems} placeholder="Search sections, actions and settings..." />
-          <TimeGreeting name={profiles.find(p => p.email === ownEmail)?.full_name} firstNameOnly />
         </div>
 
         {/* --- HEADER --- */}

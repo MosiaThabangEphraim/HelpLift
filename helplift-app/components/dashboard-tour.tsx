@@ -62,7 +62,7 @@ function stepsFor(role: TourRole, name?: string | null): TourStep[] {
     ]
   }
   return [
-    { title: `${hello}`, body: "Your organization is verified and ready to go. Here's a quick tour of everything on your dashboard - you can skip it any time." },
+    { title: `${hello}`, body: "Your organization is verified and ready to go. Here's a quick tour of your needs, offers, deliveries, messages and public updates - you can skip it any time." },
     { target: '[data-tour="search"]', title: "Search anything", body: "Looking for something? Type or speak here to jump straight to any section, action or setting - for example \"password\" or \"font size\". Press Ctrl+K from anywhere." },
     { target: '[data-tour="mobile-nav"]', title: "Your sections", body: "On your phone, the sections you use most are on this bar. Tap More for everything else, plus quick actions." },
     { target: '[data-tour="need-writer"]', title: "Post your first need", body: "Post a need opens a short form: say whether you need goods, money or both, fill in the details - or tap \"Let Lifty write it\" and describe it in a sentence. An admin reviews each need before it goes live, and \"Update still needed\" keeps givers up to date." },
@@ -75,7 +75,7 @@ function stepsFor(role: TourRole, name?: string | null): TourStep[] {
     { target: '[data-tour="tab-gifts"]', title: "Claim from the Gift Library", body: "Givers pledge goods, services and funds before a need exists. Browse them here and claim what helps you." },
     { target: '[data-tour="tab-team"]', title: "Bring in your team", body: "Invite teammates by email as Owners, Managers or Coordinators (who handle deliveries, messages and stories), so the whole team can work on HelpLift." },
     { target: '[data-tour="notifications"]', title: "Stay in the loop", body: "The bell shows new interests, donations, messages and approvals as they happen." },
-    { target: '[data-tour="settings"]', title: "Settings and your profile", body: "Settings is for your organization's details, two-factor sign-in and notifications, plus Accessibility and User interface (light or dark mode and colour schemes). More, at the top, holds your Public Profile, Documents, QR code, Badges and Organizations; ↻ refreshes your data, and Analytics is in the tabs." },
+    { target: '[data-tour="settings"]', title: "Settings and your profile", body: "Settings is for your organization's details, two-factor sign-in and notifications, plus Accessibility and User interface (light or dark mode and colour schemes). More, at the top, holds your Public Profile, Documents, QR code, Badges and Organizations; ↻ refreshes your data." },
     { target: '[data-tour="lifty"]', title: "Ask Lifty anything", body: "Lifty, your AI assistant, can explain any part of HelpLift - type, or tap the headphones and just talk." },
     { title: "You're all set", body: "Need more help? Download the user manual from Settings, ask Lifty, or take this tour again any time from Settings -> Take the tour." },
   ]
